@@ -35,7 +35,7 @@ These rules prevent 32k context blow-ups (e.g. chief @ 32768 overflowing on mono
 
 1. **Model routing**
    - Architectural exploration, large codebase mapping, and synthesis → switch to **`architect`** (`/model architect` or ai-mode `architect` @ 131072) **before** broad reads.
-   - **`chief`**, **`chat`**, and **`product`** (≤32k native on Qwen3-14B) are for dialogue and spec-sized work — not `**/*.js` sweeps or dumping tool transcripts.
+   - **`chief`** and **`product`** (≤32k native on Qwen3-14B) are for dialogue and spec-sized work — not `**/*.js` sweeps or dumping tool transcripts.
    - Each specialist pass uses that role’s model when available (`ai-mode prompt <role>`).
 
 2. **What to load**

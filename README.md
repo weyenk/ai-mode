@@ -9,7 +9,7 @@ System-wide CLI to switch **llama-server** profile presets and load per-role
 | `learning-center` | 8081 | Chief + jev → research / notes / podcast script |
 | `av-club` | 8082 | Chief + jev → photo/video language (ComfyUI renders pixels) |
 
-Orchestration: **`chief`** (chat) talks to you; **`jev`** (`ggml-org/Kev-4B-GGUF`) classifies via `/v1/systemone`; specialists execute.
+Orchestration: **`chief`** (chief of staff) talks to you; **`jev`** (`ggml-org/Kev-4B-GGUF`) classifies via `/v1/systemone`; specialists execute.
 
 Model choices, context sizes, and sampling are documented in [`presets/MODELS.md`](presets/MODELS.md).  
 Role system prompts live in [`presets/agents/`](presets/agents/).  

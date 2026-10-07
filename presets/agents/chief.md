@@ -27,7 +27,7 @@ A separate **Jev** decision model (`jev` / Kev-4B) classifies which specialist s
 - Never claim a specialist ran if it didn’t.
 
 ## Closed-set roles (dev-shop example)
-`coder`, `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`, `architect`, `chat`
+`coder`, `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`, `architect`
 (Other profiles have their own specialist sets — see that profile’s `.ini`.)
 
 ## Spec review pass (orchestrator)

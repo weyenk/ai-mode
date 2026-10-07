@@ -33,7 +33,7 @@ Native Qwen3 dense context is **32 768** (extend with YaRN only when needed).
 **Qwen3-Coder-Next** reports **262 144** native context in GGUF metadata.
 
 **Superpowers + ai-mode:** Architectural brainstorming and codebase exploration
-should run on **`architect`** (262144), not **`chief`** / **`chat`** (32768). After a
+should run on **`architect`** (262144), not **`chief`** (32768). After a
 design spec is approved for review, run **`spec-specialist-review`** before
 **`writing-plans`** on architect. See `skills/spec-specialist-review/SKILL.md`.
 
@@ -45,7 +45,6 @@ design spec is approved for review, run **`spec-specialist-review`** before
 | jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16384 |
 | coder | `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Fast agentic executor of architect's plans; Q8 via ggml-org for fidelity; local UD-Q8 kept as `coder-xl` | 131072 |
 | coder-xl | Local Qwen3-Coder-Next UD-Q8 | Heavy coder for rare under-specified / large jobs; already on disk | 131072 |
-| chat | `Qwen/Qwen3-30B-A3B-GGUF:Q4_K_M` | Open chat; architectural work → **architect** | 32768 |
 | product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Specs/stories + spec review pass (YaRN ctx) | 65536 |
 | research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Thinking variant for spikes / tradeoffs | 65536 |
 | docs | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | Strong prose; 128k-class Gemma 3; auto mmproj unused for text | 65536 |

@@ -83,6 +83,21 @@ def parse_agent_file(path: Path) -> tuple[dict[str, str], str]:
     return meta, text
 
 
+def resolve_agent_file(role: str, *, _seen: frozenset[str] | None = None) -> Path:
+    """Follow alias_of in frontmatter to the canonical agents/<role>.md."""
+    seen = _seen or frozenset()
+    if role in seen:
+        raise SystemExit(f"agent alias cycle involving '{role}'")
+    path = agents_dir() / f"{role}.md"
+    if not path.is_file():
+        return path
+    meta, _ = parse_agent_file(path)
+    target = meta.get("alias_of", "").strip()
+    if not target or target == role:
+        return path
+    return resolve_agent_file(target, _seen=seen | {role})
+
+
 def ensure_dirs() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -382,7 +397,7 @@ SYSTEMONE_WARM_BODY: dict[str, Any] = {
         "route": {
             "type": "choice",
             "instructions": "pick",
-            "criteria": {"coder": None, "chat": None},
+            "criteria": {"coder": None, "chief": None},
         }
     },
 }
@@ -483,7 +498,7 @@ def warm_one_model(
         return True
 
     is_decision = model_is_decision(entry)
-    probe = "systemone" if is_decision else "chat"
+    probe = "systemone" if is_decision else "completions"
     print(f"  {model_id}: warming via {probe}…", flush=True)
 
     err_holder: list[str] = []
@@ -1071,14 +1086,18 @@ def cmd_agents(args: argparse.Namespace) -> int:
 
 def cmd_prompt(args: argparse.Namespace) -> int:
     role = args.role
-    path = agents_dir() / f"{role}.md"
-    if not path.is_file():
+    stub = agents_dir() / f"{role}.md"
+    if not stub.is_file():
         available = sorted(
             p.stem for p in agents_dir().glob("*.md") if p.name.lower() != "readme.md"
         ) if agents_dir().is_dir() else []
         print(f"No agent guide for '{role}'", file=sys.stderr)
         if available:
             print("Available:", ", ".join(available), file=sys.stderr)
+        return 1
+    path = resolve_agent_file(role)
+    if not path.is_file():
+        print(f"No agent guide for alias target of '{role}'", file=sys.stderr)
         return 1
     meta, body = parse_agent_file(path)
     if args.json:
@@ -1122,7 +1141,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     wm = sub.add_parser(
         "warm",
-        help="Prefetch/load models on the active router (sequential; probes chat/systemone)",
+        help="Prefetch/load models on the active router (sequential; probes /chat/completions or /systemone)",
     )
     wm.add_argument(
         "models",

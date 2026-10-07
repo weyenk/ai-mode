@@ -47,8 +47,7 @@ Orchestrators use **two separate calls** (never one combined question):
         "qa": "Test plans, cases, edge cases, regression strategy",
         "security": "Threat model, secure review",
         "design": "UI and visual critique",
-        "ux": "Flows, usability, microcopy",
-        "chat": "Open discussion only, no specialist execution"
+        "ux": "Flows, usability, microcopy"
       }
     }
   }

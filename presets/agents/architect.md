@@ -35,4 +35,4 @@ When routed by **`spec-specialist-review`** (final specialist pass):
 
 ## Brainstorming / exploration
 
-For architectural brainstorming and large codebase mapping, prefer this role (131k ctx) over **`chief`** or **`chat`** (32k).
+For architectural brainstorming and large codebase mapping, prefer this role (131k ctx) over **`chief`** (32k).

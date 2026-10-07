@@ -34,26 +34,26 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
   which guideline to load (`presets/agents/jev.md`). Never mix role and layer in one
   question. Needs llama.cpp `/v1/systemone` (`ai-mode doctor`).
 - **architect** (`Qwen3-30B-A3B-Thinking-2507`, 262144) — **owns planning**, ADRs, and
-  large codebase mapping. All multi-step design lives here, not chief/chat.
+  large codebase mapping. All multi-step design lives here, not chief.
 - **coder** (`Qwen3-Coder-30B-A3B`, 131k) — agentic executor of architect's plans.
 - **coder-xl** (local `Qwen3-Coder-Next` UD-Q8, 131k) — heavy coder for rare
   under-specified / large jobs; already on disk.
-- **specialists** — `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`,
-  `chat`. One domain each; see their `agents/*.md`. **`qa`** authors tests using layer(s)
-  from jev Stage B; guidelines live in `presets/agents/qa/guidelines/` (skill:
+- **specialists** — `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`.
+  One domain each; see their `agents/*.md`. **`qa`** authors tests using layer(s) from
+  jev Stage B; guidelines live in `presets/agents/qa/guidelines/` (skill:
   `skills/testing-guidelines/SKILL.md`).
 
 Rules of the road:
 - **Planning is architect's job.** chief must not write implementation plans.
 - **chief routes via jev**, then synthesizes specialist output — don't forward walls of text.
-- **Never dump monorepo-wide explorations on ≤32k models** (chief/chat). Large reads → architect (256k).
+- **Never dump monorepo-wide explorations on ≤32k models** (chief). Large reads → architect (256k).
 
 ## Superpowers pipeline (Qwen Code)
 
 For test design in Superpowers/Qwen Code: chief routes to **qa** via jev Stage A, runs
 jev Stage B for `test_layer`, then qa loads the matching guideline file(s) before authoring.
 
-Architectural work runs on **architect** (256k), not chief/chat (32k).
+Architectural work runs on **architect** (256k), not chief (32k).
 
 1. **brainstorming** → writes `docs/superpowers/specs/…-design.md`; you approve it for review.
 2. **`/superpowers:spec-specialist-review`** → sequential passes: product → research →
