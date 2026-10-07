@@ -4,10 +4,8 @@
 
 **Related pages:** E2E tests sit at the top of the pyramid, above **Acceptance Tests** (UI with mocked backend). E2E tests involve all live services. They are the most expensive tests to write, run, and maintain — and the most powerful. Invest in them deliberately and sparingly.
 
-
 ## Table of Contents
 
-- [11. Quick Reference Checklist](#11-quick-reference-checklist)
 - [1. What Is an E2E Test?](#1-what-is-an-e2e-test)
 - [2. The Intellectual Foundation](#2-the-intellectual-foundation)
 - [3. What Belongs at the E2E Layer](#3-what-belongs-at-the-e2e-layer)
@@ -18,19 +16,8 @@
 - [8. Tooling](#8-tooling)
 - [9. CI and Deployment Integration](#9-ci-and-deployment-integration)
 - [10. When E2E Tests Are Not Enough](#10-when-e2e-tests-are-not-enough)
+- [11. Quick Reference Checklist](#11-quick-reference-checklist)
 - [Further Reading](#further-reading)
-
-## 11. Quick Reference Checklist
-
-* [ ] Test covers a critical user journey that cannot be reliably verified at a lower layer
-* [ ] No mocking of in-stack services — all services are live in the E2E environment
-* [ ] Third-party payment/regulated APIs are sandboxed
-* [ ] Test is idempotent — state is explicitly set up and cleaned up
-* [ ] No fixed waits — all async assertions wait on observable conditions
-* [ ] Test is a candidate for the smoke subset if it covers a critical path
-* [ ] Video/screenshot recording is enabled and artifacts are retained
-* [ ] Flakiness has been evaluated — test ran green 5 consecutive times before merging
-* [ ] CI step is correctly placed: after deploy, not on every PR
 
 ## 1. What Is an E2E Test?
 
@@ -125,6 +112,18 @@ Flaky E2E tests are the most expensive problem in a quality programme. They erod
 ## 10. When E2E Tests Are Not Enough
 
 E2E tests find bugs; they rarely prevent them efficiently. Their value is in the confidence they provide at deployment boundaries, not as a primary development feedback tool. If you are relying on E2E tests to catch bugs that should have been caught by unit, functional, or integration tests, invest in improving those lower layers — the E2E suite will become more reliable as a consequence.
+
+## 11. Quick Reference Checklist
+
+* [ ] Test covers a critical user journey that cannot be reliably verified at a lower layer
+* [ ] No mocking of in-stack services — all services are live in the E2E environment
+* [ ] Third-party payment/regulated APIs are sandboxed
+* [ ] Test is idempotent — state is explicitly set up and cleaned up
+* [ ] No fixed waits — all async assertions wait on observable conditions
+* [ ] Test is a candidate for the smoke subset if it covers a critical path
+* [ ] Video/screenshot recording is enabled and artifacts are retained
+* [ ] Flakiness has been evaluated — test ran green 5 consecutive times before merging
+* [ ] CI step is correctly placed: after deploy, not on every PR
 
 ## Further Reading
 

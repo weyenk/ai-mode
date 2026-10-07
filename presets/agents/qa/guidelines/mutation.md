@@ -4,7 +4,21 @@
 
 **Related pages:** These guidelines sit alongside the [Unit Testing Guidelines](Unit Testing Guidelines.md) — read that page first if you are new to the test strategy. For broader test-pyramid context, see the guidelines index in [`README.md`](README.md).
 
-## 1. Purpose and scope
+## Table of Contents
+
+- [1. What Is Mutation Testing?](#1-what-is-mutation-testing)
+- [2. When to run mutation testing](#2-when-to-run-mutation-testing)
+- [3. Approved tooling](#3-approved-tooling)
+- [4. Scope rules](#4-scope-rules)
+- [5. Mutation score thresholds](#5-mutation-score-thresholds)
+- [6. What to exclude from mutation](#6-what-to-exclude-from-mutation)
+- [7. Triage rubric (surviving mutants)](#7-triage-rubric-surviving-mutants)
+- [8. When to ignore a surviving mutant](#8-when-to-ignore-a-surviving-mutant)
+- [9. Post-run actions (standard playbook)](#9-post-run-actions-standard-playbook)
+- [10. Manual ad-hoc runs](#10-manual-ad-hoc-runs)
+- [11. CI and ownership](#11-ci-and-ownership)
+
+## 1. What Is Mutation Testing?
 
 **Mutation testing** evaluates the *quality* of your unit tests, not just whether code runs. A mutation tool injects small, intentional changes (mutants) into production code—flipping a boundary operator, removing a conditional, changing a return value—and re-runs your unit tests. If a test fails, the mutant is **killed**. If all tests still pass, the mutant **survived**, which usually means your tests do not assert strongly enough on that behavior.
 

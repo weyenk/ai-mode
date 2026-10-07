@@ -4,10 +4,8 @@
 
 **Related pages:** Component tests sit above [Unit Testing](Unit Testing Guidelines.md) (pure logic) and below **Acceptance Testing** (full user flows). This layer is primarily relevant to the React web app and React Native mobile app. Backend/API code should use the [Functional Testing Guidelines](Functional Testing Guidelines.md).
 
-
 ## Table of Contents
 
-- [14. Quick Reference Checklist](#14-quick-reference-checklist)
 - [1. What Is a Component Test?](#1-what-is-a-component-test)
 - [2. The Intellectual Foundation](#2-the-intellectual-foundation)
 - [3. The Guiding Principle: Test Like a User](#3-the-guiding-principle-test-like-a-user)
@@ -21,20 +19,8 @@
 - [11. Performance](#11-performance)
 - [12. Coverage Expectations](#12-coverage-expectations)
 - [13. Isolation from Other Test Types](#13-isolation-from-other-test-types)
+- [14. Quick Reference Checklist](#14-quick-reference-checklist)
 - [Further Reading](#further-reading)
-
-## 14. Quick Reference Checklist
-
-* [ ] Queries use `getByRole` or `getByLabelText` rather than `getByTestId`
-* [ ] No assertions on internal state, CSS classes, or component display names
-* [ ] Async interactions use `userEvent` with `await`; async assertions use `findBy*` or `waitFor`
-* [ ] Network requests are intercepted with msw, not mocked at the hook or client level
-* [ ] msw handlers are reset in `afterEach`
-* [ ] Loading, error, and empty states are exercised in addition to the happy path
-* [ ] No arbitrary `setTimeout` or `sleep` calls
-* [ ] Key screens include an axe accessibility assertion
-* [ ] Test names describe user-observable outcomes, not implementation steps
-* [ ] Snapshot tests (if any) are inline and the diff is reviewed carefully in the PR
 
 ## 1. What Is a Component Test?
 
@@ -218,6 +204,19 @@ describe('OrderSummary — empty state', () => {
 - Component test files use the naming convention `*.component.test.tsx` or `*.component.test.ts` for React Native.
 - Run with a dedicated script: `"test:component"` in `package.json`.
 - Separate CI step from unit tests — the failure message should tell you which layer broke.
+
+## 14. Quick Reference Checklist
+
+* [ ] Queries use `getByRole` or `getByLabelText` rather than `getByTestId`
+* [ ] No assertions on internal state, CSS classes, or component display names
+* [ ] Async interactions use `userEvent` with `await`; async assertions use `findBy*` or `waitFor`
+* [ ] Network requests are intercepted with msw, not mocked at the hook or client level
+* [ ] msw handlers are reset in `afterEach`
+* [ ] Loading, error, and empty states are exercised in addition to the happy path
+* [ ] No arbitrary `setTimeout` or `sleep` calls
+* [ ] Key screens include an axe accessibility assertion
+* [ ] Test names describe user-observable outcomes, not implementation steps
+* [ ] Snapshot tests (if any) are inline and the diff is reviewed carefully in the PR
 
 ## Further Reading
 

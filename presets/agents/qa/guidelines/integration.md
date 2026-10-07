@@ -4,10 +4,8 @@
 
 **Related pages:** Integration tests sit above [Functional Tests](Functional Testing Guidelines.md) (single-service, all deps mocked) and below full [E2E Tests](E2E Testing Guidelines.md) (entire stack live). Read the [Contract Testing Guidelines](Contract Testing Guidelines.md) before deciding whether integration tests are needed — strong contract coverage often makes them unnecessary.
 
-
 ## Table of Contents
 
-- [12. Quick Reference Checklist](#12-quick-reference-checklist)
 - [1. What Is an Integration Test?](#1-what-is-an-integration-test)
 - [2. Do You Actually Need Integration Tests?](#2-do-you-actually-need-integration-tests)
 - [3. The Decision: Do You Need Integration Tests?](#3-the-decision-do-you-need-integration-tests)
@@ -19,21 +17,8 @@
 - [9. Speed and CI Placement](#9-speed-and-ci-placement)
 - [10. Isolation from Other Test Types](#10-isolation-from-other-test-types)
 - [11. Coverage Expectations](#11-coverage-expectations)
+- [12. Quick Reference Checklist](#12-quick-reference-checklist)
 - [Further Reading](#further-reading)
-
-## 12. Quick Reference Checklist
-
-* [ ] Confirmed that functional + contract coverage does not already cover this risk before writing integration tests
-* [ ] At least one real collaborator is running (not a WireMock stub of the whole service) unless a justified exception applies
-* [ ] The collaborator's dependencies are controlled via WireMock stubs and test DB configuration — not from the test file
-* [ ] WireMock state is reset between tests (`wireMock.resetAll()` in `afterEach`)
-* [ ] Seed data is committed and documented; test identities are stable and human-readable
-* [ ] Error paths are covered for each real collaborator (404, 5xx, timeout) using WireMock scenarios
-* [ ] No real external / third-party API calls — these are always stubbed via WireMock
-* [ ] Services start once per test run (`beforeAll`), not once per test
-* [ ] Broad integration tests are in the nightly pipeline, not blocking every PR
-* [ ] Files use `*.integration.test.ts` naming and a dedicated `test:integration` script
-* [ ] If WireMock recordings are used as a fallback, stub mappings are backed by Pact contracts for organization-owned providers
 
 ## 1. What Is an Integration Test?
 
@@ -257,6 +242,20 @@ The main reason to choose integration tests over contract tests is to verify err
 | Collaborator with no Pact contract or unverified contracts | Narrow characterisation tests before modifying the integration |
 | Modified upstream call on a financial path | Integration test coverage must not decrease; update for the change |
 | Service with no upstream HTTP dependencies | Integration tests not required |
+
+## 12. Quick Reference Checklist
+
+* [ ] Confirmed that functional + contract coverage does not already cover this risk before writing integration tests
+* [ ] At least one real collaborator is running (not a WireMock stub of the whole service) unless a justified exception applies
+* [ ] The collaborator's dependencies are controlled via WireMock stubs and test DB configuration — not from the test file
+* [ ] WireMock state is reset between tests (`wireMock.resetAll()` in `afterEach`)
+* [ ] Seed data is committed and documented; test identities are stable and human-readable
+* [ ] Error paths are covered for each real collaborator (404, 5xx, timeout) using WireMock scenarios
+* [ ] No real external / third-party API calls — these are always stubbed via WireMock
+* [ ] Services start once per test run (`beforeAll`), not once per test
+* [ ] Broad integration tests are in the nightly pipeline, not blocking every PR
+* [ ] Files use `*.integration.test.ts` naming and a dedicated `test:integration` script
+* [ ] If WireMock recordings are used as a fallback, stub mappings are backed by Pact contracts for organization-owned providers
 
 ## Further Reading
 

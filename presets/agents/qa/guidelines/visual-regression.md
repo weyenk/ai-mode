@@ -4,10 +4,8 @@
 
 **Related pages:** Visual regression tests are embedded within **Acceptance Tests** (PR stage: `UIAcceptance_with_embedded_visual_regression_mockedAPI`) and run as a full matrix in the [Nightly Stage](E2E Testing Guidelines.md) (`Acceptance_full_matrix_with_visual_snapshots`). Visual regression is a *complement* to functional tests — it catches a class of regressions that no assertion library can express.
 
-
 ## Table of Contents
 
-- [14. Quick Reference Checklist](#14-quick-reference-checklist)
 - [1. What Is Visual Regression Testing?](#1-what-is-visual-regression-testing)
 - [2. The Intellectual Foundation](#2-the-intellectual-foundation)
 - [3. Where Visual Regression Sits in the Pipeline](#3-where-visual-regression-sits-in-the-pipeline)
@@ -21,20 +19,8 @@
 - [11. Coverage Expectations](#11-coverage-expectations)
 - [12. Visual Regression Test Smells](#12-visual-regression-test-smells)
 - [13. Legacy and Incremental Adoption](#13-legacy-and-incremental-adoption)
+- [14. Quick Reference Checklist](#14-quick-reference-checklist)
 - [Further Reading](#further-reading)
-
-## 14. Quick Reference Checklist
-
-* [ ] All CSS animations and transitions disabled before snapshot (`percyCSS` config or test setup)
-* [ ] Time is frozen; all dynamic dates and times use a fixed mock value
-* [ ] All network calls resolved before `percySnapshot()` is called
-* [ ] Third-party requests are blocked or mocked
-* [ ] Snapshot names are descriptive, stable, and include the state being captured
-* [ ] Viewports include at minimum 375px (mobile) and 1280px (desktop)
-* [ ] All significant component states have their own snapshot (not just the default state)
-* [ ] PR author has reviewed and either approved (intentional) or investigated (unintentional) all diffs before requesting review
-* [ ] No diffs have been auto-approved or approved without being viewed
-* [ ] New components have snapshots for all states and viewports before shipping
 
 ## 1. What Is Visual Regression Testing?
 
@@ -248,6 +234,19 @@ If the product supports multiple themes (light/dark, brand variations), each the
 - **Start with design system components.** The highest leverage starting point is a Storybook Percy run across all design system components. It catches regressions upstream before they propagate to every screen that uses the component.
 - **Add page-level snapshots for the critical path first.** Checkout and payment flows before everything else. Expand coverage incrementally from there.
 - **When you modify a component that has no visual snapshot, add one.** This is the visual equivalent of the Boy Scout Rule — leave it with more coverage than you found it.
+
+## 14. Quick Reference Checklist
+
+* [ ] All CSS animations and transitions disabled before snapshot (`percyCSS` config or test setup)
+* [ ] Time is frozen; all dynamic dates and times use a fixed mock value
+* [ ] All network calls resolved before `percySnapshot()` is called
+* [ ] Third-party requests are blocked or mocked
+* [ ] Snapshot names are descriptive, stable, and include the state being captured
+* [ ] Viewports include at minimum 375px (mobile) and 1280px (desktop)
+* [ ] All significant component states have their own snapshot (not just the default state)
+* [ ] PR author has reviewed and either approved (intentional) or investigated (unintentional) all diffs before requesting review
+* [ ] No diffs have been auto-approved or approved without being viewed
+* [ ] New components have snapshots for all states and viewports before shipping
 
 ## Further Reading
 

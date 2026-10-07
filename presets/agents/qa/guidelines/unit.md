@@ -4,39 +4,30 @@
 
 **Intent of this document:** These guidelines set a clear direction for net new code and AI-generated tests. They are *not* a mandate to rewrite legacy tests overnight. Where legacy constraints prevent full compliance, the expectation is that teams **do not regress** and make incremental improvements over time.
 
-
 ## Table of Contents
 
-- [12. Quick Reference Checklist](#12-quick-reference-checklist)
-- [1. Philosophy](#1-philosophy)
-- [2. FIRST Principles](#2-first-principles)
-- [3. Structure: Arrange – Act – Assert](#3-structure-arrange-act-assert)
-- [4. Naming](#4-naming)
-- [5. What to Test](#5-what-to-test)
-- [6. Mocking Philosophy](#6-mocking-philosophy)
-- [7. Code Coverage](#7-code-coverage)
-- [8. Test Smells — Things to Avoid](#8-test-smells-things-to-avoid)
-- [9. Legacy Code Strategy](#9-legacy-code-strategy)
-- [10. AI-Assisted and AI-Generated Tests](#10-ai-assisted-and-ai-generated-tests)
-- [11. Test-Driven Development (TDD)](#11-test-driven-development-tdd)
+- [1. What Is a Unit Test?](#1-what-is-a-unit-test)
+- [2. Philosophy](#2-philosophy)
+- [3. FIRST Principles](#3-first-principles)
+- [4. Structure: Arrange – Act – Assert](#4-structure-arrange-act-assert)
+- [5. Naming](#5-naming)
+- [6. What to Test](#6-what-to-test)
+- [7. Mocking Philosophy](#7-mocking-philosophy)
+- [8. Code Coverage](#8-code-coverage)
+- [9. Test Smells — Things to Avoid](#9-test-smells-things-to-avoid)
+- [10. Legacy Code Strategy](#10-legacy-code-strategy)
+- [11. AI-Assisted and AI-Generated Tests](#11-ai-assisted-and-ai-generated-tests)
+- [12. Test-Driven Development (TDD)](#12-test-driven-development-tdd)
+- [13. Quick Reference Checklist](#13-quick-reference-checklist)
 - [Further Reading](#further-reading)
 
-## 12. Quick Reference Checklist
+## 1. What Is a Unit Test?
 
-Use this when writing or reviewing tests for a new feature or bug fix:
+A unit test verifies the behaviour of a single unit of code — typically one function, method, or class — in isolation from its collaborators. External dependencies (databases, HTTP clients, clocks, file I/O) are replaced with test doubles so that failures point to logic inside the unit, not the environment.
 
-* [ ] Test name clearly describes the scenario and expected outcome
-* [ ] AAA sections are distinct and easy to identify
-* [ ] Tests pass independently in any order
-* [ ] No logic (loops or conditionals) in test bodies
-* [ ] Mocks replace real I/O, not internal domain logic
-* [ ] Happy path, edge cases, and at least one error path are covered
-* [ ] No skipped tests committed without a tracking ticket
-* [ ] Coverage does not decrease vs the base branch for modified files
-* [ ] New tests were verified to fail before the implementation was correct
-* [ ] AI-generated tests reviewed for meaningful, non-trivial assertions
+Unit tests sit at the base of the test pyramid: they should be fast, numerous, and precise. They complement — but do not replace — functional, integration, and end-to-end tests that exercise larger slices of the system.
 
-## 1. Philosophy
+## 2. Philosophy
 
 Tests are production code. They deserve the same care, naming discipline, and architectural thought as any other code you ship. A test suite that nobody trusts is worse than no test suite at all — it creates noise, slows CI, and breeds a culture of skipping failures.
 
@@ -47,7 +38,7 @@ The foremost practitioners — Kent Beck, Martin Fowler, Vladimir Khorikov, Mich
 - **Confidence, not coverage.** A number on a dashboard is not the goal; shipping working software is.
 - **Treat flaky tests as bugs.** A test that sometimes fails is always a problem.
 
-## 2. FIRST Principles
+## 3. FIRST Principles
 
 Coined by Robert C. Martin. Every unit test should be:
 
@@ -57,7 +48,7 @@ Coined by Robert C. Martin. Every unit test should be:
 - **Self-validating** — Pass or fail — no human interpretation required. Never write a test that logs a value for someone to eyeball.
 - **Timely (or Thorough)** — Write tests alongside the code, not after the PR is reviewed. AI-assisted development raises the bar here: generated code should arrive with generated tests.
 
-## 3. Structure: Arrange – Act – Assert
+## 4. Structure: Arrange – Act – Assert
 
 Every test has three distinct phases. Keep them visually separated with blank lines or comments.
 
@@ -80,7 +71,7 @@ it('returns the prorated refund when the line item qualifies', () => {
 - **No logic in the Assert section.** If you need a loop or conditional to assert, the test is too broad — split it.
 - **If Arrange exceeds \~10 lines,** extract a builder function or fixture to keep the intent clear.
 
-## 4. Naming
+## 5. Naming
 
 Test names are documentation. They are read far more often than they are written, and they are the first thing seen when CI fails.
 
@@ -106,7 +97,7 @@ describe('RefundCalculator', () => {
 - Do not restate the `describe` block in the `it` name.
 - Keep nesting to a maximum of 3 `describe` levels.
 
-## 5. What to Test
+## 6. What to Test
 
 ### Test this
 
@@ -123,7 +114,7 @@ describe('RefundCalculator', () => {
 - Infrastructure plumbing better covered at the integration layer (DB queries, HTTP clients)
 - Third-party library internals
 
-## 6. Mocking Philosophy
+## 7. Mocking Philosophy
 
 Mocking is powerful and dangerous in equal measure. Over-mocked suites give false confidence and make refactoring harder.
 
@@ -143,7 +134,7 @@ A **fake** (a lightweight working implementation — e.g., an in-memory reposito
 
 Asserting that a specific method was called a specific number of times with specific arguments is testing implementation. Assert on the observable outcome instead — unless the side-effect *is* the contract (e.g., verifying a domain event was published).
 
-## 7. Code Coverage
+## 8. Code Coverage
 
 | Context | Guideline |
 | --- | --- |
@@ -155,7 +146,7 @@ Asserting that a specific method was called a specific number of times with spec
 
 Use `/* istanbul ignore next */` or `@Generated` pragmas sparingly and always with a comment explaining why the branch is intentionally untestable.
 
-## 8. Test Smells — Things to Avoid
+## 9. Test Smells — Things to Avoid
 
 | Smell | Why it is a problem | Fix |
 | --- | --- | --- |
@@ -169,7 +160,7 @@ Use `/* istanbul ignore next */` or `@Generated` pragmas sparingly and always wi
 | **Weak or catch-all matchers** | Cryptic failure output; tests pass even when wrong | Use precise matchers (`toEqual`, `toStrictEqual`) over `toBeTruthy` / `toBeDefined` |
 | **Testing the mock, not the code** | Suite passes even when real code is broken | Ensure at least one test path exercises the real implementation |
 
-## 9. Legacy Code Strategy
+## 10. Legacy Code Strategy
 
 Based on Michael Feathers' *Working Effectively with Legacy Code* — the definitive guide to safely improving untested systems:
 
@@ -179,7 +170,7 @@ Based on Michael Feathers' *Working Effectively with Legacy Code* — the defini
 4. **The Boy Scout Rule:** Leave the test file better than you found it. Adding one good test while fixing a bug is always acceptable scope. Adding zero is a missed opportunity.
 5. **Don't let perfect be the enemy of good.** A low-quality characterization test on a critical path is better than no test. Improve it incrementally as context allows.
 
-## 10. AI-Assisted and AI-Generated Tests
+## 11. AI-Assisted and AI-Generated Tests
 
 AI coding tools (Claude Code and others) can generate test scaffolding rapidly. This raises both the ceiling and the floor for quality:
 
@@ -189,7 +180,7 @@ AI coding tools (Claude Code and others) can generate test scaffolding rapidly. 
 - **Tests generated alongside code must be real tests.** When a skill generates implementation and tests together, the tests must demonstrably fail before the implementation is correct. *Post-hoc assertions on a working system are not tests*.
 - **Use AI to surface untested paths.** Ask AI to identify branches, edge cases, and error conditions not yet covered in a module. This is one of the highest-leverage applications of AI in quality engineering.
 
-## 11. Test-Driven Development (TDD)
+## 12. Test-Driven Development (TDD)
 
 TDD is not mandated human written code, but it is strongly encouraged.   For AI-assisted or AI-generated code TDD is expected, with well-defined inputs and outputs, bug fixes, and any calculation or algorithm.
 
@@ -200,6 +191,21 @@ The Red – Green – Refactor cycle:
 3. **Refactor:** Clean up the implementation without breaking the test. This is where design emerges.
 
 Even if you do not practice strict TDD, always verify that a new test **fails before** the implementation is correct. A test that was never red may not be testing anything at all.
+
+## 13. Quick Reference Checklist
+
+Use this when writing or reviewing tests for a new feature or bug fix:
+
+* [ ] Test name clearly describes the scenario and expected outcome
+* [ ] AAA sections are distinct and easy to identify
+* [ ] Tests pass independently in any order
+* [ ] No logic (loops or conditionals) in test bodies
+* [ ] Mocks replace real I/O, not internal domain logic
+* [ ] Happy path, edge cases, and at least one error path are covered
+* [ ] No skipped tests committed without a tracking ticket
+* [ ] Coverage does not decrease vs the base branch for modified files
+* [ ] New tests were verified to fail before the implementation was correct
+* [ ] AI-generated tests reviewed for meaningful, non-trivial assertions
 
 ## Further Reading
 

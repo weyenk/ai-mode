@@ -4,10 +4,8 @@
 
 **Related pages:** These guidelines sit one layer above the [Unit Testing Guidelines](Unit Testing Guidelines.md). Read that page first if you are new to the test strategy. For multi-service and end-to-end coverage, see the Integration and Acceptance test guidelines.
 
-
 ## Table of Contents
 
-- [17. Quick Reference Checklist](#17-quick-reference-checklist)
 - [1. What Is a Functional Test?](#1-what-is-a-functional-test)
 - [2. The Intellectual Foundation](#2-the-intellectual-foundation)
 - [3. Scope — How to Define the Boundary](#3-scope-how-to-define-the-boundary)
@@ -24,24 +22,8 @@
 - [14. Legacy Code and Incremental Adoption](#14-legacy-code-and-incremental-adoption)
 - [15. AI-Generated Functional Tests](#15-ai-generated-functional-tests)
 - [16. Test Smells at the Functional Layer](#16-test-smells-at-the-functional-layer)
+- [17. Quick Reference Checklist](#17-quick-reference-checklist)
 - [Further Reading](#further-reading)
-
-## 17. Quick Reference Checklist
-
-Use this when writing or reviewing functional tests for a new feature, endpoint change, or bug fix:
-
-* [ ] Tests call through the real entry point (inject / exported handler), not internal functions
-* [ ] No real network calls — all external dependencies are fakes or stubs
-* [ ] All fakes are reset in `afterEach`
-* [ ] Happy path, auth (401/403), validation (400/422), and not-found (404) are covered for each endpoint
-* [ ] At least one dependency failure path is tested per endpoint
-* [ ] Response body is asserted (not just status code)
-* [ ] Every path + method in the OpenAPI spec has a corresponding test
-* [ ] Test file uses `*.functional.test.ts` naming and a separate test script
-* [ ] CI pipeline has a dedicated functional test step
-* [ ] No hardcoded tokens, secrets, or environment-specific URLs
-* [ ] Tests are independent and pass in any order
-* [ ] Coverage does not decrease vs the base branch for modified endpoints
 
 ## 1. What Is a Functional Test?
 
@@ -360,6 +342,23 @@ Many services will not have functional tests today. The expectation is not a big
 | **One giant test per endpoint** | Fails for multiple reasons; unclear which scenario broke | One `it` block per scenario |
 | **Fakes that never error** | Dependency failure paths are never exercised | Every fake should support both success and failure configuration |
 | **Missing auth tests** | Auth middleware bugs reach production untested | Every endpoint must have a test for missing and invalid auth |
+
+## 17. Quick Reference Checklist
+
+Use this when writing or reviewing functional tests for a new feature, endpoint change, or bug fix:
+
+* [ ] Tests call through the real entry point (inject / exported handler), not internal functions
+* [ ] No real network calls — all external dependencies are fakes or stubs
+* [ ] All fakes are reset in `afterEach`
+* [ ] Happy path, auth (401/403), validation (400/422), and not-found (404) are covered for each endpoint
+* [ ] At least one dependency failure path is tested per endpoint
+* [ ] Response body is asserted (not just status code)
+* [ ] Every path + method in the OpenAPI spec has a corresponding test
+* [ ] Test file uses `*.functional.test.ts` naming and a separate test script
+* [ ] CI pipeline has a dedicated functional test step
+* [ ] No hardcoded tokens, secrets, or environment-specific URLs
+* [ ] Tests are independent and pass in any order
+* [ ] Coverage does not decrease vs the base branch for modified endpoints
 
 ## Further Reading
 
