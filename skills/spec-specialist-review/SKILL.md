@@ -29,6 +29,49 @@ Invoke in Qwen Code:
 
 Or ask the agent to follow this skill by name after spec approval.
 
+## Qwen Code invocation (chief)
+
+**Chief stays the human-facing session.** Run each specialist pass by calling that role on the **ai-mode OpenAI API** — not by spawning Qwen `Task` / Agent subagents.
+
+<HARD-GATE>
+**NEVER** use Qwen Code’s `Task` (or any Agent tool) with `subagent_type` set to ai-mode role names: `product`, `research`, `security`, `ux`, `design`, `architect`, `coder`, `jev`, `qa`, `docs`, `fast`, `chief`, or any other `[section]` from the active preset. Those names are **llama-server model ids**, not built-in subagent types. Inventing `Task(subagent_type: "product")` does not load the specialist prompt or weights.
+</HARD-GATE>
+
+**Jev** is for open-ended routing (which specialist handles an ad-hoc ask). It is **not** a substitute for this fixed pipeline — run **six explicit passes** in order, one model per pass.
+
+### Option A — HTTP per pass (preferred)
+
+Human stays on **chief**. For each role in order `product` → `research` → `security` → `ux` → `design` → `architect`:
+
+1. `SYSTEM=$(ai-mode prompt <role>)`
+2. POST to `"$(ai-mode url)/chat/completions"` with JSON:
+   - `"model": "<role>"` (same string as the ini section)
+   - `"messages"`: `[{"role":"system","content": "<SYSTEM>"}, {"role":"user","content": "<SPEC_PATH + pass instruction>"}]`
+3. User message for the pass: absolute or repo-relative path to the approved design spec, plus a short lens-specific instruction (e.g. “Review for security threats; emit Blocking / Non-blocking / Proposed edits.”).
+4. Parse the assistant reply into the section template below; optionally save to `docs/superpowers/specs/reviews/…`.
+
+Example (adjust paths and escape as needed):
+
+```bash
+eval "$(ai-mode env)"
+ROLE=product
+SPEC_PATH=docs/superpowers/specs/YYYY-MM-DD-topic-design.md
+SYSTEM=$(ai-mode prompt "$ROLE")
+curl -sS "$(ai-mode url)/chat/completions" \
+  -H "Content-Type: application/json" \
+  -d "$(jq -n \
+    --arg model "$ROLE" \
+    --arg system "$SYSTEM" \
+    --arg user "Review $SPEC_PATH for product fit. Output: Blocking, Non-blocking, Proposed edits." \
+    '{model: $model, messages: [{role:"system", content:$system}, {role:"user", content:$user}]}')"
+```
+
+Chief collects all six sections, then merges (step 2 below).
+
+### Option B — `/model` per pass (fallback)
+
+Only if HTTP/curl is unavailable: for each role, `/model <role>`, run the pass with that role’s system behavior (`ai-mode prompt <role>` as guidance), emit the section, then **`/model chief`** before the next pass or merge. Do not leave the human on a specialist model between passes unless they chose to.
+
 ## Context discipline (read first)
 
 These rules prevent 32k context blow-ups (e.g. chief @ 32768 overflowing on monorepo globs):
@@ -66,11 +109,11 @@ Run in order. Skip a pass only with an explicit **N/A** reason in the output.
 | 5 | `design` | No UI / visual surface |
 | 6 | `architect` | Never for architectural specs — feasibility + plan readiness |
 
-**Per pass:**
+**Per pass:** use **Qwen Code invocation** above (Option A or B). Do not `Task(subagent_type: "<role>")`.
 
-1. Switch/load model for that role if your environment supports it.
-2. Load system guidance: `ai-mode prompt <role>` (or equivalent role prompt).
-3. Read `SPEC_PATH` only plus **minimal** codebase context needed for that lens.
+1. Load system guidance: `ai-mode prompt <role>`.
+2. Call that role via **`$(ai-mode url)/chat/completions`** with `"model": "<role>"` (Option A), or `/model <role>` for the pass only (Option B).
+3. Input = `SPEC_PATH` plus **minimal** codebase context for that lens — not monorepo globs in the chief session.
 4. Emit a section:
 
 ```markdown
@@ -139,15 +182,17 @@ digraph spec_review {
 
 ## ai-mode integration
 
-With `eval "$(ai-mode env)"` and dev-shop running:
+With `eval "$(ai-mode env)"` and dev-shop running (`ai-mode use dev-shop`):
 
 ```bash
-ai-mode prompt product    # system prompt for product pass
-ai-mode prompt architect  # use before large exploration or writing-plans
-curl "$(ai-mode url)/chat/completions" ...  # model id = role name from dev-shop.ini
+ai-mode url                 # → http://127.0.0.1:<port>/v1
+ai-mode prompt product      # system prompt for product pass
+ai-mode prompt architect    # architect pass + before writing-plans / large exploration
+# POST body: model = role name (ini [section]), messages = system + user (see Option A)
+curl -sS "$(ai-mode url)/chat/completions" -H "Content-Type: application/json" -d '…'
 ```
 
-Role context budgets are in `presets/MODELS.md` (catalog). Prefer **`architect`** for any pass that needs more than ~24k tokens of combined spec + code excerpts.
+`ai-mode url` already includes `/v1`; the chat endpoint is **`/chat/completions`** under that base. Role context budgets are in `presets/MODELS.md`. Prefer **`architect`** for any pass that needs more than ~24k tokens of combined spec + code excerpts.
 
 ## Principles
 

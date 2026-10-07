@@ -69,8 +69,10 @@ need to switch Qwen Code models for routing.
 3. **chief merges** reviews into the spec; you re-approve.
 4. Chief routes **`writing-plans`** to **architect**.
 
-Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md),
-symlinked into `~/.qwen/extensions/superpowers/skills/`.
+Skill sources (symlinked into `~/.qwen/extensions/superpowers/skills/`):
+
+- [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md)
+- [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) — ad-hoc “ask product/security/…” from chief
 
 ## CLI must-knows
 
@@ -104,6 +106,8 @@ which produces `Context size has been exceeded` near the real limit with a misle
 Set **`contextWindowSize`** on every local role entry to match `presets/<profile>.ini`
 (`chief` → **131072**, `architect` → **262144**, `coder` → **65536**, etc.; see `presets/MODELS.md`). Restart or reload
 Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder is orchestration-side.
+
+**Ad-hoc specialists:** When the human asks chief to consult **product**, **security**, or another role, chief must call that model on the ai-mode API (`SYSTEM=$(ai-mode prompt <role>)`, POST `"$(ai-mode url)/chat/completions"`) or briefly `/model <role>` — not Qwen `Task`/`Agent` subagents and not re-invoking **`using-superpowers`** as a delegate. Skill: [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) (symlinked like `spec-specialist-review`).
 
 ## Preset edit rules
 
