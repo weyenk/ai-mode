@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -918,6 +919,136 @@ def cmd_env(args: argparse.Namespace) -> int:
     return 0
 
 
+_RE_LOG_SPAWN = re.compile(
+    r"spawning server instance with name=(\w+) on port (\d+)"
+)
+_RE_LOG_PROXY = re.compile(r"proxying request to model (\w+) on port (\d+)")
+_RE_LOG_INSTANCE_EXIT = re.compile(r"instance name=(\w+) exited")
+_RE_LOG_CHILD_PORT = re.compile(r"^\[(\d+)\]")
+
+
+def _update_log_port_map(line: str, port_to_role: dict[int, str]) -> None:
+    m = _RE_LOG_SPAWN.search(line) or _RE_LOG_PROXY.search(line)
+    if m:
+        port_to_role[int(m.group(2))] = m.group(1)
+        return
+    m = _RE_LOG_INSTANCE_EXIT.search(line)
+    if m:
+        role = m.group(1)
+        for port, mapped in list(port_to_role.items()):
+            if mapped == role:
+                del port_to_role[port]
+
+
+def _annotate_log_line(
+    line: str, port_to_role: dict[int, str], *, annotate: bool
+) -> str:
+    text = line.rstrip("\n")
+    if not annotate:
+        return text
+    m = _RE_LOG_CHILD_PORT.match(text)
+    if not m:
+        return text
+    port = int(m.group(1))
+    role = port_to_role.get(port)
+    if role:
+        return f"[{role}:{port}]{text[m.end():]}"
+    return text
+
+
+def _log_line_matches_role(
+    line: str, role: str, port_to_role: dict[int, str]
+) -> bool:
+    if f"name={role}" in line:
+        return True
+    if re.search(rf"\bmodel {re.escape(role)}\b", line):
+        return True
+    m = _RE_LOG_CHILD_PORT.match(line.rstrip("\n"))
+    if m and port_to_role.get(int(m.group(1))) == role:
+        return True
+    return False
+
+
+def _process_log_line(
+    line: str,
+    port_to_role: dict[int, str],
+    *,
+    annotate: bool,
+    role: str | None,
+) -> str | None:
+    _update_log_port_map(line, port_to_role)
+    if role and not _log_line_matches_role(line, role, port_to_role):
+        return None
+    return _annotate_log_line(line, port_to_role, annotate=annotate)
+
+
+def _read_log_processed(
+    log: Path,
+    port_to_role: dict[int, str],
+    *,
+    annotate: bool,
+    role: str | None,
+) -> list[str]:
+    lines: list[str] = []
+    with log.open(encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            out = _process_log_line(raw, port_to_role, annotate=annotate, role=role)
+            if out is not None:
+                lines.append(out)
+    return lines
+
+
+def _rebuild_log_port_map(log: Path, port_to_role: dict[int, str]) -> None:
+    port_to_role.clear()
+    _read_log_processed(log, port_to_role, annotate=False, role=None)
+
+
+def _follow_log_file(
+    log: Path,
+    port_to_role: dict[int, str],
+    *,
+    annotate: bool,
+    role: str | None,
+) -> None:
+    """Read new lines as the log grows; rebuild port map on truncate/rotation."""
+    try:
+        inode = log.stat().st_ino
+    except FileNotFoundError:
+        inode = 0
+    while True:
+        try:
+            with log.open(encoding="utf-8", errors="replace") as f:
+                f.seek(0, os.SEEK_END)
+                end_pos = f.tell()
+                while True:
+                    raw = f.readline()
+                    if raw:
+                        end_pos = f.tell()
+                        out = _process_log_line(
+                            raw, port_to_role, annotate=annotate, role=role
+                        )
+                        if out is not None:
+                            print(out, flush=True)
+                        continue
+                    try:
+                        st_now = log.stat()
+                    except FileNotFoundError:
+                        time.sleep(0.25)
+                        break
+                    if st_now.st_ino != inode or st_now.st_size < end_pos:
+                        inode = st_now.st_ino if st_now.st_ino != inode else inode
+                        _rebuild_log_port_map(log, port_to_role)
+                        break
+                    time.sleep(0.25)
+        except FileNotFoundError:
+            time.sleep(0.25)
+            continue
+        try:
+            inode = log.stat().st_ino
+        except FileNotFoundError:
+            pass
+
+
 def cmd_logs(args: argparse.Namespace) -> int:
     state = load_state()
     name = args.profile or state.get("profile")
@@ -929,10 +1060,22 @@ def cmd_logs(args: argparse.Namespace) -> int:
     if not log.exists():
         print(f"No log yet: {log}", file=sys.stderr)
         return 1
+    annotate = not args.no_annotate
+    role = args.role
+    port_to_role: dict[int, str] = {}
+    processed = _read_log_processed(
+        log, port_to_role, annotate=annotate, role=role
+    )
+    tail = processed[-args.lines :] if args.lines > 0 else processed
+    for line in tail:
+        print(line)
     if args.follow:
-        subprocess.run(["tail", "-n", str(args.lines), "-f", str(log)])
-        return 0
-    subprocess.run(["tail", "-n", str(args.lines), str(log)])
+        try:
+            _follow_log_file(
+                log, port_to_role, annotate=annotate, role=role
+            )
+        except KeyboardInterrupt:
+            pass
     return 0
 
 
@@ -1185,6 +1328,16 @@ def build_parser() -> argparse.ArgumentParser:
     lg.add_argument("profile", nargs="?")
     lg.add_argument("-f", "--follow", action="store_true")
     lg.add_argument("-n", "--lines", type=int, default=80)
+    lg.add_argument(
+        "--no-annotate",
+        action="store_true",
+        help="Raw lines without [role:port] on child server entries",
+    )
+    lg.add_argument(
+        "--role",
+        metavar="NAME",
+        help="Only lines for this role (router mentions + child server)",
+    )
 
     sub.add_parser("url", help="Print active OpenAI base URL")
     sub.add_parser("models", help="List models from the active server")

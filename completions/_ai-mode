@@ -24,9 +24,20 @@ _ai-mode() {
     return
   fi
   case $words[2] in
-    use|restart|env|logs|init|agents)
+    use|restart|env|init|agents)
       profiles=(${(f)"$(ai-mode list 2>/dev/null | awk '/^ [* ] /{print $2}')"})
       _values 'profile' $profiles
+      ;;
+    logs)
+      if [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '-f' '-n' '--no-annotate' '--role'
+      elif [[ $words[CURRENT-1] == --role ]]; then
+        roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
+        _values 'role' $roles
+      else
+        profiles=(${(f)"$(ai-mode list 2>/dev/null | awk '/^ [* ] /{print $2}')"})
+        _values 'profile' $profiles
+      fi
       ;;
     warm)
       if (( CURRENT == 3 )); then

@@ -80,11 +80,11 @@ Verify any flag against `bin/ai-mode` before relying on it.
 - `ai-mode use <profile>` — stop any managed server, start the profile, then warm the
   `warm =` list. Flags: `--force`, `--timeout`, `--no-warm`, `--warm-timeout`.
 - `ai-mode warm [roles…]` — prefetch/load on the active router (sequential, safe for
-  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder; else chief,jev,architect). `--all` warms every ini
+  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder,fast; else chief,jev,architect). `--all` warms every ini
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode stop [--force]` — stop the managed server.
-- Also: `list`, `which`/`status`, `restart`, `logs [-f] [-n]`, `url`, `models`, `env`,
+- Also: `list`, `which`/`status`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `env`,
   `agents`, `init <name> [--with-ini] [--port] [--models-max]`.
 
 Shell env: `eval "$(ai-mode env)"` exports `OPENAI_BASE_URL` for the active profile.
@@ -113,8 +113,8 @@ Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder
 - **Keep `presets/MODELS.md` in sync** with the ini — model choice, ctx, and sampling
   rationale live there.
 - `models-max` caps resident models; warming still prefetches the rest. dev-shop uses
-  `models-max = 4` with **`warm = chief,jev,architect,coder`** so the full plan→execute stack
-  is resident at startup (`fast` loads on demand for Auto-mode classifiers).
+  `models-max = 5` with **`warm = chief,jev,architect,coder,fast`** so orchestration, plan→execute,
+  and Qwen Auto-mode classifiers (~98 GiB) are resident at startup on 128 GB.
 - Thinking models (architect's Thinking-2507) keep thinking **on** — do **not** set
   `enable_thinking=false` for them.
 

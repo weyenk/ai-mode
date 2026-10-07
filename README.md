@@ -47,9 +47,9 @@ curl -s "$(ai-mode url)/chat/completions" \
   }')"
 ```
 
-Also: `stop`, `restart`, `logs [-f]`, `url`, `models`, `init <name> --with-ini`.
+Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `init <name> --with-ini`.
 
-**Prefetch (avoid first-request HF downloads):** After the router is healthy, `ai-mode use dev-shop` sequentially warms the profile’s `warm = …` list (dev-shop default: `chief`, `jev`, `architect`, `coder`). Each role is probed via `/v1/chat/completions` or `/v1/systemone` until its weight is downloaded/loaded. Override with `warm = …` in `<profile>.mode`, `ai-mode warm chief architect`, `ai-mode warm --all` (every ini section — large downloads), or skip with `--no-warm`. With `models-max = 4`, only four models stay resident; warming still prefetches the rest for the next request. Tune per-model wait with `--warm-timeout 900`.
+**Prefetch (avoid first-request HF downloads):** After the router is healthy, `ai-mode use dev-shop` sequentially warms the profile’s `warm = …` list (dev-shop default: `chief`, `jev`, `architect`, `coder`, `fast`). Each role is probed via `/v1/chat/completions` or `/v1/systemone` until its weight is downloaded/loaded. Override with `warm = …` in `<profile>.mode`, `ai-mode warm chief architect`, `ai-mode warm --all` (every ini section — large downloads), or skip with `--no-warm`. With dev-shop `models-max = 5`, those five models stay resident (~98 GiB); warming still prefetches other roles for the next request. Tune per-model wait with `--warm-timeout 900`.
 
 ## Adding a profile later
 
