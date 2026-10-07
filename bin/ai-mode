@@ -744,7 +744,7 @@ version = 1
 jinja = 1
 flash-attn = on
 n-gpu-layers = 99
-mmap = 1
+load-mode = mmap
 
 ; [example]
 ; hf = unsloth/Qwen3-4B-GGUF:Q4_K_M
