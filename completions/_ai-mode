@@ -14,6 +14,7 @@ _ai-mode() {
     'logs:Tail logs'
     'url:Print base URL'
     'models:List server models'
+    'warm:Prefetch/load models'
     'init:Scaffold a new profile'
     'agents:List agent guides'
     'prompt:Print role system prompt'
@@ -26,6 +27,14 @@ _ai-mode() {
     use|restart|env|logs|init|agents)
       profiles=(${(f)"$(ai-mode list 2>/dev/null | awk '/^ [* ] /{print $2}')"})
       _values 'profile' $profiles
+      ;;
+    warm)
+      if (( CURRENT == 3 )); then
+        _values 'option' '--all' '--profile' '--warm-timeout'
+      elif (( CURRENT >= 3 )); then
+        models=(${(f)"$(ai-mode models 2>/dev/null | grep -v '^---')"})
+        _values 'model' $models
+      fi
       ;;
     prompt)
       roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})

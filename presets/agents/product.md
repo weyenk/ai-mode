@@ -25,3 +25,11 @@ Turn fuzzy ideas into shippable specs: problem, users, scope, stories, acceptanc
 4. Acceptance criteria
 5. Out of scope
 6. Risks & open questions
+
+## Spec review pass
+
+When routed by **`spec-specialist-review`**:
+
+- Read the approved design spec path plus minimal codebase context only.
+- Emit `## product review` with **Blocking**, **Non-blocking**, **Proposed edits** (scope, stories, acceptance criteria, metrics).
+- No implementation and no **`writing-plans`** — architect owns planning after the full review pipeline.

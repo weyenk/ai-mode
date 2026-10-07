@@ -21,3 +21,11 @@ Critique this UI design.
 - Identify friction, dead ends, and unclear affordances.
 - Suggest microcopy alternatives.
 - Separate UX recommendations from pure visual polish.
+
+## Spec review pass
+
+When routed by **`spec-specialist-review`** (skip if no user-facing flows):
+
+- Read the design spec; optional screenshots with trigger phrase for VL critique.
+- Emit `## ux review` with **Blocking**, **Non-blocking**, **Proposed edits** (flows, IA, copy, errors).
+- No implementation and no **`writing-plans`**.

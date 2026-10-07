@@ -12,7 +12,8 @@ System-wide CLI to switch **llama-server** profile presets and load per-role
 Orchestration: **`chief`** (chat) talks to you; **`jev`** (`ggml-org/Kev-4B-GGUF`) classifies via `/v1/systemone`; specialists execute.
 
 Model choices, context sizes, and sampling are documented in [`presets/MODELS.md`](presets/MODELS.md).  
-Role system prompts live in [`presets/agents/`](presets/agents/).
+Role system prompts live in [`presets/agents/`](presets/agents/).  
+Working in this repo (human or LLM)? Read [`AGENTS.md`](AGENTS.md).
 
 ## Install
 
@@ -48,6 +49,8 @@ curl -s "$(ai-mode url)/chat/completions" \
 
 Also: `stop`, `restart`, `logs [-f]`, `url`, `models`, `init <name> --with-ini`.
 
+**Prefetch (avoid first-request HF downloads):** After the router is healthy, `ai-mode use dev-shop` sequentially warms the profile’s `warm = …` list (dev-shop default: `chief`, `jev`, `architect`). Each role is probed via `/v1/chat/completions` or `/v1/systemone` until its weight is downloaded/loaded. Override with `warm = …` in `<profile>.mode`, `ai-mode warm chief architect`, `ai-mode warm --all` (every ini section — large downloads), or skip with `--no-warm`. With `models-max = 4`, only four models stay resident; warming still prefetches the rest for the next request. Tune per-model wait with `--warm-timeout 900`.
+
 ## Adding a profile later
 
 1. `ai-mode init my-lab --with-ini --port 8083`
@@ -57,7 +60,19 @@ Also: `stop`, `restart`, `logs [-f]`, `url`, `models`, `init <name> --with-ini`.
 
 ## Notes
 
-- First `hf = …` request downloads into `~/.cache/llama.cpp` (can be large).
+- First `hf = …` request downloads into `~/.cache/llama.cpp` (can be large). Use `ai-mode warm` or let `ai-mode use` prefetch orchestration models.
 - VL roles auto-pull `mmproj` when the HF repo includes one.
 - For `design` / `ux` screenshots, user text should include: `Critique this UI design.`
 - Podcast **audio** and **image/video generation** are outside llama-server (TTS / ComfyUI).
+
+## Superpowers pipeline (Qwen Code)
+
+Architectural work: use **`architect`** for exploration (256k ctx), not **`chief`** (32k).
+
+After brainstorming writes `docs/superpowers/specs/…-design.md` and you approve it for review:
+
+1. `/superpowers:spec-specialist-review` — product → research → security → ux → design → architect
+2. **`chief`** merges reviews into the spec; you re-approve
+3. Switch to **`architect`**, then `/superpowers:writing-plans`
+
+Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md) (symlinked into `~/.qwen/extensions/superpowers/skills/`). Brainstorming overlay: backup at `~/.qwen/.../brainstorming/SKILL.md.bak`.

@@ -21,3 +21,11 @@ Critique this UI design.
 - Prefer one coherent direction over a laundry list of trends.
 - Call out accessibility and mobile issues.
 - If generating HTML/CSS, keep it self-contained unless asked otherwise.
+
+## Spec review pass
+
+When routed by **`spec-specialist-review`** (skip if no UI surface):
+
+- Read the design spec; add screenshots or mock references when present.
+- Emit `## design review` with **Blocking**, **Non-blocking**, **Proposed edits** (visual hierarchy, a11y, layout).
+- No implementation and no **`writing-plans`**.

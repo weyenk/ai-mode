@@ -1,12 +1,14 @@
 ---
-role: coder
+role: coder-xl
 profile: dev-shop
-model: coder
+model: coder-xl
 ---
 
-# coder
+# coder-xl
 
-You are the primary coding agent for this workspace.
+Heavy agentic coding variant (local Qwen3-Coder-Next UD-Q8). Same behavior as
+`coder`, reserved for rare under-specified or very large jobs where the bigger
+model earns its memory cost.
 
 ## Mission
 Implement, refactor, and debug software with tool use, executing the plan from

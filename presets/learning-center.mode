@@ -3,3 +3,4 @@ description = Research → notes → podcast — chief + Kev-4B jev router
 port = 8081
 models-max = 3
 host = 127.0.0.1
+warm = chief,jev

@@ -32,22 +32,34 @@ From Qwen GGUF cards:
 Native Qwen3 dense context is **32 768** (extend with YaRN only when needed).
 **Qwen3-Coder-Next** reports **262 144** native context in GGUF metadata.
 
+**Superpowers + ai-mode:** Architectural brainstorming and codebase exploration
+should run on **`architect`** (262144), not **`chief`** / **`chat`** (32768). After a
+design spec is approved for review, run **`spec-specialist-review`** before
+**`writing-plans`** on architect. See `skills/spec-specialist-review/SKILL.md`.
+
 ## dev-shop
 
 | Role | Model | Why | ctx |
 | --- | --- | --- | --- |
-| chief | `unsloth/Qwen3-30B-A3B-GGUF:Q4_K_M` | User-facing MoE lead | 32768 |
+| chief | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Lightweight user-facing router (official); planning delegated to architect; **not** for monorepo exploration | 32768 |
 | jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16384 |
-| coder | Local Qwen3-Coder-Next UD-Q8 | Official agentic coding + tools; already on disk | 131072 |
-| chat | same as chief (alias) | Open-ended brainstorming | 32768 |
-| product | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | Better long-form specs than 8B; guided by agent md | 32768 |
-| research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Thinking variant for spikes / tradeoffs | 40960 |
+| coder | `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Fast agentic executor of architect's plans; Q8 via ggml-org for fidelity; local UD-Q8 kept as `coder-xl` | 131072 |
+| coder-xl | Local Qwen3-Coder-Next UD-Q8 | Heavy coder for rare under-specified / large jobs; already on disk | 131072 |
+| chat | `Qwen/Qwen3-30B-A3B-GGUF:Q4_K_M` | Open chat; architectural work → **architect** | 32768 |
+| product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Specs/stories + spec review pass (YaRN ctx) | 65536 |
+| research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Thinking variant for spikes / tradeoffs | 65536 |
 | docs | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | Strong prose; 128k-class Gemma 3; auto mmproj unused for text | 65536 |
 | qa | `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Code-aware test design (not Qwen2.5-Coder-7B) | 65536 |
-| security | `deer-sec/CyberStag-Security-26B-A4B-V1-Q4_K_M-GGUF` | Security-tuned MoE GGUF | 32768 |
-| design | `stefans71/frontend-design-expert-8b:Q4_K_M` | UI/frontend specialist (VL) + mmproj in repo | 8192 |
-| ux | same as design (alias) or VL general — see ini | Screenshot critique trigger phrase in agent md | 8192 |
-| architect | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | Solid reasoning for ADRs at mid size | 32768 |
+| security | `deer-sec/CyberStag-Security-26B-A4B-V1-Q4_K_M-GGUF` | Security-tuned MoE GGUF | 65536 |
+| design | `stefans71/frontend-design-expert-8b:Q4_K_M` | UI/frontend specialist (VL) + mmproj in repo | 16384 |
+| ux | same as design (alias) or VL general — see ini | Screenshot critique trigger phrase in agent md | 16384 |
+| architect | `bartowski/Qwen_Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | **Planning owner** — thinking model, native 256k ctx; alt `Qwen/Qwen3-32B-GGUF:Q4_K_M` (official, dense, YaRN>32k) | 262144 |
+
+With these footprints any resident trio (chief + jev + one specialist) is ~48 GB, so
+`models-max = 4` can keep `architect` + `coder` co-resident for a plan→execute handoff
+with no reload. No official Qwen GGUF exists for the Thinking-2507 or Coder-30B-A3B
+variants, so trusted non-Unsloth quantizers are used (bartowski / lmstudio-community /
+ggml-org); the earlier Unsloth Qwen3-30B-A3B degeneration does not apply to these.
 
 ## learning-center
 

@@ -1,5 +1,6 @@
 # ai-mode metadata for profile "dev-shop"
 description = Coding studio — chief + Kev-4B jev router + specialists
 port = 8080
-models-max = 3
+models-max = 4
 host = 127.0.0.1
+warm = chief,jev,architect
