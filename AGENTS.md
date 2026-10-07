@@ -80,7 +80,7 @@ Verify any flag against `bin/ai-mode` before relying on it.
 - `ai-mode use <profile>` — stop any managed server, start the profile, then warm the
   `warm =` list. Flags: `--force`, `--timeout`, `--no-warm`, `--warm-timeout`.
 - `ai-mode warm [roles…]` — prefetch/load on the active router (sequential, safe for
-  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,fast; else chief,jev,architect). `--all` warms every ini
+  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder; else chief,jev,architect). `--all` warms every ini
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode stop [--force]` — stop the managed server.
@@ -101,7 +101,7 @@ which produces `Context size has been exceeded` near the real limit with a misle
 “200k · 15% used” bar if `contextWindowSize` is wrong.
 
 Set **`contextWindowSize`** on every local role entry to match `presets/<profile>.ini`
-(`chief` → **131072**, `architect` → 262144, etc.; see `presets/MODELS.md`). Restart or reload
+(`chief` → **131072**, `architect` → **262144**, `coder` → **65536**, etc.; see `presets/MODELS.md`). Restart or reload
 Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder is orchestration-side.
 
 ## Preset edit rules
@@ -113,7 +113,8 @@ Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder
 - **Keep `presets/MODELS.md` in sync** with the ini — model choice, ctx, and sampling
   rationale live there.
 - `models-max` caps resident models; warming still prefetches the rest. dev-shop uses
-  `models-max = 4` so architect + coder can stay co-resident for a plan→execute handoff.
+  `models-max = 4` with **`warm = chief,jev,architect,coder`** so the full plan→execute stack
+  is resident at startup (`fast` loads on demand for Auto-mode classifiers).
 - Thinking models (architect's Thinking-2507) keep thinking **on** — do **not** set
   `enable_thinking=false` for them.
 
