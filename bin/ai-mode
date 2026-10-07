@@ -61,6 +61,27 @@ def presets_dir() -> Path:
     return DEFAULT_PRESETS
 
 
+def agents_dir() -> Path:
+    return presets_dir() / "agents"
+
+
+def parse_agent_file(path: Path) -> tuple[dict[str, str], str]:
+    """Return (frontmatter, body) for agents/<role>.md."""
+    text = path.read_text()
+    meta: dict[str, str] = {}
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            for raw in parts[1].splitlines():
+                line = raw.strip()
+                if not line or ":" not in line:
+                    continue
+                k, _, v = line.partition(":")
+                meta[k.strip()] = v.strip().strip("\"'")
+            return meta, parts[2].lstrip("\n")
+    return meta, text
+
+
 def ensure_dirs() -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -193,17 +214,18 @@ def http_get_json(url: str, timeout: float = 3.0) -> Any | None:
 
 
 def find_llama_server() -> str | None:
-    which = subprocess.run(["which", "llama-server"], capture_output=True, text=True)
-    if which.returncode == 0 and which.stdout.strip():
-        return which.stdout.strip()
+    # Prefer a source-built HEAD under ~/.local (newer than Homebrew bottles).
     for candidate in (
+        HOME / ".local" / "bin" / "llama-server",
         "/opt/homebrew/bin/llama-server",
         "/usr/local/bin/llama-server",
-        HOME / ".local" / "bin" / "llama-server",
     ):
         p = Path(candidate)
         if p.is_file() and os.access(p, os.X_OK):
             return str(p)
+    which = subprocess.run(["which", "llama-server"], capture_output=True, text=True)
+    if which.returncode == 0 and which.stdout.strip():
+        return which.stdout.strip()
     return None
 
 
@@ -524,6 +546,32 @@ def cmd_doctor(_: argparse.Namespace) -> int:
     print(f"llama-server: {llama or 'NOT FOUND'}")
     if not llama:
         issues.append("Install llama.cpp (brew install llama.cpp)")
+    else:
+        ver = subprocess.run([llama, "--version"], capture_output=True, text=True)
+        ver_line = (ver.stdout or ver.stderr or "").strip().splitlines()[:1]
+        if ver_line:
+            print(f"version:      {ver_line[0]}")
+        # Decision models (Jev) need /v1/systemone in the server binary
+        try:
+            impl = Path(llama).resolve().parent.parent / "lib" / "libllama-server-impl.dylib"
+            has_systemone = False
+            if impl.is_file():
+                probed = subprocess.run(
+                    ["strings", str(impl)], capture_output=True, text=True, timeout=10
+                )
+                has_systemone = "/v1/systemone" in (probed.stdout or "")
+            else:
+                probed = subprocess.run(
+                    ["strings", llama], capture_output=True, text=True, timeout=10
+                )
+                has_systemone = "/v1/systemone" in (probed.stdout or "")
+            print(f"/v1/systemone: {'OK (Jev/Kev ready)' if has_systemone else 'MISSING'}")
+            if not has_systemone:
+                issues.append(
+                    "llama-server lacks /v1/systemone — upgrade llama.cpp (brew install --HEAD llama.cpp) for jev/Kev-4B"
+                )
+        except Exception as e:
+            print(f"/v1/systemone: could not probe ({e})")
 
     print(f"config:       {CONFIG_DIR}")
     print(f"state:        {STATE_FILE}{'  (present)' if STATE_FILE.exists() else '  (empty)'}")
@@ -550,6 +598,18 @@ def cmd_doctor(_: argparse.Namespace) -> int:
                 print(f"      {clash.strip()}")
             if not p.ini.is_file():
                 issues.append(f"Missing ini for {p.name}")
+            # Agent guide coverage
+            missing_agents = [
+                role
+                for role in ini_sections(p.ini)
+                if not (agents_dir() / f"{role}.md").is_file()
+            ]
+            if missing_agents:
+                issues.append(
+                    f"{p.name}: missing agents/*.md for: {', '.join(missing_agents)}"
+                )
+            else:
+                print(f"      agents: OK ({len(ini_sections(p.ini))} roles)")
 
     print()
     active = state.get("profile")
@@ -718,6 +778,65 @@ host = 127.0.0.1
     return 0
 
 
+def cmd_agents(args: argparse.Namespace) -> int:
+    adir = agents_dir()
+    if not adir.is_dir():
+        print(f"No agents directory at {adir}")
+        return 1
+    files = sorted(adir.glob("*.md"))
+    files = [f for f in files if f.name.lower() != "readme.md"]
+    if not files:
+        print(f"No agent guides in {adir}")
+        return 1
+
+    # Map roles declared in presets
+    role_profiles: dict[str, list[str]] = {}
+    for p in discover_profiles():
+        for role in ini_sections(p.ini):
+            role_profiles.setdefault(role, []).append(p.name)
+
+    print(f"Agents: {adir}")
+    print()
+    for f in files:
+        meta, _ = parse_agent_file(f)
+        role = meta.get("role") or f.stem
+        profile = meta.get("profile") or ",".join(role_profiles.get(role, [])) or "?"
+        trigger = meta.get("trigger")
+        mark = ""
+        if args.profile and profile != args.profile and args.profile not in role_profiles.get(role, []):
+            continue
+        line = f"  {role:<18} profile={profile}"
+        if trigger:
+            line += f"  trigger={trigger}"
+        if role not in role_profiles:
+            line += "  (no matching ini section)"
+        print(line + mark)
+    return 0
+
+
+def cmd_prompt(args: argparse.Namespace) -> int:
+    role = args.role
+    path = agents_dir() / f"{role}.md"
+    if not path.is_file():
+        available = sorted(
+            p.stem for p in agents_dir().glob("*.md") if p.name.lower() != "readme.md"
+        ) if agents_dir().is_dir() else []
+        print(f"No agent guide for '{role}'", file=sys.stderr)
+        if available:
+            print("Available:", ", ".join(available), file=sys.stderr)
+        return 1
+    meta, body = parse_agent_file(path)
+    if args.json:
+        print(json.dumps({"role": role, "path": str(path), "meta": meta, "prompt": body}, indent=2))
+        return 0
+    if args.raw:
+        print(path.read_text(), end="" if path.read_text().endswith("\n") else "\n")
+        return 0
+    # Default: body only (ideal system prompt)
+    sys.stdout.write(body if body.endswith("\n") else body + "\n")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog=APP,
@@ -768,6 +887,14 @@ def build_parser() -> argparse.ArgumentParser:
     im.add_argument("--with-ini", action="store_true", help="Also create a starter .ini")
     im.add_argument("--force", action="store_true")
 
+    ag = sub.add_parser("agents", help="List agent markdown guides")
+    ag.add_argument("--profile", help="Filter by profile name")
+
+    pr = sub.add_parser("prompt", help="Print system prompt for a role (agents/<role>.md)")
+    pr.add_argument("role")
+    pr.add_argument("--json", action="store_true", help="Include frontmatter + body as JSON")
+    pr.add_argument("--raw", action="store_true", help="Print full markdown including frontmatter")
+
     return p
 
 
@@ -800,6 +927,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_models(args)
     if cmd == "init":
         return cmd_init_mode(args)
+    if cmd == "agents":
+        return cmd_agents(args)
+    if cmd == "prompt":
+        return cmd_prompt(args)
     parser.error(f"unknown command: {cmd}")
     return 2
 

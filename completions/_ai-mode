@@ -15,15 +15,21 @@ _ai-mode() {
     'url:Print base URL'
     'models:List server models'
     'init:Scaffold a new profile'
+    'agents:List agent guides'
+    'prompt:Print role system prompt'
   )
   if (( CURRENT == 2 )); then
     _describe -t commands 'ai-mode command' cmds
     return
   fi
   case $words[2] in
-    use|restart|env|logs|init)
+    use|restart|env|logs|init|agents)
       profiles=(${(f)"$(ai-mode list 2>/dev/null | awk '/^ [* ] /{print $2}')"})
       _values 'profile' $profiles
+      ;;
+    prompt)
+      roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
+      _values 'role' $roles
       ;;
   esac
 }
