@@ -5,13 +5,31 @@ description: "Consult an ai-mode specialist (product, security, research, ux, de
 
 # ai-mode routing
 
-Call **real llama-server roles** on the active ai-mode profile from a **chief** session. The human stays on chief; you orchestrate HTTP (preferred) or a brief `/model` switch.
+Call **real llama-server roles** on the active ai-mode profile from a **chief** session. The human stays on chief; you orchestrate **`ai-mode ask`** (preferred) or a brief `/model` switch.
 
 <HARD-GATE>
+**Same-turn Shell MUST run `ai-mode ask` before this turn ends.**
+
+These do **NOT** count as calling the specialist:
+- Invoking the Skill tool / “already loaded in context” / reading this file
+- **`AskUserQuestion`** loops instead of the model
+- Announcing “Using ai-mode-routing…” without Shell
+
+You are **forbidden** to:
+- End the turn after loading this skill without having run **Shell**:
+  `ai-mode ask <role> "<question>"`
+  (quote the question; add `--max-tokens` if needed).
+- Write memory / “specialist answered” / synthesize for the human until **`ai-mode ask` exits 0** with **non-empty stdout**.
+- Substitute chief imagination, **`Task`**, **`Agent`**, or **`Skill(using-superpowers)`** for the specialist call.
+- **Invent** specialist answers when the model did not run.
+
+If **`ai-mode ask` fails** (non-zero exit, empty stdout): report the failure to the human and retry or use **`/model <role>`** fallback — **do not** pretend the specialist ran.
+
+**Even if this skill is already loaded**, run **`ai-mode ask`** immediately in the same turn — do not re-invoke the Skill tool or ask the human product questions chief could send to **`product`** via **`ai-mode ask`**.
+
 This skill is for **single ad-hoc consultations** and open-ended “who should handle this?” routing.
 
 - **NOT** for the fixed **`spec-specialist-review`** six-pass pipeline → use `/superpowers:spec-specialist-review`.
-- **NOT** satisfied by invoking **`using-superpowers`** again, **`Task`**, or **`Agent(general-purpose)`** in the background.
 - **NEVER** `Task(subagent_type: "product"|"security"|…)` — those strings are **model ids**, not Qwen subagent types.
 </HARD-GATE>
 
@@ -30,43 +48,42 @@ If the human already named **`spec-specialist-review`** or an approved design sp
 ## Prerequisites
 
 - Active profile: `ai-mode which` / `ai-mode doctor`
-- Shell: `eval "$(ai-mode env)"` exports `OPENAI_BASE_URL`
-- **`ai-mode url`** prints the OpenAI base including **`/v1`** (e.g. `http://127.0.0.1:8080/v1`)
-- Chat endpoint: **`$(ai-mode url)/chat/completions`**
-- Jev endpoint: **`$(ai-mode url)/systemone`**
+- Shell: `eval "$(ai-mode env)"` exports `OPENAI_BASE_URL` (optional for `ask`; it uses the active profile)
+- Jev endpoint (role unclear only): **`$(ai-mode url)/systemone`**
 
-## Workflow
+## Mandatory workflow (Qwen Code)
 
-### 1. Pick the role
+**Order is fixed. Do not skip steps.**
+
+### Step 1 — Announce (only)
+
+Say you are using ai-mode-routing and which `<role>` you will call. **Do not synthesize yet.**
+
+### Step 2 — Shell: `ai-mode ask` (REQUIRED)
+
+```bash
+ai-mode ask product "Human question plus minimal context — no monorepo globs on chief" --max-tokens 2048
+```
+
+Piped stdin when the question is long:
+
+```bash
+echo "one sentence on MVP scope" | ai-mode ask product --max-tokens 256
+```
+
+**Gate:** Proceed only if exit code is **0** and stdout is **non-empty**. If not, stop and fix (server down, wrong role) — no specialist attribution.
+
+**Emergency fallback** (only if `ai-mode ask` is unavailable): `SYSTEM=$(ai-mode prompt "$ROLE")` and curl `$(ai-mode url)/chat/completions` with jq — same JSON shape as before. Prefer **`ai-mode ask`** always.
+
+### Step 3 — Pick the role (when unclear)
 
 | Human intent | Routing |
 | --- | --- |
-| Names a role (`product`, `security`, …) | Use that role; **skip jev** |
-| “Which specialist?” / domain unclear | **jev Stage A** — POST `systemone` with `model: jev`, `questions.role` criteria from `presets/agents/jev.md` (profile’s ini sections only) |
-| jev returns **`qa`** | **jev Stage B** for `test_layer`, load `presets/agents/qa/guidelines/<layer>.md`, then call **`qa`** |
+| Names a role (`product`, `security`, …) | Use that role; **skip jev** → go to Step 2 |
+| “Which specialist?” / domain unclear | **jev Stage A** first (below), then Step 2 with chosen role |
+| jev returns **`qa`** | **jev Stage B** for `test_layer`, load `presets/agents/qa/guidelines/<layer>.md`, then Step 2 with **`qa`** |
 
-### 2. Call the specialist (preferred — chief stays active)
-
-```bash
-eval "$(ai-mode env)"
-ROLE=product   # example
-SYSTEM=$(ai-mode prompt "$ROLE")
-QUESTION='…'   # human ask + minimal context; no monorepo globs on chief
-
-curl -sS "$(ai-mode url)/chat/completions" \
-  -H "Content-Type: application/json" \
-  -d "$(jq -n \
-    --arg model "$ROLE" \
-    --arg system "$SYSTEM" \
-    --arg user "$QUESTION" \
-    '{model: $model, messages: [{role:"system", content:$system}, {role:"user", content:$user}]}')"
-```
-
-Parse the assistant `content` from the JSON response.
-
-### 3. jev Stage A (only when role unclear)
-
-Minimal example — adjust `state` and `criteria` to the active profile:
+### jev Stage A (only when role unclear)
 
 ```bash
 eval "$(ai-mode env)"
@@ -95,21 +112,24 @@ curl -sS "$(ai-mode url)/systemone" \
   }'
 ```
 
-Use the highest-probability role (or orchestrator policy from jev output), then step 2 with that `ROLE`.
+Use the highest-probability role, then **Step 2** with that `ROLE`.
 
-### 4. Fallback — `/model`
+### Step 4 — Fallback — `/model`
 
-If curl/HTTP is unavailable: `/model <role>`, ask with that role’s behavior, then **`/model chief`** before the next turn.
+Only if Shell/`ai-mode ask` is blocked or repeatedly fails after you reported the error: `/model <role>`, ask with that role’s behavior, then **`/model chief`** before the next turn.
 
-### 5. Respond as chief
+### Step 5 — Respond as chief
 
-Summarize the specialist answer for the human. Attribute clearly (“**product** suggests …”). Do not claim a specialist ran if only chief or a Qwen subagent replied.
+Summarize **`ai-mode ask` stdout** for the human. Attribute clearly (“**product** suggests …”). Do not claim a specialist ran if Step 2 did not return valid content.
 
-## Qwen Code checklist
+## Qwen Code checklist (mandatory)
 
-1. Invoke this skill (announce: “Using ai-mode-routing to consult `<role>`”).
-2. Run shell **curl** to **`$(ai-mode url)/chat/completions`** with **`ai-mode prompt <role>`** — do **not** open a background **Task** or **Agent**.
-3. Synthesize on **chief**.
+1. Invoke this skill; announce role — **stop** (no synthesis, no memory update about the answer).
+2. **Run Shell** — `ai-mode ask <role> "<question>"` (see Step 2).
+3. Verify **exit 0** + non-empty stdout.
+4. **Then** synthesize on **chief** — same turn, after step 3.
+
+**Forbidden before step 3 completes:** ending the turn, updating memory that the specialist answered, **`AskUserQuestion`** instead of the model (unless the human’s question is literally empty), or attributing quotes to product/security/etc.
 
 ## Related
 
@@ -122,4 +142,4 @@ Summarize the specialist answer for the human. Attribute clearly (“**product**
 
 - **One real model per consultation** — weights and system prompt come from ai-mode.
 - **Chief synthesizes** — specialists do not talk to the human directly unless the human `/model` switched.
-- **Context discipline** — large reads → **`architect`** via the same HTTP pattern, not chief globs.
+- **Context discipline** — large reads → **`architect`** via **`ai-mode ask architect "…"`**, not chief globs.

@@ -23,6 +23,8 @@ A separate **Jev** decision model (`jev` / Kev-4B) classifies which specialist s
 
 When the human asks you to **consult a specialist** (“ask the product agent about…”, “have security review this idea”, “what would UX say?”), you must **call that ai-mode model** — not simulate the role on chief, and not spawn Qwen background agents.
 
+After **`/superpowers:ai-mode-routing`**, run **`ai-mode ask <role> "…"`** in the **same turn** before synthesis or memory updates — announcing the skill is not a substitute for that Shell command.
+
 | Situation | Action |
 | --- | --- |
 | Human **names a role** (`product`, `security`, `ux`, …) | Call that role **directly** — **skip jev** Stage A. |
@@ -31,11 +33,8 @@ When the human asks you to **consult a specialist** (“ask the product agent ab
 
 **Preferred (human stays on chief):**
 
-1. `eval "$(ai-mode env)"` if needed.
-2. `SYSTEM=$(ai-mode prompt <role>)`
-3. POST to **`"$(ai-mode url)/chat/completions"`** — `ai-mode url` is already `http://127.0.0.1:<port>/v1`; use **`/chat/completions`** under that base (not a second `/v1`).
-4. JSON: `"model": "<role>"`, `messages`: system = `SYSTEM`, user = the human’s question plus any minimal context you already have (avoid monorepo dumps on chief).
-5. **Synthesize** the specialist reply for the human; do not forward raw logs unless asked.
+1. **`ai-mode ask <role> "<question>"`** — question = human ask plus minimal context (avoid monorepo dumps on chief); use `--max-tokens` if needed or pipe stdin for long text.
+2. **Synthesize** stdout for the human; do not forward raw logs unless asked.
 
 **Fallback:** `/model <role>` for that consultation only, then **`/model chief`** before continuing the session.
 
@@ -48,7 +47,7 @@ When the human asks you to **consult a specialist** (“ask the product agent ab
 - **`Agent` / `Task` with `subagent_type: general-purpose`** (or any Qwen subagent) pretending to be `product`, `security`, `research`, etc.
 - **`Task(subagent_type: "<role>")`** where `<role>` is an ini section name — those are **llama-server model ids**, not built-in subagent types.
 
-If the specialist model did not run via **`$(ai-mode url)/chat/completions`** (or `/model <role>` fallback), do **not** claim product/security/etc. answered.
+If the specialist model did not run via **`ai-mode ask`** (or `/model <role>` fallback), do **not** claim product/security/etc. answered.
 </HARD-GATE>
 
 ## Rules

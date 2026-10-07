@@ -18,6 +18,7 @@ _ai-mode() {
     'init:Scaffold a new profile'
     'agents:List agent guides'
     'prompt:Print role system prompt'
+    'ask:Ask a role one question'
   )
   if (( CURRENT == 2 )); then
     _describe -t commands 'ai-mode command' cmds
@@ -47,7 +48,7 @@ _ai-mode() {
         _values 'model' $models
       fi
       ;;
-    prompt)
+    prompt|ask)
       roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
       _values 'role' $roles
       ;;

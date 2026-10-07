@@ -86,6 +86,7 @@ Verify any flag against `bin/ai-mode` before relying on it.
   `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder,fast; else chief,jev). `--all` warms every ini
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
+- `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens`, `--profile`, pipe stdin).
 - `ai-mode stop [--force]` — stop the managed server.
 - Also: `list`, `which`/`status`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `env`,
   `agents`, `init <name> [--with-ini] [--port] [--models-max]`.
@@ -107,7 +108,7 @@ Set **`contextWindowSize`** on every local role entry to match `presets/<profile
 (`chief` → **131072**, `architect` → **262144**, `coder` → **65536**, etc.; see `presets/MODELS.md`). Restart or reload
 Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder is orchestration-side.
 
-**Ad-hoc specialists:** When the human asks chief to consult **product**, **security**, or another role, chief must call that model on the ai-mode API (`SYSTEM=$(ai-mode prompt <role>)`, POST `"$(ai-mode url)/chat/completions"`) or briefly `/model <role>` — not Qwen `Task`/`Agent` subagents and not re-invoking **`using-superpowers`** as a delegate. Skill: [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) (symlinked like `spec-specialist-review`).
+**Ad-hoc specialists:** When the human asks chief to consult **product**, **security**, or another role, chief must run **`ai-mode ask <role> "<question>"`** (or briefly `/model <role>`) — not Qwen `Task`/`Agent` subagents and not re-invoking **`using-superpowers`** as a delegate. Skill: [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) (symlinked like `spec-specialist-review`).
 
 ## Preset edit rules
 

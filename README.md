@@ -32,22 +32,11 @@ ai-mode doctor
 
 ai-mode agents                 # role guides
 ai-mode prompt product         # system prompt for a role
+ai-mode ask product "What is a user story in one sentence?"
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
-
-# Example chat with role prompt
-SYS="$(ai-mode prompt qa)"
-curl -s "$(ai-mode url)/chat/completions" \
-  -H 'Content-Type: application/json' \
-  -d "$(jq -n --arg s "$SYS" '{
-    model:"qa",
-    messages:[
-      {role:"system",content:$s},
-      {role:"user",content:"Write edge cases for login rate limiting."}
-    ]
-  }')"
 ```
 
-Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `init <name> --with-ini`.
+Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `ask`, `init <name> --with-ini`.
 
 **Prefetch (avoid first-request HF downloads):** After the router is healthy, `ai-mode use dev-shop` sequentially warms the profile’s `warm = …` list (dev-shop default: `chief`, `jev`, `architect`, `coder`, `fast`). Each role is probed via `/v1/chat/completions` or `/v1/systemone` until its weight is downloaded/loaded. Override with `warm = …` in `<profile>.mode`, `ai-mode warm chief architect`, `ai-mode warm --all` (every ini section — large downloads), or skip with `--no-warm`. With dev-shop `models-max = 5`, those five models stay resident (~98 GiB); warming still prefetches other roles for the next request. Tune per-model wait with `--warm-timeout 900`.
 
