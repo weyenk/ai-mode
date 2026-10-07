@@ -56,6 +56,8 @@ Orchestrators use **two separate calls** (never one combined question):
 
 Use the profile’s specialist names for `criteria` (learning-center / av-club differ). Omit roles that are not in the active preset ini.
 
+**dev-shop:** Do **not** include **`fast`** in Stage A — it is an internal cheap-chat tool (Qwen Auto-mode classifiers, JSON helpers), not a human-facing specialist. Orchestrators call `fast` via `/v1/chat/completions` directly.
+
 ### Stage B — test layer (qa only)
 
 Run **after** Stage A selects `qa` (or when routing straight to test strategy). Pass the user task plus brief context (file paths, stack, “component test for Button”, etc.) in `state`.

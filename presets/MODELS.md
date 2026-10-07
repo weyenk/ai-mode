@@ -32,17 +32,44 @@ From Qwen GGUF cards:
 Native Qwen3 dense context is **32 768** (extend with YaRN only when needed).
 **Qwen3-Coder-Next** reports **262 144** native context in GGUF metadata.
 
-**Superpowers + ai-mode:** Architectural brainstorming and codebase exploration
-should run on **`architect`** (262144), not **`chief`** (32768). After a
-design spec is approved for review, run **`spec-specialist-review`** before
-**`writing-plans`** on architect. See `skills/spec-specialist-review/SKILL.md`.
+**Superpowers + ai-mode (dev-shop):** The human stays on **`chief`** (131072 ctx).
+Chief coordinates Superpowers flows and routes planning / large codebase reads to
+**`architect`** (262144) via jev — the human should not need `/model` switches for
+role routing. After a design spec is approved for review, run
+**`spec-specialist-review`** before **`writing-plans`** (architect executes plans).
+See `skills/spec-specialist-review/SKILL.md`.
+
+### dev-shop resident memory (128 GB, `models-max = 4`)
+
+Rough llama-server resident footprint (weights mmap + KV reserve at configured `ctx-size`,
+f16 KV). Use for “can these four slots coexist?” — not exact; leave headroom for macOS.
+
+| Role | Weights (Q4) | KV @ ctx | ≈ resident |
+| --- | --- | --- | --- |
+| chief | ~8.4 GiB | ~20 GiB @ 131072 | ~28 GiB |
+| jev | ~2.5 GiB | ~0.5 GiB @ 16384 | ~3 GiB |
+| fast | ~2.5 GiB | ~0.5 GiB @ 16384 | ~3 GiB |
+| architect | ~18 GiB | ~40 GiB @ 262144 | ~58 GiB |
+| coder | ~18 GiB | ~12 GiB @ 131072 | ~30 GiB |
+
+**Warm quartet** (`chief,jev,architect,fast`): ~92 GiB — comfortable on 128 GB.
+
+**Plan→execute swap** (evict `fast`, load `coder`): chief + jev + architect + coder ≈
+**~119 GiB** — still under ~128 GB unified with modest OS headroom; if tight, lower
+chief to **65536** (~14 GiB KV, ~22 GiB total chief) or evict architect before a long
+coder session.
+
+Chief **131072** uses YaRN-extended ctx on Qwen3-14B (native 32k); chosen so chief can
+hold long Superpowers threads and pasted specs without hitting the old 32k wall, without
+promoting chief to 30B-A3B (would compete with architect/coder for slots).
 
 ## dev-shop
 
 | Role | Model | Why | ctx |
 | --- | --- | --- | --- |
-| chief | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Lightweight user-facing router (official); planning delegated to architect; **not** for monorepo exploration | 32768 |
+| chief | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Sole user-facing POC (131k ctx); routes via jev; delegates planning / monorepo reads to architect | 131072 |
 | jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16384 |
+| fast | `Qwen/Qwen3-4B-GGUF:Q4_K_M` | Cheap instruct chat for classifiers, structured JSON, quick side-queries; **not** jev Stage A | 16384 |
 | coder | `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Fast agentic executor of architect's plans; Q8 via ggml-org for fidelity; local UD-Q8 kept as `coder-xl` | 131072 |
 | coder-xl | Local Qwen3-Coder-Next UD-Q8 | Heavy coder for rare under-specified / large jobs; already on disk | 131072 |
 | product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Specs/stories + spec review pass (YaRN ctx) | 65536 |
@@ -54,9 +81,13 @@ design spec is approved for review, run **`spec-specialist-review`** before
 | ux | same as design (alias) or VL general — see ini | Screenshot critique trigger phrase in agent md | 16384 |
 | architect | `bartowski/Qwen_Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | **Planning owner** — thinking model, native 256k ctx; alt `Qwen/Qwen3-32B-GGUF:Q4_K_M` (official, dense, YaRN>32k) | 262144 |
 
-With these footprints any resident trio (chief + jev + one specialist) is ~48 GB, so
-`models-max = 4` can keep `architect` + `coder` co-resident for a plan→execute handoff
-with no reload. No official Qwen GGUF exists for the Thinking-2507 or Coder-30B-A3B
+dev-shop **`warm = chief,jev,architect,fast`** matches **`models-max = 4`**: all warm slots
+are filled at startup. The first specialist load (e.g. `coder`) may evict one warm model;
+weights stay prefetched for faster reload.
+
+With **`models-max = 4`**, the warm quartet fits ~92 GiB; swapping `fast` for `coder` during
+plan→execute keeps all orchestration + coding roles resident (~119 GiB). See memory table
+above. No official Qwen GGUF exists for the Thinking-2507 or Coder-30B-A3B
 variants, so trusted non-Unsloth quantizers are used (bartowski / lmstudio-community /
 ggml-org); the earlier Unsloth Qwen3-30B-A3B degeneration does not apply to these.
 

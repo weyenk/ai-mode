@@ -68,12 +68,21 @@ Also: `stop`, `restart`, `logs [-f]`, `url`, `models`, `init <name> --with-ini`.
 
 ## Superpowers pipeline (Qwen Code)
 
-Architectural work: use **`architect`** for exploration (256k ctx), not **`chief`** (32k).
+Stay on **`chief`** in Qwen Code (dev-shop **131k** ctx) — chief routes exploration and
+plans to **`architect`** (262k) via jev; you should not need `/model` switches for Superpowers.
+
+If the status bar shows **200k** context for `chief` but requests fail with **Context size has
+been exceeded** before the real limit, set `contextWindowSize` on each `modelProviders.openai[]`
+entry in `~/.qwen/settings.json` to match `ctx-size` in the active preset (chief → **131072**,
+**fast** → **16384**). See `AGENTS.md` → Qwen Code.
+
+For Qwen Code **Auto-mode** side classifiers, point the fast alias at **`fast`**
+(`Qwen3-4B`): add a provider entry with `"id": "fast"` and run **`/model --fast fast`**.
 
 After brainstorming writes `docs/superpowers/specs/…-design.md` and you approve it for review:
 
 1. `/superpowers:spec-specialist-review` — product → research → security → ux → design → architect
 2. **`chief`** merges reviews into the spec; you re-approve
-3. Switch to **`architect`**, then `/superpowers:writing-plans`
+3. Chief routes **`/superpowers:writing-plans`** to **`architect`**
 
 Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md) (symlinked into `~/.qwen/extensions/superpowers/skills/`). Brainstorming overlay: backup at `~/.qwen/.../brainstorming/SKILL.md.bak`.

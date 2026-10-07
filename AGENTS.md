@@ -27,8 +27,13 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
 
 ## Role map (dev-shop)
 
-- **chief** (`Qwen3-14B`, 32k) — talks to the human, clarifies, synthesizes. Routes
-  via **jev**. **Not** for monorepo exploration or writing plans.
+- **chief** (`Qwen3-14B`, **131k**) — **sole user-facing POC**; clarifies, synthesizes,
+  coordinates Superpowers flows. Routes via **jev**; delegates monorepo exploration and
+  plans to **architect** (human stays on chief).
+- **fast** (`Qwen3-4B`, 16k) — cheap instruct chat for classifiers, structured JSON, and
+  quick side-queries (Qwen Auto-mode / internal tooling). **Not** a jev Stage A specialist;
+  call directly via `/v1/chat/completions`. In Qwen Code: `/model --fast fast` (set
+  `contextWindowSize` → **16384** in `~/.qwen/settings.json`).
 - **jev** (`Kev-4B`, 16k) — System One router. **Not a chat model.** Two-stage calls:
   (A) `questions.role` → specialist; (B) when role is `qa`, `questions.test_layer` →
   which guideline to load (`presets/agents/jev.md`). Never mix role and layer in one
@@ -46,20 +51,22 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
 Rules of the road:
 - **Planning is architect's job.** chief must not write implementation plans.
 - **chief routes via jev**, then synthesizes specialist output — don't forward walls of text.
-- **Never dump monorepo-wide explorations on ≤32k models** (chief). Large reads → architect (256k).
+- **Never dump monorepo-wide explorations on chief.** Route large reads → **architect** (262k).
 
 ## Superpowers pipeline (Qwen Code)
 
 For test design in Superpowers/Qwen Code: chief routes to **qa** via jev Stage A, runs
 jev Stage B for `test_layer`, then qa loads the matching guideline file(s) before authoring.
 
-Architectural work runs on **architect** (256k), not chief (32k).
+Architectural execution runs on **architect** (262k); **chief** orchestrates — you do not
+need to switch Qwen Code models for routing.
 
-1. **brainstorming** → writes `docs/superpowers/specs/…-design.md`; you approve it for review.
+1. **brainstorming** (chief coordinates; architect runs large exploration) →
+   `docs/superpowers/specs/…-design.md`; you approve it for review.
 2. **`/superpowers:spec-specialist-review`** → sequential passes: product → research →
    security → ux → design → architect. Each emits Blocking / Non-blocking / Proposed edits.
 3. **chief merges** reviews into the spec; you re-approve.
-4. Switch to **architect**, run **`/superpowers:writing-plans`**.
+4. Chief routes **`writing-plans`** to **architect**.
 
 Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md),
 symlinked into `~/.qwen/extensions/superpowers/skills/`.
@@ -73,7 +80,7 @@ Verify any flag against `bin/ai-mode` before relying on it.
 - `ai-mode use <profile>` — stop any managed server, start the profile, then warm the
   `warm =` list. Flags: `--force`, `--timeout`, `--no-warm`, `--warm-timeout`.
 - `ai-mode warm [roles…]` — prefetch/load on the active router (sequential, safe for
-  `models-max`). Defaults to `warm =` (else chief,jev,architect). `--all` warms every ini
+  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,fast; else chief,jev,architect). `--all` warms every ini
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode stop [--force]` — stop the managed server.
@@ -81,6 +88,21 @@ Verify any flag against `bin/ai-mode` before relying on it.
   `agents`, `init <name> [--with-ini] [--port] [--models-max]`.
 
 Shell env: `eval "$(ai-mode env)"` exports `OPENAI_BASE_URL` for the active profile.
+
+## Qwen Code (local OpenAI providers)
+
+Each ai-mode role is a custom model in `~/.qwen/settings.json` under
+`modelProviders.openai[]` (`baseUrl` → `http://127.0.0.1:<port>/v1`, `id` = role name).
+
+Qwen Code does **not** infer context from llama-server’s `meta.n_ctx` for these aliases. If
+`contextWindowSize` is missing, the UI defaults to **200k** (`DEFAULT_TOKEN_LIMIT`) while
+llama-server still enforces each role’s `ctx-size` from the preset ini — e.g. chief **131072**,
+which produces `Context size has been exceeded` near the real limit with a misleading
+“200k · 15% used” bar if `contextWindowSize` is wrong.
+
+Set **`contextWindowSize`** on every local role entry to match `presets/<profile>.ini`
+(`chief` → **131072**, `architect` → 262144, etc.; see `presets/MODELS.md`). Restart or reload
+Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder is orchestration-side.
 
 ## Preset edit rules
 
