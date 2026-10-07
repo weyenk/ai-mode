@@ -63,6 +63,7 @@ Also: `stop`, `restart`, `logs [-f]`, `url`, `models`, `init <name> --with-ini`.
 - First `hf = …` request downloads into `~/.cache/llama.cpp` (can be large). Use `ai-mode warm` or let `ai-mode use` prefetch orchestration models.
 - VL roles auto-pull `mmproj` when the HF repo includes one.
 - For `design` / `ux` screenshots, user text should include: `Critique this UI design.`
+- `qa` carries a guideline router in its prompt and loads vendored testing guides on demand from [`presets/agents/qa/guidelines/`](presets/agents/qa/guidelines/) (one layer at a time to fit its 65k ctx).
 - Podcast **audio** and **image/video generation** are outside llama-server (TTS / ComfyUI).
 
 ## Superpowers pipeline (Qwen Code)
