@@ -4,6 +4,38 @@
 
 **Intent of this document:** These guidelines set a clear direction for net new code and AI-generated tests. They are *not* a mandate to rewrite legacy tests overnight. Where legacy constraints prevent full compliance, the expectation is that teams **do not regress** and make incremental improvements over time.
 
+
+## Table of Contents
+
+- [12. Quick Reference Checklist](#12-quick-reference-checklist)
+- [1. Philosophy](#1-philosophy)
+- [2. FIRST Principles](#2-first-principles)
+- [3. Structure: Arrange – Act – Assert](#3-structure-arrange-act-assert)
+- [4. Naming](#4-naming)
+- [5. What to Test](#5-what-to-test)
+- [6. Mocking Philosophy](#6-mocking-philosophy)
+- [7. Code Coverage](#7-code-coverage)
+- [8. Test Smells — Things to Avoid](#8-test-smells-things-to-avoid)
+- [9. Legacy Code Strategy](#9-legacy-code-strategy)
+- [10. AI-Assisted and AI-Generated Tests](#10-ai-assisted-and-ai-generated-tests)
+- [11. Test-Driven Development (TDD)](#11-test-driven-development-tdd)
+- [Further Reading](#further-reading)
+
+## 12. Quick Reference Checklist
+
+Use this when writing or reviewing tests for a new feature or bug fix:
+
+* [ ] Test name clearly describes the scenario and expected outcome
+* [ ] AAA sections are distinct and easy to identify
+* [ ] Tests pass independently in any order
+* [ ] No logic (loops or conditionals) in test bodies
+* [ ] Mocks replace real I/O, not internal domain logic
+* [ ] Happy path, edge cases, and at least one error path are covered
+* [ ] No skipped tests committed without a tracking ticket
+* [ ] Coverage does not decrease vs the base branch for modified files
+* [ ] New tests were verified to fail before the implementation was correct
+* [ ] AI-generated tests reviewed for meaningful, non-trivial assertions
+
 ## 1. Philosophy
 
 Tests are production code. They deserve the same care, naming discipline, and architectural thought as any other code you ship. A test suite that nobody trusts is worse than no test suite at all — it creates noise, slows CI, and breeds a culture of skipping failures.
@@ -168,21 +200,6 @@ The Red – Green – Refactor cycle:
 3. **Refactor:** Clean up the implementation without breaking the test. This is where design emerges.
 
 Even if you do not practice strict TDD, always verify that a new test **fails before** the implementation is correct. A test that was never red may not be testing anything at all.
-
-## 12. Quick Reference Checklist
-
-Use this when writing or reviewing tests for a new feature or bug fix:
-
-* [ ] Test name clearly describes the scenario and expected outcome
-* [ ] AAA sections are distinct and easy to identify
-* [ ] Tests pass independently in any order
-* [ ] No logic (loops or conditionals) in test bodies
-* [ ] Mocks replace real I/O, not internal domain logic
-* [ ] Happy path, edge cases, and at least one error path are covered
-* [ ] No skipped tests committed without a tracking ticket
-* [ ] Coverage does not decrease vs the base branch for modified files
-* [ ] New tests were verified to fail before the implementation was correct
-* [ ] AI-generated tests reviewed for meaningful, non-trivial assertions
 
 ## Further Reading
 

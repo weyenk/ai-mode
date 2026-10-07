@@ -4,6 +4,34 @@
 
 **Related pages:** Contract tests back the doubles used in [Functional Tests](Functional Testing Guidelines.md) and [Component Tests](Component Testing Guidelines.md). Without contract tests, your fakes and stubs can drift silently from the real services they represent. Contract tests are the mechanism that keeps them honest.
 
+
+## Table of Contents
+
+- [12. Quick Reference Checklist](#12-quick-reference-checklist)
+- [1. What Is a Contract Test?](#1-what-is-a-contract-test)
+- [2. The Intellectual Foundation](#2-the-intellectual-foundation)
+- [3. The Consumer-Driven Contract Workflow](#3-the-consumer-driven-contract-workflow)
+- [4. Scope — What Goes in a Contract Test](#4-scope-what-goes-in-a-contract-test)
+- [5. Writing a Pact Consumer Test](#5-writing-a-pact-consumer-test)
+- [6. Provider Verification](#6-provider-verification)
+- [7. The Can I Deploy Gate](#7-the-can-i-deploy-gate)
+- [8. When to Write Contract Tests](#8-when-to-write-contract-tests)
+- [9. Relationship to Fakes and Stubs](#9-relationship-to-fakes-and-stubs)
+- [10. Pact Broker / PactFlow](#10-pact-broker-pactflow)
+- [11. Test Smells](#11-test-smells)
+- [Further Reading](#further-reading)
+
+## 12. Quick Reference Checklist
+
+* [ ] Consumer test uses Pact mock provider — no real HTTP to the actual service
+* [ ] Only fields the consumer actually uses are included in the contract
+* [ ] Volatile values use `like()` matchers, not exact values
+* [ ] Provider states are descriptive and implementable
+* [ ] Pact file is published to the Pact Broker on every CI build
+* [ ] Provider verification runs on the provider's CI pipeline
+* [ ] Can I Deploy gate is present in both consumer and provider deploy pipelines
+* [ ] Fakes used in functional/component tests match the shape defined in the contract
+
 ## 1. What Is a Contract Test?
 
 A contract test verifies the agreement between a service consumer and a service provider. It answers two separate questions — one on each side of the boundary:
@@ -167,17 +195,6 @@ The ideal workflow: write the consumer contract first, use the Pact interaction 
 | **Vague provider states** | Provider can't implement state setup; verification is inconsistent | States must describe a specific, replicable condition |
 | **Not running Can I Deploy before deploying** | Silent incompatibility reaches production | Can I Deploy is a mandatory CI gate, not optional |
 | **Treating contract tests as integration tests** | Slow, environment-dependent, defeats the purpose | No live service communication; Pact mock provider only |
-
-## 12. Quick Reference Checklist
-
-* [ ] Consumer test uses Pact mock provider — no real HTTP to the actual service
-* [ ] Only fields the consumer actually uses are included in the contract
-* [ ] Volatile values use `like()` matchers, not exact values
-* [ ] Provider states are descriptive and implementable
-* [ ] Pact file is published to the Pact Broker on every CI build
-* [ ] Provider verification runs on the provider's CI pipeline
-* [ ] Can I Deploy gate is present in both consumer and provider deploy pipelines
-* [ ] Fakes used in functional/component tests match the shape defined in the contract
 
 ## Further Reading
 

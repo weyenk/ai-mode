@@ -4,6 +4,35 @@
 
 **Context:** These guidelines apply to the testing and quality assurance of **AI skills** — structured SKILL.md-driven agents that perform engineering tasks (writing tests, reviewing code, triaging issues, etc.). This is a distinct domain from testing software that happens to use AI as a component; for that, see the broader testing pyramid guidelines. This page addresses how to verify that a skill itself behaves correctly, reliably, and safely.
 
+
+## Table of Contents
+
+- [12. Quick Reference Checklist](#12-quick-reference-checklist)
+- [1. The Challenge of Testing AI Behaviour](#1-the-challenge-of-testing-ai-behaviour)
+- [2. The Intellectual Foundation](#2-the-intellectual-foundation)
+- [3. Layers of AI Skill Quality](#3-layers-of-ai-skill-quality)
+- [4. The Eval Case: Structure and Design](#4-the-eval-case-structure-and-design)
+- [5. What Makes a Good Eval](#5-what-makes-a-good-eval)
+- [6. Running Evals](#6-running-evals)
+- [7. The Skill Development Workflow](#7-the-skill-development-workflow)
+- [8. Safety and Scope Testing](#8-safety-and-scope-testing)
+- [9. Human Review in the Eval Loop](#9-human-review-in-the-eval-loop)
+- [10. Versioning and Changelog](#10-versioning-and-changelog)
+- [11. Quality Metrics for AI Skills](#11-quality-metrics-for-ai-skills)
+- [Further Reading](#further-reading)
+
+## 12. Quick Reference Checklist
+
+* [ ] Eval cases exist in `evals/evals.json` for the skill
+* [ ] Evals cover the happy path, at least two edge cases, and at least one adversarial input
+* [ ] Safety evals are present: scope containment, no secret exposure, graceful refusal
+* [ ] Evals run multiple times per case (minimum 2 runs)
+* [ ] Eval pass rate is ≥90% before the SKILL.md change is merged
+* [ ] No previously passing eval case has regressed
+* [ ] SKILL.md PR includes the eval run output as evidence
+* [ ] Breaking changes communicated to skill consumers before merging
+* [ ] Any bug found in production has a corresponding new eval case before the fix is merged
+
 ## 1. The Challenge of Testing AI Behaviour
 
 Testing a conventional software function is straightforward: given a deterministic input, assert a deterministic output. AI skills do not behave this way. A skill receives a natural-language or structured prompt and produces a response that varies between runs, between models, and with changes to the system prompt. The output is rarely checkable with `assertEqual`.
@@ -166,18 +195,6 @@ For skills that are used at high frequency or in high-stakes contexts, schedule 
 | Scope violation rate | Percentage of runs where the skill modified files outside its defined scope | 0% — any violation is a critical bug |
 | Edge case pass rate | Pass rate on adversarial and edge-case evals specifically | \>75% (these are inherently harder) |
 | Human review score | Qualitative rating from periodic human sampling (1–5 scale) | ≥4/5 average |
-
-## 12. Quick Reference Checklist
-
-* [ ] Eval cases exist in `evals/evals.json` for the skill
-* [ ] Evals cover the happy path, at least two edge cases, and at least one adversarial input
-* [ ] Safety evals are present: scope containment, no secret exposure, graceful refusal
-* [ ] Evals run multiple times per case (minimum 2 runs)
-* [ ] Eval pass rate is ≥90% before the SKILL.md change is merged
-* [ ] No previously passing eval case has regressed
-* [ ] SKILL.md PR includes the eval run output as evidence
-* [ ] Breaking changes communicated to skill consumers before merging
-* [ ] Any bug found in production has a corresponding new eval case before the fix is merged
 
 ## Further Reading
 
