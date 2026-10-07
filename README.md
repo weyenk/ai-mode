@@ -11,7 +11,7 @@ System-wide CLI to switch **llama-server** profile presets and load per-role
 
 Orchestration: **`chief`** (chief of staff) talks to you; **`jev`** (`ggml-org/Kev-4B-GGUF`) classifies via `/v1/systemone`; specialists execute.
 
-Model choices, context sizes, and sampling are documented in [`presets/MODELS.md`](presets/MODELS.md).  
+Model catalog: [`presets/MODELS.md`](presets/MODELS.md). Rationale and memory notes: [`presets/.local/MODELS-notes.md`](presets/.local/MODELS-notes.md) (local).  
 Role system prompts live in [`presets/agents/`](presets/agents/).  
 Working in this repo (human or LLM)? Read [`AGENTS.md`](AGENTS.md).
 
@@ -56,7 +56,7 @@ Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, 
 1. `ai-mode init my-lab --with-ini --port 8083`
 2. Edit `presets/my-lab.ini` (models + ctx/sampling)
 3. Add `presets/agents/<role>.md` for each `[section]`
-4. Note rationale in `presets/MODELS.md`
+4. Add catalog rows in `presets/MODELS.md`; optional rationale in `presets/.local/MODELS-notes.md`
 
 ## Notes
 

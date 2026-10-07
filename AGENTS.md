@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Guidance for anyone (human or LLM) working **in this repo**. For end-user usage,
-see [`README.md`](README.md). For model rationale, see [`presets/MODELS.md`](presets/MODELS.md).
+see [`README.md`](README.md). Model **catalog**: [`presets/MODELS.md`](presets/MODELS.md). Rationale / memory notes: [`presets/.local/MODELS-notes.md`](presets/.local/MODELS-notes.md) (local, gitignored).
 
 ## Purpose
 
@@ -21,7 +21,8 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
 | `presets/*.ini` | llama-server model presets. `[section]` = a role; `[*]` = shared defaults. |
 | `presets/*.mode` | Sidecar metadata: `port`, `models-max`, `host`, `description`, `warm`. |
 | `presets/agents/*.md` | System prompt per role. Frontmatter `role:` must match an ini `[section]`. |
-| `presets/MODELS.md` | Why each model/ctx/sampling was chosen. Keep in sync with the ini files. |
+| `presets/MODELS.md` | Per-profile model catalog (ini + mode). Keep in sync with presets. |
+| `presets/.local/MODELS-notes.md` | Local rationale, memory estimates, tuning (gitignored). |
 | `skills/` | Qwen Code / Superpowers skills (e.g. `spec-specialist-review`). |
 | `completions/_ai-mode` | zsh completion. Update when you add/rename commands or flags. |
 
@@ -80,7 +81,7 @@ Verify any flag against `bin/ai-mode` before relying on it.
 - `ai-mode use <profile>` — stop any managed server, start the profile, then warm the
   `warm =` list. Flags: `--force`, `--timeout`, `--no-warm`, `--warm-timeout`.
 - `ai-mode warm [roles…]` — prefetch/load on the active router (sequential, safe for
-  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder,fast; else chief,jev,architect). `--all` warms every ini
+  `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder,fast; else chief,jev). `--all` warms every ini
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode stop [--force]` — stop the managed server.
@@ -110,8 +111,8 @@ Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder
   `mmap`), **not** a key named `mmap`. Don't invent keys.
 - **Every ini `[section]` needs a matching `agents/<role>.md`** (frontmatter `role:` must
   match). `ai-mode doctor` flags missing agents.
-- **Keep `presets/MODELS.md` in sync** with the ini — model choice, ctx, and sampling
-  rationale live there.
+- **Keep `presets/MODELS.md` in sync** with the ini — catalog entries must match `[section]` blocks.
+  Rationale and memory debugging go in `presets/.local/MODELS-notes.md`.
 - `models-max` caps resident models; warming still prefetches the rest. dev-shop uses
   `models-max = 5` with **`warm = chief,jev,architect,coder,fast`** so orchestration, plan→execute,
   and Qwen Auto-mode classifiers (~98 GiB) are resident at startup on 128 GB.

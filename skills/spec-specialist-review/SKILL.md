@@ -34,7 +34,7 @@ Or ask the agent to follow this skill by name after spec approval.
 These rules prevent 32k context blow-ups (e.g. chief @ 32768 overflowing on monorepo globs):
 
 1. **Model routing**
-   - Architectural exploration, large codebase mapping, and synthesis → switch to **`architect`** (`/model architect` or ai-mode `architect` @ 131072) **before** broad reads.
+   - Architectural exploration, large codebase mapping, and synthesis → switch to **`architect`** (`/model architect` or ai-mode `architect` @ 262144) **before** broad reads.
    - **`chief`** and **`product`** (≤32k native on Qwen3-14B) are for dialogue and spec-sized work — not `**/*.js` sweeps or dumping tool transcripts.
    - Each specialist pass uses that role’s model when available (`ai-mode prompt <role>`).
 
@@ -147,7 +147,7 @@ ai-mode prompt architect  # use before large exploration or writing-plans
 curl "$(ai-mode url)/chat/completions" ...  # model id = role name from dev-shop.ini
 ```
 
-Role context budgets are documented in `presets/MODELS.md`. Prefer **`architect`** for any pass that needs more than ~24k tokens of combined spec + code excerpts.
+Role context budgets are in `presets/MODELS.md` (catalog). Prefer **`architect`** for any pass that needs more than ~24k tokens of combined spec + code excerpts.
 
 ## Principles
 

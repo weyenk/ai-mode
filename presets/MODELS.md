@@ -1,131 +1,100 @@
-# Model research notes
+# Model catalog
 
-Selections verified against Hugging Face GGUF repos (existence, quant tags, mmproj,
-documented context). Role fit combines **base model strengths** + **agent markdown**
-(there are almost no true “PRD-only” GGUFs; specialists exist for security, Flux
-prompts, and UI critique).
+Per-profile inventory of what each **ai-mode** preset runs on **llama-server**. Authoritative
+values are `presets/<profile>.ini` (models, ctx, sampling) and `presets/<profile>.mode`
+(port, `models-max`, `warm`).
 
-Hardware target: Mac Studio M5 Max, 128 GB unified memory.
+For memory estimates, quantizer choices, YaRN notes, and tuning levers, see
+[`presets/.local/MODELS-notes.md`](.local/MODELS-notes.md) (gitignored; create locally if missing).
 
-## Orchestration (all profiles)
+## Shared defaults
 
-| Role | Model | API | Why |
-| --- | --- | --- | --- |
-| `chief` | Generative LLM (profile-specific) | `/v1/chat/completions` | Talks to the human; synthesizes specialist output |
-| `jev` | `ggml-org/Kev-4B-GGUF:Q4_K_M` | **`/v1/systemone`** | System One decision model — closed-set role routing |
+All profiles inherit section `[*]`:
 
-`jev` is **not** a chat model. Orchestrators must call System One with a closed
-criterion set (see `agents/jev.md`). Requires a llama.cpp build that exposes
-`/v1/systemone` (check with `ai-mode doctor`).
+| Option | Value |
+| --- | --- |
+| `jinja` | 1 |
+| `flash-attn` | on |
+| `n-gpu-layers` | 99 |
+| `load-mode` | mmap |
+| `top-k` | 20 |
+| `min-p` | 0 |
+| `presence-penalty` | 1.5 |
 
-**`models-max` is profile-specific:** `learning-center` and `av-club` use **3** (chief + jev + one specialist); **dev-shop** uses **5** (warm fills all slots — see below).
+Roles below list **overrides** only when they differ from `[*]`. Empty temp/top-p means the role
+does not set them (System One / jev). **KV** = `cache-type-k` / `cache-type-v` when set; otherwise
+default (typically f16).
 
-## Sampling defaults (Qwen3 family)
-
-From Qwen GGUF cards:
-
-| Mode | temp | top_p | top_k | min_p | presence_penalty |
-| --- | --- | --- | --- | --- | --- |
-| Thinking | 0.6 | 0.95 | 20 | 0 | 1.5 |
-| Non-thinking / tools | 0.7 | 0.8 | 20 | 0 | 1.5 |
-
-Native Qwen3 dense context is **32 768** (extend with YaRN only when needed).
-**Qwen3-Coder-Next** reports **262 144** native context in GGUF metadata.
-
-**Superpowers + ai-mode (dev-shop):** The human stays on **`chief`** (131072 ctx).
-Chief coordinates Superpowers flows and routes planning / large codebase reads to
-**`architect`** (262144) via jev — the human should not need `/model` switches for
-role routing. After a design spec is approved for review, run
-**`spec-specialist-review`** before **`writing-plans`** (architect executes plans).
-See `skills/spec-specialist-review/SKILL.md`.
-
-### dev-shop resident memory (128 GB, `models-max = 5`)
-
-Rough llama-server resident footprint (weights mmap + KV reserve at configured `ctx-size`).
-Specialists and heavy roles use default **f16** KV; **chief** alone uses **`cache-type-k` /
-`cache-type-v` = `q4_0`** (conversational frontend — quality work stays on specialists).
-Use for “can these five slots coexist?” — not exact; leave headroom for macOS.
-
-| Role | Weights (Q4) | KV @ ctx | ≈ resident |
-| --- | --- | --- | --- |
-| chief | ~8.4 GiB | ~5 GiB @ 131072 (q4_0 K/V) | ~13 GiB |
-| jev | ~2.5 GiB | ~0.5 GiB @ 16384 | ~3 GiB |
-| fast | ~2.5 GiB | ~0.5 GiB @ 16384 | ~3 GiB |
-| architect | ~18 GiB | ~40 GiB @ 262144 | ~58 GiB |
-| coder (before) | ~18 GiB | ~12 GiB @ 131072 (f16 K/V) | ~30 GiB |
-| coder (after) | ~18 GiB | ~3 GiB @ 65536 (q8_0 K/V) | ~21 GiB |
-
-**Before:** warm `chief,jev,architect,fast` ≈ **~77 GiB** — coder absent; loading coder evicted
-a warm slot → chief + jev + architect + coder @ 131072 ≈ **~104 GiB**.
-
-**After (superseded):** warm `chief,jev,architect,coder` ≈ **~95 GiB** reserved (~13 + 3 + 58 + 21) —
-all four core roles co-resident with **`models-max = 4`**. **`fast`** loaded on demand (~3 GiB)
-when Auto-mode hit `/model --fast fast`; with four full slots that often meant “Classifier stage 1 unavailable.”
-
-**Current:** warm **`chief,jev,architect,coder,fast`** ≈ **~98 GiB** reserved (~13 + 3 + 58 + 21 + 3) —
-orchestration, plan→execute stack, and Qwen Auto-mode classifiers co-resident with **`models-max = 5`** on 128 GB.
-
-Architect stays **262144** (native 256k); coder **65536** (native, no YaRN) plus **q8_0** KV
-was enough headroom — no architect ctx cut. If RSS is still tight in practice, next levers are
-architect **131072** (~20 GiB KV save) or coder **32768** (~3 GiB more vs 65536).
-
-Chief **131072** uses YaRN-extended ctx on Qwen3-14B (native 32k); chosen so chief can
-hold long Superpowers threads and pasted specs without hitting the old 32k wall, without
-promoting chief to 30B-A3B (would compete with architect/coder for slots).
+**`jev`** on every profile: `ggml-org/Kev-4B-GGUF:Q4_K_M`, ctx **16384**, API **`/v1/systemone`**
+(not chat). Confirm with `ai-mode doctor`.
 
 ## dev-shop
 
-| Role | Model | Why | ctx |
-| --- | --- | --- | --- |
-| chief | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Sole user-facing POC (131k ctx, **q4_0 KV**); routes via jev; delegates planning / monorepo reads to architect | 131072 |
-| jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16384 |
-| fast | `Qwen/Qwen3-4B-GGUF:Q4_K_M` | Cheap instruct chat for classifiers, structured JSON, quick side-queries; **not** jev Stage A | 16384 |
-| coder | `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Agentic executor of architect's plans; **65536** native ctx + **q8_0** KV for five-slot warm; Q8 weights via ggml-org optional; `coder-xl` for huge jobs | 65536 |
-| coder-xl | Local Qwen3-Coder-Next UD-Q8 | Heavy coder for rare under-specified / large jobs; already on disk | 131072 |
-| product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Specs/stories + spec review pass (YaRN ctx) | 65536 |
-| research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Thinking variant for spikes / tradeoffs | 65536 |
-| docs | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | Strong prose; 128k-class Gemma 3; auto mmproj unused for text | 65536 |
-| qa | `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Code-aware test design (not Qwen2.5-Coder-7B) | 65536 |
-| security | `deer-sec/CyberStag-Security-26B-A4B-V1-Q4_K_M-GGUF` | Security-tuned MoE GGUF | 65536 |
-| design | `stefans71/frontend-design-expert-8b:Q4_K_M` | UI/frontend specialist (VL) + mmproj in repo | 16384 |
-| ux | same as design (alias) or VL general — see ini | Screenshot critique trigger phrase in agent md | 16384 |
-| architect | `bartowski/Qwen_Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | **Planning owner** — thinking model, native 256k ctx; alt `Qwen/Qwen3-32B-GGUF:Q4_K_M` (official, dense, YaRN>32k) | 262144 |
+| Setting | Value |
+| --- | --- |
+| Port | 8080 |
+| Host | 127.0.0.1 |
+| `models-max` | 5 |
+| `warm` | chief, jev, architect, coder, fast |
 
-dev-shop **`warm = chief,jev,architect,coder,fast`** matches **`models-max = 5`**: orchestration,
-plan + execute, and **`fast`** (Qwen Auto-mode Stage 1) are resident at startup. Other ini roles
-(e.g. `product`, `qa`) load on demand and may evict a resident model until a slot frees.
+| Role | Model | ctx | temp | top-p | KV | Other |
+| --- | --- | --- | --- | --- | --- | --- |
+| chief | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | 131072 | 0.7 | 0.8 | q4_0 | `enable_thinking`: false |
+| jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | 16384 | — | — | default | System One only |
+| fast | `Qwen/Qwen3-4B-GGUF:Q4_K_M` | 16384 | 0.7 | 0.8 | default | `enable_thinking`: false |
+| coder | `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | 65536 | 0.7 | 0.8 | q8_0 | |
+| coder-xl | local Qwen3-Coder-Next UD-Q8 (path in ini) | 131072 | 0.7 | 0.8 | default | |
+| product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | 65536 | 0.5 | 0.8 | default | |
+| research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | 65536 | 0.6 | 0.95 | default | thinking on |
+| docs | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | 65536 | 0.6 | 0.9 | default | `presence-penalty`: 0.5 |
+| qa | `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | 65536 | 0.3 | 0.8 | default | |
+| security | `deer-sec/CyberStag-Security-26B-A4B-V1-Q4_K_M-GGUF` | 65536 | 0.2 | 0.85 | default | `presence-penalty`: 0.5 |
+| design | `stefans71/frontend-design-expert-8b:Q4_K_M` | 16384 | 0.4 | 0.9 | default | VL + mmproj; `presence-penalty`: 0; `enable_thinking`: false |
+| ux | same as design | 16384 | 0.4 | 0.9 | default | alias role |
+| architect | `bartowski/Qwen_Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | 262144 | 0.6 | 0.95 | default | thinking on; alt `Qwen/Qwen3-32B-GGUF:Q4_K_M` @ 65536 |
 
-See the **memory table** above (~98 GiB warm reserve) — live RSS is often lower until contexts
-fill (e.g. architect ~42 GiB loaded vs ~58 GiB reserved). No official Qwen GGUF exists for the Thinking-2507 or Coder-30B-A3B
-variants, so trusted non-Unsloth quantizers are used (bartowski / lmstudio-community /
-ggml-org); the earlier Unsloth Qwen3-30B-A3B degeneration does not apply to these.
+Non-warm roles load on demand and may evict a resident model until a slot frees.
 
 ## learning-center
 
-| Role | Model | Why | ctx |
-| --- | --- | --- | --- |
-| chief | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | User-facing learning lead (**q4_0 KV**) | 32768 |
-| jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16384 |
-| research-deep | `unsloth/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q4_K_M` | Best-known dense reasoning distill for deep work | 65536 |
-| research-qwen | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Newer Qwen3 thinking MoE alternative | 40960 |
-| synthesizer | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | Outline / study guide structuring | 32768 |
-| podcast-host | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | Conversational scripts (Mozilla doc→podcast used ~7B; 14B is better creative headroom) | 32768 |
-| show-notes | `unsloth/Qwen3-4B-GGUF:Q4_K_M` | Fast titles / blurbs | 16384 |
-| tutor | `unsloth/Qwen3-8B-GGUF:Q4_K_M` | Socratic Q&A over notes | 32768 |
+| Setting | Value |
+| --- | --- |
+| Port | 8081 |
+| Host | 127.0.0.1 |
+| `models-max` | 3 |
+| `warm` | chief, jev |
 
-TTS stays outside llama-server (Kokoro / Chatterbox / mlx-audio).
+| Role | Model | ctx | temp | top-p | KV | Other |
+| --- | --- | --- | --- | --- | --- | --- |
+| chief | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | 32768 | 0.7 | 0.8 | q4_0 | |
+| jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | 16384 | — | — | default | System One only |
+| research-deep | `unsloth/DeepSeek-R1-Distill-Qwen-32B-GGUF:Q4_K_M` | 65536 | 0.6 | 0.95 | default | |
+| research-qwen | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | 40960 | 0.6 | 0.95 | default | thinking on |
+| synthesizer | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | 32768 | 0.5 | 0.8 | default | |
+| podcast-host | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | 32768 | 0.9 | 0.95 | default | `top-k`: 40; `presence-penalty`: 1.2 |
+| show-notes | `unsloth/Qwen3-4B-GGUF:Q4_K_M` | 16384 | 0.5 | 0.8 | default | |
+| tutor | `unsloth/Qwen3-8B-GGUF:Q4_K_M` | 32768 | 0.6 | 0.8 | default | |
+
+Podcast **audio** is outside llama-server (TTS). See notes file.
 
 ## av-club
 
-| Role | Model | Why | ctx |
-| --- | --- | --- | --- |
-| chief | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | Creative lead talking to the human (**q4_0 KV**) | 32768 |
-| jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16384 |
-| director | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | Creative direction / shot lists | 32768 |
-| prompt-crafter | `mradermacher/Qwen3-1.7B-Flux-Prompt-GGUF:Q4_K_M` | Flux-prompt fine-tune (not generic 8B) | 8192 |
-| frame-review | `unsloth/Qwen3-VL-8B-Instruct-GGUF:Q4_K_M` | Strong local VLM for stills / OCR | 16384 |
-| editor | `unsloth/Qwen3-8B-GGUF:Q4_K_M` | Edit notes / assembly language | 32768 |
-| captioner | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | Publish-ready copy | 32768 |
-| tagger | `unsloth/Qwen3-1.7B-GGUF:Q4_K_M` | Cheap taxonomy / filenames | 8192 |
+| Setting | Value |
+| --- | --- |
+| Port | 8082 |
+| Host | 127.0.0.1 |
+| `models-max` | 3 |
+| `warm` | chief, jev |
 
-Image/video **generation** remains ComfyUI (+ your Flux GGUF), not these LLMs.
+| Role | Model | ctx | temp | top-p | KV | Other |
+| --- | --- | --- | --- | --- | --- | --- |
+| chief | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | 32768 | 0.85 | 0.95 | q4_0 | |
+| jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | 16384 | — | — | default | System One only |
+| director | `unsloth/Qwen3-14B-GGUF:Q4_K_M` | 32768 | 0.85 | 0.95 | default | |
+| prompt-crafter | `mradermacher/Qwen3-1.7B-Flux-Prompt-GGUF:Q4_K_M` | 8192 | 0.7 | 0.9 | default | `presence-penalty`: 0.5 |
+| frame-review | `unsloth/Qwen3-VL-8B-Instruct-GGUF:Q4_K_M` | 16384 | 0.3 | 0.8 | default | VL + mmproj; `presence-penalty`: 0.5 |
+| editor | `unsloth/Qwen3-8B-GGUF:Q4_K_M` | 32768 | 0.5 | 0.8 | default | |
+| captioner | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | 32768 | 0.6 | 0.9 | default | `presence-penalty`: 0.5 |
+| tagger | `unsloth/Qwen3-1.7B-GGUF:Q4_K_M` | 8192 | 0.2 | 0.8 | default | `presence-penalty`: 0 |
+
+Image/video **generation** is ComfyUI (+ your Flux GGUF), not these LLMs. See notes file.
