@@ -31,3 +31,7 @@ Frontmatter fields:
 | `trigger` | Optional exact user phrase the model expects |
 
 Load order for `ai-mode prompt <role>`: `presets/agents/<role>.md`.
+
+**jev (System One):** use two calls — Stage A `role`, then Stage B `test_layer` when the
+task is qa / test strategy (`jev.md`). QA consumes the layer; it does not replace jev's
+classification.
