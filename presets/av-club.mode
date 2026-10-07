@@ -1,0 +1,5 @@
+# ai-mode metadata for profile "av-club"
+description = Photo/video language side (pair with ComfyUI)
+port = 8082
+models-max = 2
+host = 127.0.0.1

@@ -1,0 +1,10 @@
+#!/bin/zsh
+set -euo pipefail
+# Deep research models are large — keep only one resident by default.
+exec llama-server \
+  --models-preset "$HOME/models/presets/learning-center.ini" \
+  --models-max 1 \
+  --host 127.0.0.1 \
+  --port 8081 \
+  --jinja \
+  "$@"

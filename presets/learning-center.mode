@@ -1,0 +1,5 @@
+# ai-mode metadata for profile "learning-center"
+description = Research → notes → podcast script
+port = 8081
+models-max = 1
+host = 127.0.0.1

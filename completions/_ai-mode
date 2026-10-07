@@ -1,0 +1,30 @@
+#compdef ai-mode
+
+_ai-mode() {
+  local -a cmds profiles
+  cmds=(
+    'list:List profiles'
+    'use:Activate a profile'
+    'which:Show active profile'
+    'status:Alias for which'
+    'stop:Stop managed server'
+    'restart:Restart profile'
+    'doctor:Health checks'
+    'env:Print shell exports'
+    'logs:Tail logs'
+    'url:Print base URL'
+    'models:List server models'
+    'init:Scaffold a new profile'
+  )
+  if (( CURRENT == 2 )); then
+    _describe -t commands 'ai-mode command' cmds
+    return
+  fi
+  case $words[2] in
+    use|restart|env|logs|init)
+      profiles=(${(f)"$(ai-mode list 2>/dev/null | awk '/^ [* ] /{print $2}')"})
+      _values 'profile' $profiles
+      ;;
+  esac
+}
+compdef _ai-mode ai-mode
