@@ -1,6 +1,6 @@
 # Unit Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
 **Intent of this document:** These guidelines set a clear direction for net new code and AI-generated tests. They are *not* a mandate to rewrite legacy tests overnight. Where legacy constraints prevent full compliance, the expectation is that teams **do not regress** and make incremental improvements over time.
 
@@ -30,13 +30,13 @@ Coined by Robert C. Martin. Every unit test should be:
 Every test has three distinct phases. Keep them visually separated with blank lines or comments.
 
 ```typescript
-it('returns the early payout amount when the bet qualifies', () => {
+it('returns the prorated refund when the line item qualifies', () => {
   // Arrange
-  const bet = buildBet({ stake: 10, currentOdds: -110, isEarlyPayoutEligible: true });
-  const calculator = new PayoutCalculator({ houseEdge: 0.05 });
+  const line = buildOrderLine({ quantity: 2, unitPrice: 49.99, isProratedRefundEligible: true });
+  const calculator = new RefundCalculator({ feeRate: 0.05 });
 
   // Act
-  const result = calculator.earlyPayout(bet);
+  const result = calculator.proratedRefund(line);
 
   // Assert
   expect(result.amount).toBeCloseTo(8.64, 2);
@@ -57,11 +57,11 @@ Test names are documentation. They are read far more often than they are written
 `describe` names the unit under test. `it` / `test` names the scenario and expected outcome.
 
 ```typescript
-describe('PayoutCalculator', () => {
-  describe('earlyPayout', () => {
-    it('returns the discounted amount when the bet is eligible', () => { ... });
-    it('throws InvalidBetError when the stake is zero', () => { ... });
-    it('returns null when early payout is not available for the market', () => { ... });
+describe('RefundCalculator', () => {
+  describe('proratedRefund', () => {
+    it('returns the discounted amount when the line item is eligible', () => { ... });
+    it('throws InvalidOrderLineError when the quantity is zero', () => { ... });
+    it('returns null when prorated refund is not available for the SKU', () => { ... });
   });
 });
 ```
@@ -116,7 +116,7 @@ Asserting that a specific method was called a specific number of times with spec
 | Context | Guideline |
 | --- | --- |
 | Net new services and modules | 80% line and branch coverage as a CI gate |
-| Critical business logic (bet settlement, payout calculation, eligibility rules) | Near 100% branch coverage, enforced in review |
+| Critical business logic (order settlement, refund calculation, eligibility rules) | Near 100% branch coverage, enforced in review |
 | Existing code with no tests | Do not decrease coverage; add characterization tests before modifying |
 | Generated or boilerplate code | Exclude from coverage tooling via per-file pragma or config |
 | AI-generated code | Same standard as handwritten code — AI output is not a coverage exemption |

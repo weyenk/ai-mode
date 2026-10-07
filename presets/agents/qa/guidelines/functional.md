@@ -1,6 +1,6 @@
 # Functional Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
 **Related pages:** These guidelines sit one layer above the [Unit Testing Guidelines](Unit Testing Guidelines.md). Read that page first if you are new to the test strategy. For multi-service and end-to-end coverage, see the Integration and Acceptance test guidelines.
 
@@ -42,7 +42,7 @@ The boundary of a functional test is the public contract of the module under tes
 
 ### Things that are always replaced at the boundary
 
-- External HTTP services (other internal platform services, third-party APIs, pricing feeds)
+- External HTTP services (other microservices, third-party APIs, catalog or inventory APIs)
 - Databases and data stores (PostgreSQL, Redis, DynamoDB) — use fakes or in-memory alternatives
 - Message queues and event buses (Kafka, SQS) — use fakes or captured payloads
 - Clocks and random number generators — always controlled
@@ -63,25 +63,25 @@ A functional test answers the question: *"When everything inside this module wor
 - **Not found** — requesting a non-existent resource returns 404 with a consistent error shape
 - **Conflict / duplicate** — creating a resource that already exists returns 409 where specified
 - **Dependency failure handling** — when an external double is configured to error, the service returns the correct degraded or error response (not a 500 with a stack trace)
-- **Domain rule enforcement** — business constraints that span multiple internal layers (e.g. a bet cannot be placed on a suspended market) should be verified end-to-end through the full internal stack, not just at the unit layer
+- **Domain rule enforcement** — business constraints that span multiple internal layers (e.g. an order cannot be placed when inventory is unavailable) should be verified end-to-end through the full internal stack, not just at the unit layer
 
 ## 5. Structure: Arrange – Act – Assert
 
 Functional tests follow the same AAA structure as unit tests, with one common addition: a **controlled environment setup** phase that configures the external doubles before each test. The same pattern applies across languages — only the entry point idiom differs.
 
 ```typescript
-describe('POST /bets', () => {
-  it('returns 201 with the created bet when the request is valid', async () => {
+describe('POST /orders', () => {
+  it('returns 201 with the created order when the request is valid', async () => {
     // Arrange — configure external doubles
-    pricingServiceFake.stubOdds({ marketId: 'mkt-001', odds: -110 });
-    walletServiceFake.stubBalance({ userId: 'usr-001', available: 100 });
+    catalogServiceFake.stubPrice({ skuId: 'sku-001', unitPrice: 49.99 });
+    inventoryServiceFake.stubAvailability({ skuId: 'sku-001', quantityAvailable: 100 });
 
-    const payload = { marketId: 'mkt-001', userId: 'usr-001', stake: 10 };
+    const payload = { skuId: 'sku-001', userId: 'usr-001', quantity: 2 };
 
     // Act — call through the full internal stack via Fastify injection
     const response = await app.inject({
       method: 'POST',
-      url: '/bets',
+      url: '/orders',
       payload,
       headers: { authorization: `Bearer ${validToken}` },
     });
@@ -91,26 +91,26 @@ describe('POST /bets', () => {
     expect(response.json()).toMatchObject({
       id: expect.any(String),
       status: 'PENDING',
-      stake: 10,
-      potentialPayout: expect.any(Number),
+      quantity: 2,
+      lineTotal: expect.any(Number),
     });
   });
 
-  it('returns 422 when the market is suspended', async () => {
+  it('returns 422 when the SKU is out of stock', async () => {
     // Arrange
-    pricingServiceFake.stubMarketSuspended({ marketId: 'mkt-suspended' });
+    inventoryServiceFake.stubOutOfStock({ skuId: 'sku-unavailable' });
 
     // Act
     const response = await app.inject({
       method: 'POST',
-      url: '/bets',
-      payload: { marketId: 'mkt-suspended', userId: 'usr-001', stake: 10 },
+      url: '/orders',
+      payload: { skuId: 'sku-unavailable', userId: 'usr-001', quantity: 1 },
       headers: { authorization: `Bearer ${validToken}` },
     });
 
     // Assert
     expect(response.statusCode).toBe(422);
-    expect(response.json().code).toBe('MARKET_SUSPENDED');
+    expect(response.json().code).toBe('SKU_UNAVAILABLE');
   });
 });
 ```
@@ -118,36 +118,36 @@ describe('POST /bets', () => {
 ```java
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-class PostBetsControllerTest {
+class PostOrdersControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
-    private PricingServiceClient pricingServiceClient;
+    private CatalogServiceClient catalogServiceClient;
 
     @MockBean
-    private WalletServiceClient walletServiceClient;
+    private InventoryServiceClient inventoryServiceClient;
 
     @Test
-    @DisplayName("returns 201 with the created bet when the request is valid")
-    void returns201WithCreatedBet() throws Exception {
+    @DisplayName("returns 201 with the created order when the request is valid")
+    void returns201WithCreatedOrder() throws Exception {
         // Arrange — configure external doubles
-        given(pricingServiceClient.getOdds("mkt-001"))
-            .willReturn(new OddsResponse("mkt-001", -110));
-        given(walletServiceClient.getBalance("usr-001"))
-            .willReturn(new BalanceResponse("usr-001", 100.0));
+        given(catalogServiceClient.getPrice("sku-001"))
+            .willReturn(new PriceResponse("sku-001", 49.99));
+        given(inventoryServiceClient.getAvailability("sku-001"))
+            .willReturn(new AvailabilityResponse("sku-001", 100));
 
         String payload = """
             {
-                "marketId": "mkt-001",
+                "skuId":    "sku-001",
                 "userId":   "usr-001",
-                "stake":    10
+                "quantity": 2
             }
             """;
 
         // Act — call through the full internal stack via MockMvc
-        mockMvc.perform(post("/bets")
+        mockMvc.perform(post("/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload)
                 .header("Authorization", "Bearer " + VALID_TOKEN))
@@ -155,33 +155,33 @@ class PostBetsControllerTest {
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.id").isString())
             .andExpect(jsonPath("$.status").value("PENDING"))
-            .andExpect(jsonPath("$.stake").value(10))
-            .andExpect(jsonPath("$.potentialPayout").isNumber());
+            .andExpect(jsonPath("$.quantity").value(2))
+            .andExpect(jsonPath("$.lineTotal").isNumber());
     }
 
     @Test
-    @DisplayName("returns 422 when the market is suspended")
-    void returns422WhenMarketIsSuspended() throws Exception {
+    @DisplayName("returns 422 when the SKU is out of stock")
+    void returns422WhenSkuUnavailable() throws Exception {
         // Arrange
-        given(pricingServiceClient.getOdds("mkt-suspended"))
-            .willThrow(new MarketSuspendedException("mkt-suspended"));
+        given(inventoryServiceClient.getAvailability("sku-unavailable"))
+            .willThrow(new SkuUnavailableException("sku-unavailable"));
 
         String payload = """
             {
-                "marketId": "mkt-suspended",
+                "skuId":    "sku-unavailable",
                 "userId":   "usr-001",
-                "stake":    10
+                "quantity": 1
             }
             """;
 
         // Act
-        mockMvc.perform(post("/bets")
+        mockMvc.perform(post("/orders")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(payload)
                 .header("Authorization", "Bearer " + VALID_TOKEN))
             // Assert
             .andExpect(status().isUnprocessableEntity())
-            .andExpect(jsonPath("$.code").value("MARKET_SUSPENDED"));
+            .andExpect(jsonPath("$.code").value("SKU_UNAVAILABLE"));
     }
 }
 ```
@@ -199,16 +199,16 @@ Functional test names describe the API surface and the outcome from the caller's
 **Pattern:** `[METHOD] [path] [scenario] → [expected outcome]`
 
 ```typescript
-describe('GET /bets/:id', () => {
-  it('returns 200 with the full bet detail when the bet belongs to the caller', () => { ... });
-  it('returns 404 when the bet does not exist', () => { ... });
-  it('returns 403 when the bet belongs to a different user', () => { ... });
+describe('GET /orders/:id', () => {
+  it('returns 200 with the full order detail when the order belongs to the caller', () => { ... });
+  it('returns 404 when the order does not exist', () => { ... });
+  it('returns 403 when the order belongs to a different user', () => { ... });
   it('returns 401 when no authorization header is provided', () => { ... });
 });
 
-describe('BetSettlementHandler', () => {
-  it('marks the bet as WON and triggers the payout event when the result is confirmed', () => { ... });
-  it('marks the bet as VOID and refunds the stake when the event is cancelled', () => { ... });
+describe('OrderFulfillmentHandler', () => {
+  it('marks the order as SHIPPED and emits the fulfillment event when dispatch is confirmed', () => { ... });
+  it('marks the order as CANCELLED and refunds the line total when fulfillment is aborted', () => { ... });
 });
 ```
 
@@ -247,10 +247,10 @@ Functional tests share the same independence requirements as unit tests, but the
 
 Good test data is explicit, minimal, and self-describing. The reader should understand the scenario from the data alone.
 
-- **Use builder functions** (factory pattern) for constructing domain objects. A `buildBet(overrides)` function with sensible defaults is far more readable than object literals scattered across 50 test files.
+- **Use builder functions** (factory pattern) for constructing domain objects. A `buildOrderLine(overrides)` function with sensible defaults is far more readable than object literals scattered across 50 test files.
 - **Only set fields relevant to the scenario.** Avoid copying full production payloads into tests — they obscure which fields actually matter for the behaviour under test.
 - **Avoid shared fixture files** that are reused across many tests. Shared fixtures become a maintenance burden and often hide which fields a test actually depends on.
-- **IDs and identifiers should be human-readable in tests** — `'market-suspended-001'` is better than `'a1b2c3d4-e5f6-...'` for communicating intent, even if production uses UUIDs.
+- **IDs and identifiers should be human-readable in tests** — `'sku-unavailable-001'` is better than `'a1b2c3d4-e5f6-...'` for communicating intent, even if production uses UUIDs.
 
 ## 10. OpenAPI / Swagger as the Source of Truth
 
@@ -258,13 +258,13 @@ For HTTP services, the OpenAPI specification is the definitive description of th
 
 - Every path + method combination in the spec should have at least one functional test.
 - Every documented response code (2xx, 4xx, 5xx) should be exercised by at least one test.
-- Request examples in the spec (`requestBody.content.*.examples`) should be used as test payloads where they exist — they represent the contract the API team committed to.
+- Request examples in the spec (`requestBody.content.*.examples`) should be used as test payloads where they exist — they represent the contract the API spec commits to.
 - Response bodies should be validated against the response schema using a schema validator (e.g. Ajv for TypeScript/Node) on critical endpoints. This catches drift between the spec and the implementation before it reaches consumers.
 - When the spec and the tests disagree, treat it as a bug — either the spec is wrong (update it) or the implementation is wrong (fix it).
 
 ## 11. Isolation from Other Test Types
 
-Functional tests must run independently from unit tests and multi-service integration tests. This is not bureaucratic — it is operational: when a functional test fails in CI, the team needs to know immediately which layer broke.
+Functional tests must run independently from unit tests and multi-service integration tests. This is not bureaucratic — it is operational: when a functional test fails in CI, you need to know immediately which layer broke.
 
 - **Separate file naming convention:**`*.functional.test.ts` or `*.api.test.ts` (never `*.test.ts` or `*.spec.ts` alone).
 - **Separate test script:**`"test:functional"` in `package.json`, not mixed into `"test"` (which should run unit tests only).

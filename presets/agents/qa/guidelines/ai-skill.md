@@ -1,6 +1,6 @@
 # AI Skill Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
 **Context:** These guidelines apply to the testing and quality assurance of **AI skills** — structured SKILL.md-driven agents that perform engineering tasks (writing tests, reviewing code, triaging issues, etc.). This is a distinct domain from testing software that happens to use AI as a component; for that, see the broader testing pyramid guidelines. This page addresses how to verify that a skill itself behaves correctly, reliably, and safely.
 
@@ -25,7 +25,7 @@ Like conventional software, AI skill quality has multiple layers. Each layer cat
 | Layer | What it verifies | Primary mechanism |
 | --- | --- | --- |
 | **Structural** | The SKILL.md is well-formed, has the required sections, and passes schema validation | Static analysis / linting of SKILL.md |
-| **Behavioural (Evals)** | The skill produces correct, useful output for a representative set of inputs | Eval harness (`run_skill_eval.py`) |
+| **Behavioural (Evals)** | The skill produces correct, useful output for a representative set of inputs | Project eval harness (script or CI job you maintain) |
 | **Regression** | Changes to the skill do not degrade previously passing behaviours | Eval score comparison between versions |
 | **Adversarial / Edge Case** | The skill handles unusual, ambiguous, or edge-case inputs gracefully | Curated adversarial eval cases |
 | **Safety** | The skill does not produce harmful, misleading, or out-of-scope outputs | Safety-focused eval cases; human review |
@@ -38,11 +38,11 @@ An eval case is a structured test scenario. It is the AI skill equivalent of a u
 
 ```json
 {
-  "id": "create-functional-tests-happy-path",
-  "description": "Skill creates a functional test file for a Fastify route with a valid OpenAPI spec",
+  "id": "example-test-writing-skill-happy-path",
+  "description": "Example: a test-writing skill creates a functional test file for a Fastify route with a valid OpenAPI spec",
   "input": {
-    "prompt": "Add functional tests for the GET /bets/:id route in bet-service",
-    "context": "PR diff showing a new GET /bets/:id route handler"
+    "prompt": "Add functional tests for the GET /orders/:id route in order-service",
+    "context": "PR diff showing a new GET /orders/:id route handler"
   },
   "criteria": [
     {
@@ -103,15 +103,13 @@ The temptation is to write evals that are easy to pass — simple, well-structur
 Evals must be run whenever the skill definition changes. This is the regression gate for AI skill development — the equivalent of running tests before merging a code change.
 
 ```bash
-# Validate a specific skill after SKILL.md changes
-/validate-skill-changes create-functional-api-tests
-
-# Or run directly
-python3 skills/evaluating-skills/scripts/run_skill_eval.py \
-  --skill skills/create-functional-api-tests \
-  --iteration 1 \
+# After SKILL.md changes — use your repo's eval harness (paths and flags are project-specific)
+python3 path/to/your_eval_runner.py \
+  --skill path/to/your-skill \
   --runs-per-eval 2
 ```
+
+If you do not have an eval runner yet, treat manual review plus a fixed set of golden prompts as the minimum gate until you add one.
 
 ### Multiple runs per eval case
 
@@ -156,7 +154,7 @@ For skills that are used at high frequency or in high-stakes contexts, schedule 
 ## 10. Versioning and Changelog
 
 - SKILL.md files should be treated like production code: changes go through PR review, include a summary of what changed and why, and are linked to the eval results that validated the change.
-- Breaking changes to a skill (changes that alter its scope, output format, or required inputs) must be communicated to the teams who use the skill before merging.
+- Breaking changes to a skill (changes that alter its scope, output format, or required inputs) should be communicated to consumers of the skill before merging.
 - Maintain a changelog section in or alongside SKILL.md recording the intent of each significant revision.
 
 ## 11. Quality Metrics for AI Skills

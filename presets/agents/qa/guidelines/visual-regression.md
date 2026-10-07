@@ -1,6 +1,6 @@
 # Visual Regression Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
 **Related pages:** Visual regression tests are embedded within **Acceptance Tests** (PR stage: `UIAcceptance_with_embedded_visual_regression_mockedAPI`) and run as a full matrix in the [Nightly Stage](E2E Testing Guidelines.md) (`Acceptance_full_matrix_with_visual_snapshots`). Visual regression is a *complement* to functional tests — it catches a class of regressions that no assertion library can express.
 
@@ -24,7 +24,7 @@ Visual regression testing catches the regressions that are invisible to assertio
 - **Jason Palmer** — Creator of Percy and the originator of *perceptual diffing* as a discipline. Palmer's core thesis: visual correctness is not a binary property that can be expressed as a pass/fail assertion. A 2-pixel shift is meaningless in one context and critical in another. The correct solution is human review of computed diffs, not automated pass/fail on pixel counts. Percy's architecture — snapshot → diff → human review → approve/reject — is the practical expression of this philosophy.
 - **Gleb Bahmutov** — On the integration of visual testing with Cypress and the discipline of *snapshot stabilisation*: eliminating all sources of non-determinism (animations, dynamic dates, random IDs, loading spinners) before taking a snapshot. A snapshot taken of an unstable UI is a source of false positives, not a quality signal.
 - **Adam Carmi (Applitools)** — Visual AI testing: using perceptual similarity rather than exact pixel comparison to reduce noise from sub-pixel rendering differences across platforms and anti-aliasing variations. The signal-to-noise ratio of a visual test suite is determined entirely by how well non-meaningful differences are filtered from meaningful ones.
-- **Brad Frost** — Atomic Design and the argument for *component-level visual snapshots* over page-level snapshots. Testing the visual output of each component in isolation (via Storybook) gives precise failure messages — "the BetSlip card's border radius changed" rather than "the bet placement page looks different." Pages are composed of components; catch regressions at the component level to get actionable, low-noise diffs.
+- **Brad Frost** — Atomic Design and the argument for *component-level visual snapshots* over page-level snapshots. Testing the visual output of each component in isolation (via Storybook) gives precise failure messages — "the OrderSummary card's border radius changed" rather than "the checkout page looks different." Pages are composed of components; catch regressions at the component level to get actionable, low-noise diffs.
 - **Martin Fowler** — On non-determinism and test reliability. The single biggest cause of failing visual test suites is non-deterministic snapshots: animations mid-frame, async content that hasn't resolved, platform-specific font rendering. A flaky visual test is worthless — it will be ignored, then bypassed, then its entire category will be discredited.
 
 ## 3. Where Visual Regression Sits in the Pipeline
@@ -69,7 +69,7 @@ A false positive is a diff that does not represent a visual regression — it re
 | **User avatars and remote images** | Network latency; images may not load; CDN responses vary | Mock all image requests to return deterministic local assets |
 | **Font rendering differences** | Sub-pixel differences between OS font renderers (macOS vs Linux CI) | Use Percy's perceptual diffing mode; ensure CI and local runs use the same font stack; pin font files in the test environment |
 | **Scroll position** | Scrolled viewport captures different content than fresh viewport | Reset scroll position to 0,0 before each snapshot; use Percy's full-page snapshot capability explicitly |
-| **Third-party embeds** | Ads, tracking pixels, live odds feeds render differently each run | Block or mock all third-party network requests in the visual test environment |
+| **Third-party embeds** | Ads, tracking pixels, live recommendation widgets render differently each run | Block or mock all third-party network requests in the visual test environment |
 
 ## 6. What to Snapshot
 
@@ -77,7 +77,7 @@ A false positive is a diff that does not represent a visual regression — it re
 
 - **Component states:** Every significant visual state of a component — default, hover, active, disabled, loading, error, empty, focused. Take one snapshot per state, not one per component.
 - **Responsive breakpoints:** At a minimum, mobile (375px), tablet (768px), and desktop (1280px) for every component and flow. Visual regressions are disproportionately likely at breakpoints.
-- **Critical user flows:** Bet slip, deposit form, registration — the screens where a visual regression has direct financial or conversion impact.
+- **Critical user flows:** Checkout, payment form, registration — the screens where a visual regression has direct financial or conversion impact.
 - **Design system components:** Every component in the shared design system library. These are upstream dependencies — a visual change to a base button affects every screen that uses it.
 - **Typography and colour token applications:** Explicitly snapshot text-heavy components and colour-critical components after any design token change.
 
@@ -95,7 +95,7 @@ Both have their place. The principle is the same as the testing pyramid: prefer 
 COMPONENT-LEVEL (PREFERRED)
 
 - Taken via Storybook stories or RTL renders
-- Precise diff: "the BetSlip card footer changed"
+- Precise diff: "the OrderSummary card footer changed"
 - Fast, isolated, deterministic
 - Easy to update baselines per component
 - Low noise — only the component under test is in the frame
@@ -140,13 +140,13 @@ Percy snapshot names appear in the diff review UI and become the permanent recor
 
 ```typescript
 // Good — specific, stable, includes state and viewport context
-cy.percySnapshot('BetSlip - single selection - desktop');
-cy.percySnapshot('BetSlip - single selection - empty state - mobile');
-cy.percySnapshot('BetSlip - error: insufficient funds - desktop');
+cy.percySnapshot('OrderSummary - single item - desktop');
+cy.percySnapshot('OrderSummary - single item - empty state - mobile');
+cy.percySnapshot('OrderSummary - error: insufficient funds - desktop');
 
 // Bad — vague, volatile, duplicated
 cy.percySnapshot('test');
-cy.percySnapshot('BetSlip screenshot 1');
+cy.percySnapshot('OrderSummary screenshot 1');
 cy.percySnapshot(`Screenshot ${Date.now()}`);
 ```
 
@@ -182,9 +182,9 @@ module.exports = {
 
 If the product supports multiple themes (light/dark, brand variations), each theme is a separate visual concern. A snapshot in light mode does not cover dark mode regressions.
 
-- Take snapshots in each supported theme as separate named snapshots: `'BetSlip - desktop - light'` and `'BetSlip - desktop - dark'`.
+- Take snapshots in each supported theme as separate named snapshots: `'OrderSummary - desktop - light'` and `'OrderSummary - desktop - dark'`.
 - Use Percy's `colorScheme` option to control the preferred colour scheme at the browser level rather than manipulating the DOM directly — this tests the real CSS media query behaviour.
-- Prioritise dark mode coverage for components with complex colour logic (e.g. odds movement indicators, status colours, gradients).
+- Prioritise dark mode coverage for components with complex colour logic (e.g. stock or status indicators, status colours, gradients).
 
 ## 11. Coverage Expectations
 
@@ -214,7 +214,7 @@ If the product supports multiple themes (light/dark, brand variations), each the
 
 - **Don't add visual snapshots to components without first stabilising them.** Adding a Percy snapshot to an unstable component immediately creates a source of false positives that will be bypassed.
 - **Start with design system components.** The highest leverage starting point is a Storybook Percy run across all design system components. It catches regressions upstream before they propagate to every screen that uses the component.
-- **Add page-level snapshots for the critical path first.** Bet placement and deposit flows before everything else. Expand coverage incrementally from there.
+- **Add page-level snapshots for the critical path first.** Checkout and payment flows before everything else. Expand coverage incrementally from there.
 - **When you modify a component that has no visual snapshot, add one.** This is the visual equivalent of the Boy Scout Rule — leave it with more coverage than you found it.
 
 ## 14. Quick Reference Checklist

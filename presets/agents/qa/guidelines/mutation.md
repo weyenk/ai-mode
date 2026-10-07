@@ -1,8 +1,8 @@
 # Mutation Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
-**Related pages:** These guidelines sit alongside the [Unit Testing Guidelines](Unit Testing Guidelines.md) — read that page first if you are new to the test strategy. For broader test-pyramid context, see the **Quality in Product Engineering** parent page.
+**Related pages:** These guidelines sit alongside the [Unit Testing Guidelines](Unit Testing Guidelines.md) — read that page first if you are new to the test strategy. For broader test-pyramid context, see the guidelines index in [`README.md`](README.md).
 
 ## 1. Purpose and scope
 
@@ -17,9 +17,9 @@ Use mutation testing when you want confidence that unit tests would catch realis
 | Trigger | Run target | Notes |
 | --- | --- | --- |
 | **PR / feature branch** | Changed files in scope only | Default for developers; fast feedback |
-| **Pre-merge gate (critical modules)** | Entire module or package | Auth, pricing, payments, bet placement, PII |
+| **Pre-merge gate (critical modules)** | Entire module or package | Auth, pricing, payments, checkout, PII |
 | **Nightly / scheduled** | Configured module set | Full scope; trend mutation score over time |
-| **Ad hoc / skill invocation** | User-defined scope | Via the `create-mutation-tests` Cursor skill |
+| **Ad hoc / local run** | User-defined scope | Manual run using §3 tooling; triage with §7 template |
 
 **Prerequisite:** The unit test suite must be **green** before a mutation run. Do not run mutation testing on a failing suite—the results are meaningless.
 
@@ -44,7 +44,7 @@ Use the mutation tool already configured in the repo. Do not introduce a second 
 | **Changes only** | Mutate files or lines touched in the PR or branch diff. Use incremental/diff mode when the tool supports it. |
 | **Entire scope** | Mutate all production code in the named module or package. Apply exclude patterns from §6. |
 
-**Scope inference on feature branches:** Default to `git diff` against the default branch (`main` / `master`). Branch names with a Jira key prefix (e.g. `TOAD-1234-feature-name`) may expand context via the linked story.
+**Scope inference on feature branches:** Default to `git diff` against the default branch (`main` / `master`). Branch names with an issue-key prefix (e.g. `PROJ-1234-feature-name`) may expand context via the linked ticket.
 
 ## 5. Mutation score thresholds
 
@@ -54,7 +54,7 @@ Team defaults below. Individual repos may tighten thresholds in their mutation c
 | --- | --- | --- |
 | PR (changed files) | **No hard gate (v1)** — report only | Triage Critical and High survivors before merge (team judgment) |
 | Critical modules (auth, pricing, payments) | **≥ 70%** | Block merge or require documented exception |
-| Nightly trend | No regression \> 5 pts week-over-week | Investigate in next sprint |
+| Nightly trend | No regression \> 5 pts week-over-week | Investigate in the next planning cycle |
 
 Scores are informational on non-critical paths until teams adopt local gates.
 
@@ -70,7 +70,7 @@ These patterns are **Low triage by default**. Exclude them in mutation config wh
 | DTOs / data-only types | Pure data classes with no logic |
 | Logging and debug | Log statements, debug helpers |
 | Framework boilerplate | `main`, default `toString`, `hashCode`, `equals` with no custom logic |
-| Third-party / vendored | Code not owned by the team |
+| Third-party / vendored | Code not owned by the project |
 | Config and build | Config-only files, migrations, build scripts |
 
 **Per-repo config examples:**
@@ -87,14 +87,14 @@ A **survivor** is a mutant your tests did not kill. Assign each survivor one imp
 
 | Level | Definition | Examples | Required action |
 | --- | --- | --- | --- |
-| **Critical** | Security, money, PII, auth, idempotency, concurrency | Conditional removed on auth check; boundary operator flipped on stake or price | **Must** add a test or fix before merge; escalate if product change is needed |
+| **Critical** | Security, money, PII, auth, idempotency, concurrency | Conditional removed on auth check; boundary operator flipped on quantity or price | **Must** add a test or fix before merge; escalate if product change is needed |
 | **High** | Core business rules, error paths, state transitions | Missing assertion on error branch; untested wrong default | Add test in same PR or linked follow-up before merge |
-| **Medium** | Secondary logic, non-default branches | Optional validation edge case | Add test or accept with Jira ticket |
+| **Medium** | Secondary logic, non-default branches | Optional validation edge case | Add test or accept with a tracked issue |
 | **Low** | Logging, trivial accessors, generated/boilerplate | Matches §6 exclude patterns | Ignore in config or accept with rationale |
 
 ### Triage report template
 
-Teams and the `create-mutation-tests` skill use this shape:
+Teams use this shape for mutation triage reports:
 
 ```markdown
 ## Mutation run summary
@@ -128,12 +128,12 @@ Ignore a survivor (via config + documented rationale) when **all** of the follow
 1. Triage level is **Low**, OR the code matches §6 exclude patterns
 2. Adding a test would assert implementation detail without behavioral value
 3. The mutant is equivalent (e.g. string literal mutation in user-facing copy with no logic impact)
-4. Cost to kill exceeds value (document in PR; Tech Lead or QE sign-off for Critical/High deferrals)
+4. Cost to kill exceeds value (document in PR; engineering lead or QA reviewer sign-off for Critical/High deferrals)
 
 **Rules:**
 
-- **Never ignore without documentation** — PR comment, Jira link, or config comment.
-- **Never ignore Critical or High** without explicit exception approval (QE + dev lead).
+- **Never ignore without documentation** — PR comment, issue link, or config comment.
+- **Never ignore Critical or High** without explicit exception approval (QA reviewer + engineering lead).
 
 ## 9. Post-run actions (standard playbook)
 
@@ -142,44 +142,28 @@ Ignore a survivor (via config + documented rationale) when **all** of the follow
 | **Report only** | Exploratory run, CI nightly review |
 | **Strengthen tests** | Default for PR work — add unit tests for Critical/High survivors (test code only) |
 | **Configure ignores** | Low survivors matching §6; document rationale |
-| **Track externally** | Jira ticket for deferred Medium+ items |
+| **Track externally** | Issue tracker ticket for deferred Medium+ items |
 | **Re-run** | After test changes; confirm score improved and survivors killed |
 
 Product or application code changes to kill mutants require **explicit approval**. Prefer test improvements first.
 
-## 10. Using the `create-mutation-tests` Cursor skill
+## 10. Manual ad-hoc runs
 
-The skill implements this page at runtime. It is the recommended way to run mutation testing locally with consistent triage and post-run handling.
+When running mutation testing outside CI, follow this playbook:
 
-|  |  |
-| --- | --- |
-| **Invocation** | Explicit only — `@create-mutation-tests` or skill picker. Not auto-applied. |
-| **Repo** | `ee-quality-cursor-skills` (your organization's quality Cursor skills repository) — activate via `link-active-skills.sh` |
-| **Source of truth** | Loads the canonical guidelines document (e.g. via your team's docs MCP or local copy); falls back to `docs/standards/mutation-testing-guidelines.md` in the skills repo |
+1. Confirm the unit suite is green (§2).
+2. Choose **scope** and **run target** (changes only vs entire scope) per §4.
+3. Run the project's mutation command from §3.
+4. Triage surviving mutants using the §7 template.
+5. Apply the chosen post-run action from §9.
 
-**What the skill does:**
+**Guidelines source:** Read this page from `presets/agents/qa/guidelines/mutation.md`. In ai-mode / Qwen Code, load layer guides (including mutation) via the local `skills/testing-guidelines/` skill — see `skills/README.md` for symlink install.
 
-1. Prompts for **scope**, **run target** (changes only vs entire scope), and **post-run action** if not supplied
-2. Loads the canonical **Mutation Testing Guidelines** document
-3. Detects language and existing mutation tooling
-4. Runs mutation testing on the scoped area
-5. Triages surviving mutants per §7
-6. Executes the chosen post-run action per §9
-
-**What the skill does not do:**
-
-- Modify product code without approval
-- Skip or fake success when the unit suite is red or tooling is missing
-- Invent thresholds not defined on this page
-
-**Related skills:**
-
-- `create-unit-tests` — writing isolated unit tests
-- `expose-the-testing-gaps` — gap analysis without running a mutator
-
-**Example invocation:**
+**Example request (human or agent):**
 
 > Run mutation testing on `src/pricing/` — changed files only, strengthen tests for Critical and High survivors.
+
+Do not modify product code without approval. Do not run mutation when the unit suite is red or tooling is missing.
 
 ## 11. CI and ownership
 
@@ -187,4 +171,4 @@ The skill implements this page at runtime. It is the recommended way to run muta
 | --- | --- |
 | **PR** | Optional mutation step on changed paths; publish HTML or JSON report as a CI artifact |
 | **Nightly** | Full module runs for designated services; track score trend |
-| **Ownership** | QE defines standards (this page); service teams own config and remediation |
+| **Ownership** | Project maintainers define standards (this page); each service owner maintains config and remediation |

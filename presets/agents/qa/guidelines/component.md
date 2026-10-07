@@ -1,8 +1,8 @@
 # Component Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
-**Related pages:** Component tests sit above [Unit Testing](Unit Testing Guidelines.md) (pure logic) and below **Acceptance Testing** (full user flows). This layer is primarily relevant to the React web app and React Native mobile app. Backend service teams should refer to the [Functional Testing Guidelines](Functional Testing Guidelines.md).
+**Related pages:** Component tests sit above [Unit Testing](Unit Testing Guidelines.md) (pure logic) and below **Acceptance Testing** (full user flows). This layer is primarily relevant to the React web app and React Native mobile app. Backend/API code should use the [Functional Testing Guidelines](Functional Testing Guidelines.md).
 
 ## 1. What Is a Component Test?
 
@@ -83,13 +83,13 @@ Use **Mock Service Worker (msw)** to intercept HTTP requests at the service work
 ```typescript
 // Preferred: intercept at the network layer
 server.use(
-  http.get('/api/bets/:id', () =>
-    HttpResponse.json({ id: 'bet-001', status: 'PENDING', stake: 10 })
+  http.get('/api/orders/:id', () =>
+    HttpResponse.json({ id: 'ord-001', status: 'PENDING', quantity: 2 })
   )
 );
 
 // Avoid: mocking the hook or client directly
-jest.mock('../hooks/useBet', () => ({ useBet: () => ({ data: { id: 'bet-001' } }) }));
+jest.mock('../hooks/useOrder', () => ({ useOrder: () => ({ data: { id: 'ord-001' } }) }));
 ```
 
 ### Navigation and platform APIs
@@ -109,14 +109,14 @@ Async is where most component tests break or become flaky. Follow these rules wi
 - **Configure **`server.resetHandlers()`** in **`afterEach` when using msw — stale handlers are a leading cause of test order dependency.
 
 ```typescript
-it('shows the bet slip after the user places a bet', async () => {
-  render(<BetPlacementFlow />, { wrapper: Providers });
+it('shows the order summary after the user submits checkout', async () => {
+  render(<CheckoutFlow />, { wrapper: Providers });
 
-  await userEvent.type(screen.getByRole('spinbutton', { name: /stake/i }), '10');
-  await userEvent.click(screen.getByRole('button', { name: /place bet/i }));
+  await userEvent.type(screen.getByRole('spinbutton', { name: /quantity/i }), '2');
+  await userEvent.click(screen.getByRole('button', { name: /place order/i }));
 
-  expect(await screen.findByText(/bet placed/i)).toBeInTheDocument();
-  expect(screen.getByText(/potential payout/i)).toBeInTheDocument();
+  expect(await screen.findByText(/order confirmed/i)).toBeInTheDocument();
+  expect(screen.getByText(/order total/i)).toBeInTheDocument();
 });
 ```
 
@@ -152,15 +152,15 @@ Component tests are the lowest-cost place to catch accessibility regressions. A 
 Component test names describe user-observable behaviour. The `describe` block names the component or feature; `it` names the condition and what the user sees.
 
 ```typescript
-describe('BetSlip', () => {
-  it('shows the potential payout when a valid stake is entered', async () => { ... });
-  it('disables the Place Bet button when the stake exceeds the available balance', async () => { ... });
-  it('shows an error message when the market is suspended', async () => { ... });
-  it('clears all selections when the user taps Clear', async () => { ... });
+describe('OrderSummary', () => {
+  it('shows the order total when a valid quantity is entered', async () => { ... });
+  it('disables the Place Order button when the total exceeds the available balance', async () => { ... });
+  it('shows an error message when the SKU is out of stock', async () => { ... });
+  it('clears all line items when the user taps Clear', async () => { ... });
 });
 
-describe('BetSlip — empty state', () => {
-  it('shows the empty state message when no selections have been added', () => { ... });
+describe('OrderSummary — empty state', () => {
+  it('shows the empty state message when no items have been added', () => { ... });
 });
 ```
 

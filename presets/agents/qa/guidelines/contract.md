@@ -1,6 +1,6 @@
 # Contract Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
 **Related pages:** Contract tests back the doubles used in [Functional Tests](Functional Testing Guidelines.md) and [Component Tests](Component Testing Guidelines.md). Without contract tests, your fakes and stubs can drift silently from the real services they represent. Contract tests are the mechanism that keeps them honest.
 
@@ -61,39 +61,39 @@ Contract tests are narrow by design. They verify the **shape and semantics** of 
 ## 5. Writing a Pact Consumer Test
 
 ```typescript
-describe('BetService consumer contract', () => {
+describe('OrderService consumer contract', () => {
   const provider = new PactV3({
-    consumer: 'sportsbook-web',
-    provider: 'bet-service',
+    consumer: 'storefront-web',
+    provider: 'order-service',
     dir: path.resolve(process.cwd(), 'pacts'),
   });
 
-  it('returns the bet detail when a valid bet ID is requested', async () => {
+  it('returns the order detail when a valid order ID is requested', async () => {
     await provider
-      .given('a bet with ID bet-001 exists')
-      .uponReceiving('a GET request for bet bet-001')
+      .given('an order with ID ord-001 exists')
+      .uponReceiving('a GET request for order ord-001')
       .withRequest({
         method: 'GET',
-        path: '/bets/bet-001',
+        path: '/orders/ord-001',
         headers: { Authorization: like('Bearer some-token') },
       })
       .willRespondWith({
         status: 200,
         headers: { 'Content-Type': 'application/json' },
         body: {
-          id: like('bet-001'),
+          id: like('ord-001'),
           status: like('PENDING'),
-          stake: like(10),
-          potentialPayout: like(19.09),
-          marketId: like('mkt-abc'),
+          quantity: like(2),
+          lineTotal: like(99.98),
+          skuId: like('sku-abc'),
         },
       })
       .executeTest(async (mockServer) => {
-        const client = new BetServiceClient({ baseUrl: mockServer.url });
-        const bet = await client.getBet('bet-001');
+        const client = new OrderServiceClient({ baseUrl: mockServer.url });
+        const order = await client.getOrder('ord-001');
 
-        expect(bet.id).toBe('bet-001');
-        expect(bet.status).toBe('PENDING');
+        expect(order.id).toBe('ord-001');
+        expect(order.status).toBe('PENDING');
       });
   });
 });
@@ -103,19 +103,19 @@ describe('BetService consumer contract', () => {
 
 - Use `like()` matchers for volatile values; use exact values only when the consumer's logic depends on a specific value.
 - Use `eachLike()` for arrays — verifies the array structure without requiring a specific length.
-- Provider states (the `given()` clause) must be meaningful English that the provider team can implement as test setup. "a bet with ID bet-001 exists" is correct; "state 1" is not.
+- Provider states (the `given()` clause) must be meaningful English that provider maintainers can implement as test setup. "an order with ID ord-001 exists" is correct; "state 1" is not.
 - One interaction per `it` block — keep contracts granular and composable.
 
 ## 6. Provider Verification
 
-The provider team verifies pacts as part of their CI pipeline. They are responsible for:
+Provider maintainers verify pacts as part of their CI pipeline. They are responsible for:
 
 - Implementing provider state handlers that set up the test data described by consumer-defined states
 - Running `verifyProvider()` against their real service (typically using Fastify injection or a local test server)
 - Publishing verification results to the Pact Broker on every provider CI build
 - Treating a failed verification as a breaking change — equivalent to a failing test
 
-Provider teams must not merge changes that break existing consumer contracts without coordinating the breaking change with all affected consumer teams first.
+Providers must not merge changes that break existing consumer contracts without coordinating the breaking change with all affected consumers first.
 
 ## 7. The Can I Deploy Gate
 
@@ -123,7 +123,7 @@ The Pact Broker's `can-i-deploy` command must be run as a pipeline gate before d
 
 ```bash
 pact-broker can-i-deploy \
-  --pacticipant sportsbook-web \
+  --pacticipant storefront-web \
   --version $GIT_COMMIT \
   --to-environment production
 ```
@@ -140,7 +140,7 @@ This gate is what gives contract testing its real value — it replaces the need
 | Adding a new field from an existing endpoint that your consumer uses | Update the consumer contract to include the new field |
 | Adding a new endpoint to a provider service | Check whether any consumers are already relying on it; if so, formalise the contract |
 | Writing a functional test that needs a fake for an external service | The fake should be backed by a Pact contract — write the contract first |
-| A provider is changing or removing a field | Provider team must check whether any consumer contracts depend on the field before making the change |
+| A provider is changing or removing a field | Provider maintainers must check whether any consumer contracts depend on the field before making the change |
 
 ## 9. Relationship to Fakes and Stubs
 
@@ -162,7 +162,7 @@ The ideal workflow: write the consumer contract first, use the Pact interaction 
 
 | Smell | Problem | Fix |
 | --- | --- | --- |
-| **Exact value matchers everywhere** | Contracts break on irrelevant value changes (e.g. a payout rounding change) | Use `like()` for values the consumer does not depend on exactly |
+| **Exact value matchers everywhere** | Contracts break on irrelevant value changes (e.g. a tax rounding change) | Use `like()` for values the consumer does not depend on exactly |
 | **Contracting fields the consumer never reads** | Unnecessary coupling; provider can't evolve freely | Only contract what your code actually maps or displays |
 | **Vague provider states** | Provider can't implement state setup; verification is inconsistent | States must describe a specific, replicable condition |
 | **Not running Can I Deploy before deploying** | Silent incompatibility reaches production | Can I Deploy is a mandatory CI gate, not optional |

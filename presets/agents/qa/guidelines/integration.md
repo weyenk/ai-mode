@@ -1,6 +1,6 @@
 # Integration Testing Guidelines
 
-*Maintained by the Engineering Quality Team. Last reviewed June 2026.*
+*Portable QA reference. Last reviewed June 2026.*
 
 **Related pages:** Integration tests sit above [Functional Tests](Functional Testing Guidelines.md) (single-service, all deps mocked) and below full [E2E Tests](E2E Testing Guidelines.md) (entire stack live). Read the [Contract Testing Guidelines](Contract Testing Guidelines.md) before deciding whether integration tests are needed — strong contract coverage often makes them unnecessary.
 
@@ -52,7 +52,7 @@ There are specific gaps that Pact contracts cannot close, even when coverage is 
 | BFF / orchestration service, strong Pact contracts per collaborator | FUNCTIONAL + CONTRACT IS SUFFICIENT for most paths |
 | Any service with complex HTTP client config (retries, mTLS, circuit breakers) | NARROW INTEGRATION TEST targeting infrastructure behaviour specifically |
 | Service with collaborators that have thin or unverified contracts | NARROW INTEGRATION TEST to characterise real collaborator behaviour |
-| Financial / regulated flows (bet placement, withdrawal, settlement) | NARROW INTEGRATION TEST REQUIRED — risk asymmetry justifies the cost |
+| Financial / regulated flows (checkout, refund, settlement) | NARROW INTEGRATION TEST REQUIRED — risk asymmetry justifies the cost |
 | Multi-service financial chain where failures cascade | BROAD INTEGRATION TEST for the critical path; narrow for individual services |
 
 **Before writing an integration test, ask:** does adding this test give me confidence that functional tests and contract tests cannot already provide? If the answer is no, invest that effort in improving contract coverage instead. A better Pact contract is more reusable and cheaper to maintain than an integration test environment.
@@ -72,47 +72,47 @@ When integration tests are warranted, their breadth should be calibrated to the 
 When a narrow integration test is warranted, run your service against a real collaborator started with its dependencies controlled. You do not control the collaborator's dependencies from your test file — you configure them in the collaborator's Docker or test profile, where WireMock stubs replace its upstream calls.
 
 ```typescript
-// test/integration/saved-bets.integration.test.ts
+// test/integration/saved-orders.integration.test.ts
 //
-// When to write this: bet-service has thin error contracts, or this is a financial path.
-// Setup: saved-bets-service (our service) + real bet-service via docker-compose.
-// bet-service "integration-test" profile: seeded DB, WireMock sidecar for its upstream pricing calls.
+// When to write this: order-service has thin error contracts, or this is a financial path.
+// Setup: saved-orders-service (our service) + real order-service via docker-compose.
+// order-service "integration-test" profile: seeded DB, WireMock sidecar for its upstream catalog calls.
 
 import { createApp } from '../../src/app';
 import type { FastifyInstance } from 'fastify';
 
-describe('GET /saved-bets/:userId — narrow integration with real bet-service', () => {
+describe('GET /saved-orders/:userId — narrow integration with real order-service', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
-    // BET_SERVICE_URL points to the real Docker service (see docker-compose.integration.yml)
-    app = await createApp({ betServiceUrl: process.env.BET_SERVICE_URL });
+    // ORDER_SERVICE_URL points to the real Docker service (see docker-compose.integration.yml)
+    app = await createApp({ orderServiceUrl: process.env.ORDER_SERVICE_URL });
     await app.ready();
   });
 
   afterAll(() => app.close());
 
-  it('returns enriched saved bets using real bet-service responses', async () => {
-    // usr-seed-001 exists in bet-service's seeded test database
+  it('returns enriched saved orders using real order-service responses', async () => {
+    // usr-seed-001 exists in order-service's seeded test database
     const response = await app.inject({
       method: 'GET',
-      url: '/saved-bets/usr-seed-001',
+      url: '/saved-orders/usr-seed-001',
       headers: { authorization: 'Bearer test-token' },
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().bets[0]).toMatchObject({
+    expect(response.json().orders[0]).toMatchObject({
       id: expect.any(String),
-      stake: expect.any(Number),
-      status: 'SETTLED',
+      quantity: expect.any(Number),
+      status: 'FULFILLED',
     });
   });
 
-  it('propagates 404 correctly when real bet-service returns 404', async () => {
-    // usr-no-bets is a seed identity with no bets in bet-service's test DB
+  it('propagates 404 correctly when real order-service returns 404', async () => {
+    // usr-no-orders is a seed identity with no orders in order-service's test DB
     const response = await app.inject({
       method: 'GET',
-      url: '/saved-bets/usr-no-bets',
+      url: '/saved-orders/usr-no-orders',
       headers: { authorization: 'Bearer test-token' },
     });
 
@@ -123,17 +123,17 @@ describe('GET /saved-bets/:userId — narrow integration with real bet-service',
 
 ```java
 // When to write this: financial path, or complex HTTP client config to verify.
-// BetService runs as a real container in its "integration-test" Spring profile:
+// OrderService runs as a real container in its "integration-test" Spring profile:
 //   - DB: seeded H2 instance
-//   - Upstream pricing calls: WireMock sidecar (configured in docker-compose.integration.yml)
+//   - Upstream catalog calls: WireMock sidecar (configured in docker-compose.integration.yml)
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
 @Testcontainers
-class SavedBetsNarrowIntegrationTest {
+class SavedOrdersNarrowIntegrationTest {
 
     @Container
-    static GenericContainer<?> betService = new GenericContainer<>("example-org/bet-service:test")
+    static GenericContainer<?> orderService = new GenericContainer<>("my-service/order-service:test")
         .withExposedPorts(8080)
         .withEnv("SPRING_PROFILES_ACTIVE", "integration-test")
         .waitingFor(Wait.forHttp("/health").forStatusCode(200));
@@ -143,14 +143,14 @@ class SavedBetsNarrowIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {
-        registry.add("bet-service.base-url",
-            () -> "http://localhost:" + betService.getMappedPort(8080));
+        registry.add("order-service.base-url",
+            () -> "http://localhost:" + orderService.getMappedPort(8080));
     }
 
     @Test
-    @DisplayName("propagates 404 from real bet-service when user has no bets")
-    void propagates404FromRealBetService() throws Exception {
-        mockMvc.perform(get("/saved-bets/usr-no-bets")
+    @DisplayName("propagates 404 from real order-service when user has no orders")
+    void propagates404FromRealOrderService() throws Exception {
+        mockMvc.perform(get("/saved-orders/usr-no-orders")
                 .header("Authorization", "Bearer test-token"))
             .andExpect(status().isNotFound());
     }
