@@ -54,6 +54,21 @@ labelled cases (accuracy, confidence, wrong-but-clear, confusions) without writi
 runs the tuning set and the held-out set. See *Tuning jev's confidence* in
 [`presets/agents/jev.md`](presets/agents/jev.md).
 
+**Review real traffic.** `ai-mode review` steps through recent calls (default: last 7 days, newest 20, only
+ones you haven't judged) and asks how each did:
+
+```bash
+ai-mode review                       # interactive: Enter = looks right, or type the correct role / n [why]
+ai-mode review --list                # how many are waiting
+ai-mode review --kind classify --since 24h --role qa
+ai-mode review --export evals/reviewed.jsonl   # reviewed routing calls → eval cases (appends, de-duplicated)
+ai-mode classify --eval evals/reviewed.jsonl   # score jev against what you actually decided
+```
+
+Verdicts live in `~/.local/state/ai-mode/reviews.jsonl` and show up in `ai-mode stats` (ok / wrong /
+wrong-but-clear per role) and `ai-mode trace`. `evals/reviewed.jsonl` holds real task text, so it is
+gitignored. To check chief is using the router at all: `ai-mode events --kind classify --since 24h`.
+
 To link a chain (chief → specialist → specialist) into one trace, pass ids along:
 `T=$(ai-mode trace new); ai-mode ask product "..." --trace $T --caller chief -v` prints
 `span=<id>`; use `--parent <id>` on follow-ups (or set `AI_MODE_TRACE_ID`,

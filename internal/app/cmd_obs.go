@@ -287,6 +287,7 @@ func printTrace(id string, spans []Event, full bool) {
 	}
 	fmt.Printf("trace %s  %s  %d span(s)  wall %s\n\n", id, t0.Local().Format("2006-01-02 15:04:05"), len(spans), fmtDur(total))
 
+	reviews, _ := readReviews()
 	var walk func(e Event, depth int)
 	walk = func(e Event, depth int) {
 		indent := strings.Repeat("  ", depth)
@@ -310,6 +311,16 @@ func printTrace(id string, spans []Event, full bool) {
 		}
 		if e.Error != "" {
 			fmt.Printf("%s  error: %s\n", indent, e.Error)
+		}
+		if r, ok := reviews[e.Span]; ok {
+			v := r.Verdict
+			if r.Correct != "" {
+				v += " → " + r.Correct
+			}
+			if r.Note != "" {
+				v += " (" + r.Note + ")"
+			}
+			fmt.Printf("%s  review: %s\n", indent, v)
 		}
 		if full && e.Payload != "" {
 			printPayload(indent+"  ", e.Payload)
@@ -452,7 +463,45 @@ func cmdStats(args []string) int {
 			a.unclear++
 		}
 	}
-	if len(groups) == 0 && len(warm) == 0 && len(cls) == 0 {
+	type ragg struct{ reviewed, ok, wrong, wrongClear, ignored int }
+	revs := map[string]*ragg{}
+	_, allRev := readReviews()
+	latestRev := map[string]Review{}
+	for _, r := range allRev {
+		latestRev[r.Span] = r
+	}
+	cutoff := time.Time{}
+	if since > 0 {
+		cutoff = time.Now().Add(-since)
+	}
+	for _, r := range latestRev {
+		if !cutoff.IsZero() && r.TS.Before(cutoff) || *role != "" && r.Role != *role && r.Choice != *role {
+			continue
+		}
+		key := r.Profile + "/" + r.Role
+		if r.Kind == "classify" {
+			key += ":" + r.Question
+		}
+		a := revs[key]
+		if a == nil {
+			a = &ragg{}
+			revs[key] = a
+		}
+		switch r.Verdict {
+		case "ignore":
+			a.ignored++
+		case "ok":
+			a.reviewed++
+			a.ok++
+		default: // bad | fixed
+			a.reviewed++
+			a.wrong++
+			if r.Kind == "classify" && r.Decision == "clear" {
+				a.wrongClear++
+			}
+		}
+	}
+	if len(groups) == 0 && len(warm) == 0 && len(cls) == 0 && len(revs) == 0 {
 		fmt.Printf("No events in window (%s).\n", firstNonEmpty(*sinceF, "all time"))
 		return 0
 	}
@@ -500,6 +549,19 @@ func cmdStats(args []string) int {
 			sort.Strings(picks)
 			fmt.Printf("%-26s %6d %4d %8s %8.2f %8d  %s\n", k, a.calls, a.errs, fmtDur(percentile(a.durs, 0.5)),
 				a.conf/float64(a.calls), a.unclear, strings.Join(picks, " "))
+		}
+	}
+	if len(revs) > 0 {
+		fmt.Printf("\nreviews (your verdicts) — last %s\n", win)
+		fmt.Printf("%-30s %9s %4s %6s %16s %8s\n", "target", "reviewed", "ok", "wrong", "wrong-but-clear", "ignored")
+		rk := make([]string, 0, len(revs))
+		for k := range revs {
+			rk = append(rk, k)
+		}
+		sort.Strings(rk)
+		for _, k := range rk {
+			a := revs[k]
+			fmt.Printf("%-30s %9d %4d %6d %16d %8d\n", k, a.reviewed, a.ok, a.wrong, a.wrongClear, a.ignored)
 		}
 	}
 	if len(warm) > 0 {

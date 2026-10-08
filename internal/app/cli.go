@@ -34,6 +34,7 @@ func commands() map[string]command {
 		"prompt":   {"Print system prompt for a role (agents/<role>.md)", cmdPrompt},
 		"ask":      {"Ask a role one question (chat/completions)", cmdAsk},
 		"classify": {"Ask jev to route: which role, or which QA test layer", cmdClassify},
+		"review":   {"Review recent calls: confirm/correct routing, rate answers", cmdReview},
 		"events":   {"Show the structured event log (calls, lifecycle)", cmdEvents},
 		"trace":    {"Show a call tree for a trace id (default: latest)", cmdTrace},
 		"stats":    {"Latency, token and error stats per role", cmdStats},

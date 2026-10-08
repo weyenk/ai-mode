@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestParseKV(t *testing.T) {
@@ -230,5 +231,104 @@ func TestSummarizeEval(t *testing.T) {
 	}
 	if s.Confusions["ux→design"] != 1 || s.Confusions["docs→coder"] != 1 {
 		t.Fatalf("%v", s.Confusions)
+	}
+}
+
+func TestParseClassifyAnswer(t *testing.T) {
+	cands := []string{"architect", "coder", "security", "qa"}
+	cases := []struct {
+		in      string
+		act     reviewAction
+		correct string
+		note    string
+	}{
+		{"", actOK, "", ""},
+		{"y looks fine", actOK, "", "looks fine"},
+		{"n", actBad, "", ""},
+		{"sec", actFix, "security", ""},
+		{"QA tests not code", actFix, "qa", "tests not code"},
+		{"a", actInvalid, "", ""}, // ambiguous prefix? only architect starts with "a" → fix
+		{"zzz", actInvalid, "", ""},
+		{"s", actSkip, "", ""},
+		{"q", actQuit, "", ""},
+		{"i", actIgnore, "", ""},
+	}
+	for _, c := range cases {
+		act, correct, note := parseClassifyAnswer(c.in, cands)
+		want := c.act
+		if c.in == "a" { // unique prefix of "architect"
+			want, c.correct = actFix, "architect"
+		}
+		if act != want || correct != c.correct || note != c.note {
+			t.Fatalf("%q → %v %q %q; want %v %q %q", c.in, act, correct, note, want, c.correct, c.note)
+		}
+	}
+	if _, ok := matchCandidate("c", []string{"coder", "chief"}); ok {
+		t.Fatal("ambiguous prefix must not match")
+	}
+}
+
+func TestParseAskAnswer(t *testing.T) {
+	if a, n := parseAskAnswer("n too long"); a != actBad || n != "too long" {
+		t.Fatalf("%v %q", a, n)
+	}
+	if a, _ := parseAskAnswer(""); a != actOK {
+		t.Fatal("empty should be ok")
+	}
+	if a, _ := parseAskAnswer("f"); a != actFull {
+		t.Fatal("f should be full")
+	}
+	if a, _ := parseAskAnswer("???"); a != actInvalid {
+		t.Fatal("garbage should be invalid")
+	}
+}
+
+func TestPendingReviews(t *testing.T) {
+	now := time.Now().UTC()
+	evs := []Event{
+		{Kind: "classify", Span: "a", TS: now.Add(-3 * time.Hour), Status: "ok", Payload: "t/a.json"},
+		{Kind: "ask", Span: "b", TS: now.Add(-2 * time.Hour), Status: "ok", Payload: "t/b.json", Role: "qa"},
+		{Kind: "ask", Span: "c", TS: now.Add(-1 * time.Hour), Status: "error", Payload: "t/c.json"}, // failed: skip
+		{Kind: "ask", Span: "d", TS: now.Add(-30 * time.Minute), Status: "ok"},                      // no payload: skip
+		{Kind: "use", Span: "e", TS: now, Status: "ok", Payload: "x"},                               // not a call
+		{Kind: "ask", Span: "f", TS: now.Add(-100 * time.Hour), Status: "ok", Payload: "t/f.json"},  // too old
+	}
+	got := pendingReviews(evs, map[string]Review{}, reviewFilter{since: 24 * time.Hour})
+	if len(got) != 2 || got[0].Span != "a" || got[1].Span != "b" {
+		t.Fatalf("%+v", got)
+	}
+	got = pendingReviews(evs, map[string]Review{"a": {Span: "a"}}, reviewFilter{since: 24 * time.Hour})
+	if len(got) != 1 || got[0].Span != "b" {
+		t.Fatalf("reviewed span should be excluded: %+v", got)
+	}
+	got = pendingReviews(evs, map[string]Review{"a": {Span: "a"}}, reviewFilter{since: 24 * time.Hour, again: true, limit: 1})
+	if len(got) != 1 || got[0].Span != "b" {
+		t.Fatalf("limit keeps newest: %+v", got)
+	}
+	if got := pendingReviews(evs, nil, reviewFilter{kind: "classify", since: 24 * time.Hour}); len(got) != 1 || got[0].Span != "a" {
+		t.Fatalf("kind filter: %+v", got)
+	}
+}
+
+func TestExportReviews(t *testing.T) {
+	t.Setenv("AI_MODE_STATE", t.TempDir())
+	appendReview(Review{Span: "1", Kind: "classify", Question: "role", Task: "t1", Choice: "qa", Verdict: "ok"})
+	appendReview(Review{Span: "2", Kind: "classify", Question: "role", Task: "t2", Choice: "coder", Verdict: "fixed", Correct: "qa"})
+	appendReview(Review{Span: "3", Kind: "classify", Question: "role", Task: "t3", Choice: "ux", Verdict: "bad"})
+	appendReview(Review{Span: "4", Kind: "ask", Role: "qa", Task: "q", Verdict: "ok"})
+	appendReview(Review{Span: "2", Kind: "classify", Question: "role", Task: "t2", Choice: "coder", Verdict: "fixed", Correct: "security"}) // re-review wins
+	path := filepath.Join(t.TempDir(), "r.jsonl")
+	if code := exportReviews(path); code != 0 {
+		t.Fatal(code)
+	}
+	data, _ := os.ReadFile(path)
+	cases, err := parseEvalCases(string(data))
+	if err != nil || len(cases) != 2 || cases[0].Expect != "qa" || cases[1].Expect != "security" {
+		t.Fatalf("%v %+v", err, cases)
+	}
+	exportReviews(path) // idempotent
+	data2, _ := os.ReadFile(path)
+	if string(data) != string(data2) {
+		t.Fatal("second export must not duplicate")
 	}
 }
