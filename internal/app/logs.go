@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	reLogSpawn        = regexp.MustCompile(`spawning server instance with name=(\w+) on port (\d+)`)
-	reLogProxy        = regexp.MustCompile(`proxying request to model (\w+) on port (\d+)`)
-	reLogInstanceExit = regexp.MustCompile(`instance name=(\w+) exited`)
+	reLogSpawn        = regexp.MustCompile(`spawning server instance with name=([\w.-]+) on port (\d+)`)
+	reLogProxy        = regexp.MustCompile(`proxying request to model ([\w.-]+) on port (\d+)`)
+	reLogInstanceExit = regexp.MustCompile(`instance name=([\w.-]+) exited`)
 	reLogChildPort    = regexp.MustCompile(`^\[(\d+)\]`)
 )
 

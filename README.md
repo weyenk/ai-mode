@@ -81,7 +81,7 @@ cached tokens, finish reason, whether the model was cold-started, who asked, and
 ai-mode events [-f] [--kind ask|classify] [--role R] [--status error] [--since 1h] [--json]
 ai-mode stats [--since 24h] [--role R]     # p50/p95, tokens, tok/s, errors, truncations, routing, warm times, your reviews
 ai-mode trace [ID] [--full]                # call tree for a trace (default: latest); --list for recent
-ai-mode ps                                 # roles loaded/unloaded, ctx, last ask
+ai-mode ps                                 # roles loaded/unloaded, effective ctx (! = differs from preset), last ask
 ```
 
 ### Debug mode: record traffic from Qwen Code and other clients

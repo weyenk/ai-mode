@@ -79,7 +79,9 @@ Skill sources (symlinked into `~/.qwen/extensions/superpowers/skills/`):
 
 Verify any flag against `internal/app/` (or `ai-mode <cmd> -h`) before relying on it.
 
-- `ai-mode doctor` — install/profile/health check. Confirms `/v1/systemone` support, agent
+- `ai-mode doctor` — install/profile/health check. Also flags roles whose running `n_ctx_slot` (from the
+  llama-server log) differs from the preset `ctx-size` (model-trained-ctx cap) and presets edited after
+  start (`ai-mode restart` applies them; `use` on an active profile does not). Confirms `/v1/systemone` support, agent
   coverage, port clashes, PATH. **Run this first when something is off.**
 - `ai-mode use <profile>` — stop any managed server, start the profile, then warm the
   `warm =` list. Flags: `--force`, `--timeout`, `--no-warm`, `--warm-timeout`.

@@ -145,6 +145,18 @@ func cmdDoctor(args []string) int {
 			if pid == 0 && up {
 				issues = append(issues, fmt.Sprintf("port %d open but not ai-mode-managed (foreign process?)", p.Port))
 			}
+			if healthy {
+				bad, _ := ctxMismatchesFor(p, fetchCatalog(p, 3*time.Second))
+				for _, b := range bad {
+					issues = append(issues, "context mismatch — "+b.String())
+				}
+				if len(bad) == 0 {
+					fmt.Println("Role ctx:       OK (preset matches running servers)")
+				}
+				if info, err := os.Stat(p.Ini); err == nil && presetChangedSince(info.ModTime(), st.StartedAt) {
+					issues = append(issues, fmt.Sprintf("%s was edited after the server started; run: ai-mode restart", filepath.Base(p.Ini)))
+				}
+			}
 		} else {
 			issues = append(issues, fmt.Sprintf("Active profile '%s' has no matching .ini anymore", st.Profile))
 		}

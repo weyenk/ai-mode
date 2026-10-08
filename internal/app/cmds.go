@@ -224,6 +224,7 @@ func useProfile(name string, o useOpts) int {
 		(!o.debug || pidAlive(st.ProxyPID)) {
 		if _, healthy := getJSON(p.BaseURL()+"/models", 2*time.Second); healthy {
 			fmt.Printf("Already using %s at %s\n", p.Name, p.BaseURL())
+			warnPresetChanged(p, st)
 			writeActiveEnv(p)
 			maybeWarmAfterUse(p, o)
 			return 0

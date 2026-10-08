@@ -188,5 +188,9 @@ func warmModels(p Profile, names []string, timeout time.Duration) int {
 		return 1
 	}
 	fmt.Println("All models ready.")
+	bad, _ := ctxMismatchesFor(p, cat)
+	for _, b := range bad {
+		fmt.Fprintf(os.Stderr, "Warning: %s\n", b)
+	}
 	return 0
 }

@@ -619,6 +619,8 @@ func cmdPS(args []string) int {
 		}
 	}
 	fmt.Printf("%s  %s  models-max=%d\n\n", p.Name, p.BaseURL(), p.ModelsMax)
+	// Effective ctx comes from what llama-server logged at load, not the preset.
+	bad, effective := ctxMismatchesFor(p, cat)
 	fmt.Printf("%-34s %-9s %8s  %s\n", "model", "status", "ctx", "last ask")
 	for _, id := range ids {
 		m := cat[id]
@@ -632,11 +634,30 @@ func cmdPS(args []string) int {
 				}
 			}
 		}
+		if modelStatus(m) == "loaded" {
+			if eff, ok := effective[id]; ok {
+				ctx = fmt.Sprint(eff)
+				for _, b := range bad {
+					if b.Role == id {
+						ctx += "!"
+					}
+				}
+			}
+		}
 		la := "-"
 		if e, ok := last[id]; ok {
 			la = fmt.Sprintf("%s ago (%s, %s)", fmtDur(time.Since(e.TS).Milliseconds()), e.Status, fmtDur(e.DurationMS))
 		}
 		fmt.Printf("%-34s %-9s %8s  %s\n", id, firstNonEmpty(modelStatus(m), "?"), ctx, la)
 	}
+	for _, b := range bad {
+		fmt.Printf("\n! %s\n", b)
+	}
 	return 0
+}
+
+// ctxMismatchesFor compares loaded roles' preset ctx-size with what they run at.
+func ctxMismatchesFor(p Profile, cat catalog) ([]ctxMismatch, map[string]int) {
+	effective, bad := profileCtx(p, loadedRoles(p, cat))
+	return bad, effective
 }
