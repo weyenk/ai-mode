@@ -28,7 +28,7 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
 
 ## Role map (dev-shop)
 
-- **chief** (`Qwen3-14B`, **131k**) — **sole user-facing POC**; clarifies, synthesizes,
+- **chief** (`Qwen3-30B-A3B-Instruct-2507`, **131k**, test swap) — **sole user-facing POC**; clarifies, synthesizes,
   coordinates Superpowers flows. Routes via **jev**; delegates monorepo exploration and
   plans to **architect** (human stays on chief).
 - **fast** (`Qwen3-4B`, 16k) — cheap instruct chat for classifiers, structured JSON, and
@@ -41,7 +41,8 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
   question. Needs llama.cpp `/v1/systemone` (`ai-mode doctor`).
 - **architect** (`Qwen3-30B-A3B-Thinking-2507`, 262144) — **owns planning**, ADRs, and
   large codebase mapping. All multi-step design lives here, not chief.
-- **coder** (`Qwen3-Coder-30B-A3B`, 64k) — agentic executor of architect's plans.
+- **coder** (`Devstral-Small-2-24B`, 64k) — agentic executor of architect's plans; non-Qwen on
+  purpose so it is adversarial to architect.
 - **coder-xl** (local `Qwen3-Coder-Next` UD-Q8, 131k) — heavy coder for rare
   under-specified / large jobs; already on disk.
 - **specialists** — `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`.

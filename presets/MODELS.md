@@ -21,10 +21,10 @@ Rationale, memory math, sampling defaults, and tuning levers:
 
 | Role | Model | Why | ctx | ≈ GiB |
 | --- | --- | --- | --- | --- |
-| chief | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Sole user-facing POC (131k ctx, **q4_0 KV**); routes via jev; delegates planning / monorepo reads to architect | 131k | ~13 |
+| chief | `lmstudio-community/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M` | Sole user-facing POC (131k ctx, native 262k, **q4_0 KV**, non-thinking); routes via jev; delegates planning / monorepo reads to architect. **Test swap** from Qwen3-14B (capped at 40960 by llama-server) | 131k | ~22 (est.) |
 | jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16k | ~3 |
 | fast | `Qwen/Qwen3-4B-GGUF:Q4_K_M` | Cheap instruct chat for classifiers, structured JSON, quick side-queries; **not** jev Stage A | 16k | ~3 |
-| coder | `lmstudio-community/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Agentic executor of architect's plans; **64k** native ctx + **q8_0** KV for five-slot warm; Q8 weights via ggml-org optional; `coder-xl` for huge jobs | 64k | ~21 |
+| coder | `lmstudio-community/Devstral-Small-2-24B-Instruct-2512-GGUF:Q4_K_M` | Agentic executor of architect's plans; Mistral (non-Qwen) so it is adversarial to architect; **64k** ctx + **q8_0** KV (native 256k); `coder-xl` for huge jobs | 64k | ~20 (est.) |
 | coder-xl | Local Qwen3-Coder-Next UD-Q8 | Heavy coder for rare under-specified / large jobs; already on disk | 131k | ~40 |
 | product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Specs/stories + spec review pass (YaRN ctx) | 64k | ~11 |
 | research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Thinking variant for spikes / tradeoffs | 64k | ~25 |
