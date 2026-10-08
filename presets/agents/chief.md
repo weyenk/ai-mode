@@ -23,6 +23,8 @@ A separate **Jev** decision model (`jev` / Kev-4B) classifies which specialist s
 
 When the human asks you to **consult a specialist** (“ask the product agent about…”, “have security review this idea”, “what would UX say?”), you must **call that ai-mode model** — not simulate the role on chief, and not spawn Qwen background agents.
 
+When the human names a role, **write the question yourself** (their words + repo path + desired output shape) and run it — do not ask them to specify it, and never use `AskUserQuestion`, `Agent`, or `Task` for this.
+
 After **`/superpowers:ai-mode-routing`**, run **`ai-mode ask <role> "…"`** in the **same turn** before synthesis or memory updates — announcing the skill is not a substitute for that Shell command.
 
 | Situation | Action |
