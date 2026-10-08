@@ -222,7 +222,7 @@ func resolveAgentFile(role string, seen map[string]bool) (string, error) {
 
 func listAgentRoles() []string {
 	files, _ := filepath.Glob(filepath.Join(agentsDir(), "*.md"))
-	sort.Strings(files) // by filename, like the Python version ("coder-xl.md" < "coder.md")
+	sort.Strings(files) // by filename: "coder-xl.md" sorts before "coder.md"
 	var roles []string
 	for _, f := range files {
 		if strings.EqualFold(filepath.Base(f), "readme.md") {

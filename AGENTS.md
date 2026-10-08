@@ -17,7 +17,7 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
 
 | Path | What |
 | --- | --- |
-| `bin/ai-mode` | The CLI (single Python 3 file, stdlib only). Source of truth for commands/flags. |
+| `cmd/ai-mode`, `internal/app/` | The CLI (Go, stdlib only; `make build` → `dist/ai-mode`). Source of truth for commands/flags. |
 | `presets/*.ini` | llama-server model presets. `[section]` = a role; `[*]` = shared defaults. |
 | `presets/*.mode` | Sidecar metadata: `port`, `models-max`, `host`, `description`, `warm`. |
 | `presets/agents/*.md` | System prompt per role. Frontmatter `role:` must match an ini `[section]`. |
@@ -41,7 +41,7 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
   question. Needs llama.cpp `/v1/systemone` (`ai-mode doctor`).
 - **architect** (`Qwen3-30B-A3B-Thinking-2507`, 262144) — **owns planning**, ADRs, and
   large codebase mapping. All multi-step design lives here, not chief.
-- **coder** (`Qwen3-Coder-30B-A3B`, 131k) — agentic executor of architect's plans.
+- **coder** (`Qwen3-Coder-30B-A3B`, 64k) — agentic executor of architect's plans.
 - **coder-xl** (local `Qwen3-Coder-Next` UD-Q8, 131k) — heavy coder for rare
   under-specified / large jobs; already on disk.
 - **specialists** — `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`.
@@ -76,7 +76,7 @@ Skill sources (symlinked into `~/.qwen/extensions/superpowers/skills/`):
 
 ## CLI must-knows
 
-Verify any flag against `bin/ai-mode` before relying on it.
+Verify any flag against `internal/app/` (or `ai-mode <cmd> -h`) before relying on it.
 
 - `ai-mode doctor` — install/profile/health check. Confirms `/v1/systemone` support, agent
   coverage, port clashes, PATH. **Run this first when something is off.**
@@ -86,9 +86,12 @@ Verify any flag against `bin/ai-mode` before relying on it.
   `models-max`). Defaults to `warm =` (dev-shop: chief,jev,architect,coder,fast; else chief,jev). `--all` warms every ini
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
+- `ai-mode classify <role|layer> "<task>"` — jev routing (Stage A role / Stage B test layer) with a clear/ambiguous/low-confidence decision; traced. Roles need a `summary:` in `agents/<role>.md` to be routable (`chief`, `coder-xl`, `fast`, `jev` deliberately have none). `classify --eval evals/classify.jsonl` / `make eval` measures routing; tune summaries against it.
 - `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens`, `--profile`, pipe stdin).
 - `ai-mode stop [--force]` — stop the managed server.
-- Also: `list`, `which`/`status`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `env`,
+- Observability: `events`, `trace`, `stats`, `ps` (see README).
+
+Also: `list`, `which`/`status`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `env`,
   `agents`, `init <name> [--with-ini] [--port] [--models-max]`.
 
 Shell env: `eval "$(ai-mode env)"` exports `OPENAI_BASE_URL` for the active profile.
@@ -107,6 +110,11 @@ which produces `Context size has been exceeded` near the real limit with a misle
 Set **`contextWindowSize`** on every local role entry to match `presets/<profile>.ini`
 (`chief` → **131072**, `architect` → **262144**, `coder` → **65536**, etc.; see `presets/MODELS.md`). Restart or reload
 Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder is orchestration-side.
+
+Don't put `enable_thinking` in a provider's `extra_body`: llama-server ignores it at the top level of the
+request, so it only looks like a toggle. Thinking is set per role in the preset ini via
+`chat-template-kwargs`. Only chat roles belong here (not `jev`, a router) and allow no Qwen
+`Agent(...)` subagents for specialist consults.
 
 **Ad-hoc specialists:** When the human asks chief to consult **product**, **security**, or another role, chief must run **`ai-mode ask <role> "<question>"`** (or briefly `/model <role>`) — not Qwen `Task`/`Agent` subagents and not re-invoking **`using-superpowers`** as a delegate. Skill: [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) (symlinked like `spec-specialist-review`).
 
@@ -136,7 +144,7 @@ Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder
 ## Guardrails
 
 - **Don't commit or push unless the user explicitly asks.**
-- **Don't invent CLI flags** — confirm in `bin/ai-mode`.
+- **Don't invent CLI flags** — confirm in `internal/app/`.
 - Don't expose the API beyond `127.0.0.1` without care; weights can be large downloads.
 - Keep `README.md`, `MODELS.md`, `agents/*.md`, and `completions/_ai-mode` consistent when
   you change roles or commands.

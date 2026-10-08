@@ -19,6 +19,7 @@ _ai-mode() {
     'agents:List agent guides'
     'prompt:Print role system prompt'
     'ask:Ask a role one question'
+    'classify:Route a task with jev (role or QA layer)'
     'events:Show structured event log'
     'trace:Show call tree for a trace id'
     'stats:Latency/token/error stats per role'

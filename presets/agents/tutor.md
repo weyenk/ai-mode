@@ -2,6 +2,7 @@
 role: tutor
 profile: learning-center
 model: tutor
+summary: Socratic tutoring: questions, hints, short explanations
 ---
 
 # tutor

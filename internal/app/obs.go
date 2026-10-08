@@ -16,7 +16,7 @@ import (
 // so every write path swallows errors.
 type Event struct {
 	TS               time.Time `json:"ts"`
-	Kind             string    `json:"kind"` // ask | use | stop | restart | warm | warm_model
+	Kind             string    `json:"kind"` // ask | classify | use | stop | restart | warm | warm_model
 	Trace            string    `json:"trace_id,omitempty"`
 	Span             string    `json:"span_id,omitempty"`
 	Parent           string    `json:"parent_id,omitempty"`
@@ -39,7 +39,14 @@ type Event struct {
 	SystemSHA        string    `json:"system_sha,omitempty"`
 	Payload          string    `json:"payload,omitempty"` // path relative to traces dir
 	Detail           string    `json:"detail,omitempty"`
+	Question         string    `json:"question,omitempty"`   // classify: role | test_layer
+	Choice           string    `json:"choice,omitempty"`     // classify: jev's pick
+	Confidence       float64   `json:"confidence,omitempty"` // classify: jev's confidence
+	Decision         string    `json:"decision,omitempty"`   // classify: clear | ambiguous | low-confidence
 }
+
+// isCall reports whether an event is a traced model call (a span in a trace).
+func isCall(e Event) bool { return e.Kind == "ask" || e.Kind == "classify" }
 
 const (
 	maxEventsBytes = 10 << 20 // rotate events.jsonl past 10 MiB (keeps one .1 backup)

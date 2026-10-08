@@ -2,6 +2,7 @@
 role: coder
 profile: dev-shop
 model: coder
+summary: Implement, fix or refactor code: features, bug fixes, CLI flags, per an approved plan
 ---
 
 # coder

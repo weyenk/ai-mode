@@ -2,6 +2,7 @@
 role: tagger
 profile: av-club
 model: tagger
+summary: Terse taxonomy tags and filenames
 ---
 
 # tagger

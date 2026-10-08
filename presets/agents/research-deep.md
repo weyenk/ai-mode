@@ -2,6 +2,7 @@
 role: research-deep
 profile: learning-center
 model: research-deep
+summary: Thorough structured research on a topic with explicit uncertainty
 ---
 
 # research-deep

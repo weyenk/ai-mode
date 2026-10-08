@@ -2,6 +2,7 @@
 role: frame-review
 profile: av-club
 model: frame-review
+summary: Describe and critique stills or storyboard frames
 ---
 
 # frame-review

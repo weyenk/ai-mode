@@ -2,6 +2,7 @@
 role: research-qwen
 profile: learning-center
 model: research-qwen
+summary: Thinking-model research notes with explicit uncertainty
 ---
 
 # research-qwen

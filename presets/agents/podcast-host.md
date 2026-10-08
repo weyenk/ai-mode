@@ -2,6 +2,7 @@
 role: podcast-host
 profile: learning-center
 model: podcast-host
+summary: Turn notes into a two-speaker podcast script
 ---
 
 # podcast-host

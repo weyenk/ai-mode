@@ -27,42 +27,16 @@ cases, regression checklists, or test-quality review.
 
 If the harness already passed `test_layer`, skip Stage B and load guides directly.
 
-### Invoking `/v1/systemone`
-
-Qwen Code may not have a native System One tool. Options:
-
-- **Chief orchestrates**: chief runs Stage A then Stage B and passes `test_layer` into the
-  qa turn.
-- **curl** (active router from `ai-mode url`):
+### Running the classification
 
 ```bash
-BASE="$(ai-mode url)"
-curl -sS "${BASE}/v1/systemone" \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "model": "jev",
-    "state": "<user task + brief context>",
-    "questions": {
-      "test_layer": {
-        "type": "choice",
-        "instructions": "Which test layer should qa use as the primary lens?",
-        "criteria": {
-          "unit": "Pure functions or single units in isolation, fast, no I/O",
-          "functional": "Feature or use-case through its public boundary/API",
-          "integration": "Modules with real collaborators (db, http, queues)",
-          "component": "UI components rendered and exercised like a user",
-          "contract": "Consumer/provider API compatibility (e.g. Pact)",
-          "e2e": "Full user journeys across the deployed system",
-          "visual-regression": "Rendered UI pixel or snapshot diffs",
-          "mutation": "Assertion strength, surviving mutants",
-          "ai-skill": "Evals for AI skills, prompts, agent behavior"
-        }
-      }
-    }
-  }'
+ai-mode classify layer "<user task + brief context>" --caller chief
 ```
 
-There is no `ai-mode classify` helper yet — use curl or chief-mediated jev calls.
+Prints jev's `choice`, `confidence`, a `decision` (`clear` / `ambiguous` / `low-confidence`),
+the ranking, and the guideline file(s) to load (`load:`): one when clear, the top two when
+ambiguous. Add `--json` for machine-readable output, and `--trace <id> --parent <span>` to
+link it to the Stage A call.
 
 ## Layer → guide (reference)
 

@@ -55,6 +55,9 @@ func warnings(e Event) []string {
 	if e.Detail != "" && e.Kind == "ask" {
 		w = append(w, e.Detail)
 	}
+	if e.Kind == "classify" && e.Decision != "" && e.Decision != "clear" {
+		w = append(w, e.Decision)
+	}
 	return w
 }
 
@@ -64,6 +67,12 @@ func eventLine(e Event) string {
 		who += "/" + e.Role
 	}
 	line := fmt.Sprintf("%s %-10s %-24s %-5s %7s", e.TS.Local().Format("15:04:05"), e.Kind, who, e.Status, fmtDur(e.DurationMS))
+	if e.Kind == "classify" {
+		line += fmt.Sprintf("  %s→%s (%.2f)", e.Question, e.Choice, e.Confidence)
+		if e.Caller != "" {
+			line += " by=" + e.Caller
+		}
+	}
 	if e.Kind == "ask" {
 		line += fmt.Sprintf("  in=%d out=%d", e.PromptTokens, e.CompletionTokens)
 		if e.GenTPS > 0 {
@@ -112,7 +121,7 @@ func cmdEvents(args []string) int {
 	fs := newFlags("events")
 	n := fs.Int("n", 30, "Most recent events to show (0 = all)")
 	followF := fs.Bool("f", false, "Follow new events")
-	kind := fs.String("kind", "", "Filter: ask, use, stop, restart, warm, warm_model")
+	kind := fs.String("kind", "", "Filter: ask, classify, use, stop, restart, warm, warm_model")
 	role := fs.String("role", "", "Filter by role")
 	trace := fs.String("trace", "", "Filter by trace id")
 	status := fs.String("status", "", "Filter: ok or error")
@@ -176,7 +185,7 @@ func summarizeTraces(evs []Event) []traceSummary {
 	byID := map[string]*traceSummary{}
 	var order []string
 	for _, e := range evs {
-		if e.Kind != "ask" || e.Trace == "" {
+		if !isCall(e) || e.Trace == "" {
 			continue
 		}
 		t := byID[e.Trace]
@@ -241,7 +250,12 @@ func cmdTrace(args []string) int {
 	if id == "" {
 		return fail("No traces yet. Run: ai-mode ask <role> \"...\"")
 	}
-	spans := filterEvents(evs, "ask", "", id, "", 0)
+	var spans []Event
+	for _, e := range filterEvents(evs, "", "", id, "", 0) {
+		if isCall(e) {
+			spans = append(spans, e)
+		}
+	}
 	if len(spans) == 0 {
 		return fail("No spans for trace %s (try: ai-mode trace --list)", id)
 	}
@@ -280,8 +294,13 @@ func printTrace(id string, spans []Event, full bool) {
 		if e.Status != "ok" {
 			mark = "✗"
 		}
-		fmt.Printf("%s%s %s/%s  +%s  %s  in=%d out=%d", indent, mark, e.Profile, e.Role,
-			fmtDur(e.TS.Sub(t0).Milliseconds()), fmtDur(e.DurationMS), e.PromptTokens, e.CompletionTokens)
+		fmt.Printf("%s%s %s/%s  +%s  %s", indent, mark, e.Profile, e.Role,
+			fmtDur(e.TS.Sub(t0).Milliseconds()), fmtDur(e.DurationMS))
+		if e.Kind == "classify" {
+			fmt.Printf("  classify %s→%s (%.2f)", e.Question, e.Choice, e.Confidence)
+		} else {
+			fmt.Printf("  in=%d out=%d", e.PromptTokens, e.CompletionTokens)
+		}
 		if e.GenTPS > 0 {
 			fmt.Printf(" %.0ft/s", e.GenTPS)
 		}
@@ -323,6 +342,9 @@ func printPayload(indent, rel string) {
 				}
 			}
 		}
+	}
+	if req := asMap(p["request"]); req != nil && req["state"] != nil {
+		fmt.Printf("%sTask: %s\n", indent, indentBlock(asString(req["state"]), indent+"      "))
 	}
 	if resp := asMap(p["response"]); resp != nil {
 		if ch, _ := resp["choices"].([]any); len(ch) > 0 {
@@ -401,7 +423,36 @@ func cmdStats(args []string) int {
 			a.tps = append(a.tps, e.GenTPS)
 		}
 	}
-	if len(groups) == 0 && len(warm) == 0 {
+	type cagg struct {
+		calls, errs, unclear int
+		durs                 []int64
+		conf                 float64
+		picks                map[string]int
+	}
+	cls := map[string]*cagg{}
+	for _, e := range evs {
+		if e.Kind != "classify" {
+			continue
+		}
+		key := e.Profile + "/" + e.Question
+		a := cls[key]
+		if a == nil {
+			a = &cagg{picks: map[string]int{}}
+			cls[key] = a
+		}
+		a.calls++
+		a.durs = append(a.durs, e.DurationMS)
+		a.conf += e.Confidence
+		if e.Status != "ok" {
+			a.errs++
+		} else {
+			a.picks[e.Choice]++
+		}
+		if e.Decision != "" && e.Decision != "clear" {
+			a.unclear++
+		}
+	}
+	if len(groups) == 0 && len(warm) == 0 && len(cls) == 0 {
 		fmt.Printf("No events in window (%s).\n", firstNonEmpty(*sinceF, "all time"))
 		return 0
 	}
@@ -429,6 +480,26 @@ func cmdStats(args []string) int {
 			}
 			fmt.Printf("%-26s %6d %4d %6d %5d %8s %8s %9d %9d %7.0f\n", k, a.calls, a.errs, a.trunc, a.cold,
 				fmtDur(percentile(a.durs, 0.5)), fmtDur(percentile(a.durs, 0.95)), a.in, a.out, avg)
+		}
+	}
+	if len(cls) > 0 {
+		fmt.Printf("\nclassify (jev routing) — last %s\n", win)
+		fmt.Printf("%-26s %6s %4s %8s %8s %8s  %s\n", "profile/question", "calls", "err", "p50", "avg conf", "unclear", "picks")
+		ks := make([]string, 0, len(cls))
+		for k := range cls {
+			ks = append(ks, k)
+		}
+		sort.Strings(ks)
+		for _, k := range ks {
+			a := cls[k]
+			sort.Slice(a.durs, func(i, j int) bool { return a.durs[i] < a.durs[j] })
+			var picks []string
+			for name, n := range a.picks {
+				picks = append(picks, fmt.Sprintf("%s×%d", name, n))
+			}
+			sort.Strings(picks)
+			fmt.Printf("%-26s %6d %4d %8s %8.2f %8d  %s\n", k, a.calls, a.errs, fmtDur(percentile(a.durs, 0.5)),
+				a.conf/float64(a.calls), a.unclear, strings.Join(picks, " "))
 		}
 	}
 	if len(warm) > 0 {

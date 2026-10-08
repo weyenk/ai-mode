@@ -2,6 +2,7 @@
 role: docs
 profile: dev-shop
 model: docs
+summary: Documentation prose: README, changelog, release notes, guides, API reference, config docs
 ---
 
 # docs

@@ -4,8 +4,6 @@
 .env.*
 .active
 .local/
-__pycache__/
-*.pyc
 .idea/
 .vscode/
 dist/

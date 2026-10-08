@@ -2,6 +2,7 @@
 role: design
 profile: dev-shop
 model: design
+summary: UI and visual critique
 trigger: "Critique this UI design."
 ---
 

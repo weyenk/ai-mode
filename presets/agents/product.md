@@ -2,6 +2,7 @@
 role: product
 profile: dev-shop
 model: product
+summary: Write user stories, acceptance criteria and PRDs; prioritise features, scope and MVP
 ---
 
 # product

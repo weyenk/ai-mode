@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// State is persisted to state.json. Field names match the Python implementation
-// so both can share one state file during the migration.
+// State is persisted to state.json. Keys are stable across versions.
 type State struct {
 	Profile   string `json:"profile,omitempty"`
 	PID       int    `json:"pid,omitempty"`

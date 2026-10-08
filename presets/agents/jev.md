@@ -22,9 +22,25 @@ Orchestrators use **two separate calls** (never one combined question):
 
 **Never** put role options and test-layer options in the same `questions.*.choice` — Kev expects one decision domain per request.
 
-## How to call (llama-server)
+## How to call
 
-`POST {base_url}/v1/systemone` (same host as the active profile; `eval "$(ai-mode env)"` or `ai-mode url`)
+Use the CLI — it builds the closed set, calls jev, applies the confidence policy below, and
+records the call in `ai-mode events` / `ai-mode trace`:
+
+```bash
+ai-mode classify role  "<task>" --caller chief   # Stage A
+ai-mode classify layer "<task>" --caller chief   # Stage B (after role=qa)
+```
+
+The closed set for Stage A is every ini section whose `agents/<role>.md` has a `summary:` line
+(so `jev`, `fast`, and deprecated roles are excluded automatically).
+**`chief` and `coder-xl` are deliberately not routable:** chief is the caller, and in testing it absorbed probability from real specialists (one research task was routed to `chief`); `coder-xl` overlaps `coder` and is an escalation chief chooses, not something a task description identifies. Stage B offers each layer
+that has a guide in `presets/agents/qa/guidelines/`.
+
+### Raw API (reference)
+
+`POST {base_url}/systemone`, where `base_url` is `ai-mode url` and already ends in `/v1`
+(do **not** append another `/v1`; that returns 404).
 
 ### Stage A — role
 
@@ -37,10 +53,8 @@ Orchestrators use **two separate calls** (never one combined question):
       "type": "choice",
       "instructions": "Which specialist should handle this task?",
       "criteria": {
-        "chief": "Clarify with human, synthesize, present — not implementation",
         "architect": "Plans, ADRs, large codebase structure",
         "coder": "Implement or change code per plan",
-        "coder-xl": "Heavy or under-specified coding jobs",
         "product": "Specs, stories, prioritization",
         "research": "Investigate APIs, spikes, competitive look",
         "docs": "README, changelog, release prose",
@@ -73,7 +87,7 @@ Each option maps to `presets/agents/qa/guidelines/<name>.md`:
 | `contract` | `contract.md` | Consumer/provider API compatibility (e.g. Pact) |
 | `e2e` | `e2e.md` | Full user journeys across the deployed system |
 | `visual-regression` | `visual-regression.md` | Rendered UI pixel or snapshot diffs |
-| `mutation` | `mutation.md` | Assertion strength, surviving mutants |
+| `mutation` | `mutation.md` | Mutation testing: would the tests catch real bugs? Assertion strength, surviving mutants |
 | `ai-skill` | `ai-skill.md` | Evals for AI skills, prompts, agent behavior |
 
 ```json
@@ -92,7 +106,7 @@ Each option maps to `presets/agents/qa/guidelines/<name>.md`:
         "contract": "Consumer/provider API compatibility (e.g. Pact)",
         "e2e": "Full user journeys across the deployed system",
         "visual-regression": "Rendered UI pixel or snapshot diffs",
-        "mutation": "Assertion strength, surviving mutants",
+        "mutation": "Mutation testing: would the tests catch real bugs? Assertion strength, surviving mutants",
         "ai-skill": "Evals for AI skills, prompts, agent behavior"
       }
     }
@@ -108,18 +122,30 @@ Hand the winning layer (and optional second if policy below) to **qa** — qa lo
 - **Low confidence** or **top two within ~0.1 probability**: load **top two** guides, or have **chief** ask **one** clarifying question and re-run Stage B.
 - Mixed tasks: primary layer from jev first; qa may add **at most one** adjacent layer from the fallback table in `qa.md` if the task clearly spans layers — do not replace jev’s primary pick.
 
+## Tuning jev's confidence
+
+Confidence depends mostly on (1) how many overlapping options are in the closed set and (2) whether
+each `summary:` uses the words people actually use in task descriptions. Measure, don't guess:
+
+```bash
+make eval        # ai-mode classify --eval on evals/classify.jsonl and the held-out set
+```
+
+Tune `summary:` lines (and the layer criteria in `internal/app/classify.go`) against
+`evals/classify.jsonl`; run `evals/classify-holdout.jsonl` afterwards to check the gains generalise.
+Watch **wrong-but-clear** (confidently wrong: the dangerous one) before average confidence.
+
 ## Rules for orchestrators
 
 - Always pass a **closed set**; never ask Jev to invent a new role or layer name.
 - Prefer the highest-probability option above a confidence threshold; otherwise ask the chief to clarify with the human.
 - Do not use `/v1/chat/completions` for this model.
-- There is no `ai-mode classify` subcommand yet; use `curl` against `$(ai-mode url)/v1/systemone` (see `skills/testing-guidelines/SKILL.md`).
 
-## Example Stage B curl
+## Example Stage B curl (what `ai-mode classify layer` sends)
 
 ```bash
 BASE="$(ai-mode url)"
-curl -sS "${BASE}/v1/systemone" \
+curl -sS "${BASE}/systemone" \
   -H 'Content-Type: application/json' \
   -d '{
     "model": "jev",
@@ -136,7 +162,7 @@ curl -sS "${BASE}/v1/systemone" \
           "contract": "Consumer/provider API compatibility (e.g. Pact)",
           "e2e": "Full user journeys across the deployed system",
           "visual-regression": "Rendered UI pixel or snapshot diffs",
-          "mutation": "Assertion strength, surviving mutants",
+          "mutation": "Mutation testing: would the tests catch real bugs? Assertion strength, surviving mutants",
           "ai-skill": "Evals for AI skills, prompts, agent behavior"
         }
       }

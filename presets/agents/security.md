@@ -2,6 +2,7 @@
 role: security
 profile: dev-shop
 model: security
+summary: Threat model, secure review
 ---
 
 # security

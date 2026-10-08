@@ -2,6 +2,7 @@
 role: qa
 profile: dev-shop
 model: qa
+summary: Test strategy: write tests and test cases, edge cases, regression plans, find missing coverage
 ---
 
 # qa

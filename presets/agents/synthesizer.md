@@ -2,6 +2,7 @@
 role: synthesizer
 profile: learning-center
 model: synthesizer
+summary: Turn research into study assets: outline, key terms, flashcards
 ---
 
 # synthesizer

@@ -2,6 +2,7 @@
 role: prompt-crafter
 profile: av-club
 model: prompt-crafter
+summary: Rewrite intent into image-model prompts (Flux/SD)
 ---
 
 # prompt-crafter

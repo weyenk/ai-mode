@@ -147,7 +147,7 @@ func cmdDoctor(args []string) int {
 	onPath := contains(filepath.SplitList(os.Getenv("PATH")), localBin)
 	fmt.Printf("~/.local/bin on PATH: %s\n\n", flag(onPath, "yes", "NO"))
 	if !onPath {
-		issues = append(issues, "Add ~/.local/bin to PATH so `ai-mode` works in every shell")
+		issues = append(issues, "~/.local/bin is not on PATH. Run: "+pathFixCommand())
 	}
 
 	if len(issues) > 0 {
@@ -159,4 +159,21 @@ func cmdDoctor(args []string) int {
 	}
 	fmt.Println("All checks passed.")
 	return 0
+}
+
+// pathFixCommand returns a copy-pasteable command that puts ~/.local/bin on
+// PATH for the user's shell and reloads it.
+func pathFixCommand() string {
+	switch filepath.Base(os.Getenv("SHELL")) {
+	case "fish":
+		return `fish_add_path "$HOME/.local/bin"`
+	case "bash":
+		rc := "~/.bashrc"
+		if _, err := os.Stat(filepath.Join(homeDir, ".bashrc")); err != nil {
+			rc = "~/.bash_profile"
+		}
+		return `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ` + rc + " && source " + rc
+	default:
+		return `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshenv && source ~/.zshenv`
+	}
 }

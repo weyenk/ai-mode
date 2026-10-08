@@ -2,6 +2,7 @@
 role: director
 profile: av-club
 model: director
+summary: Creative direction: concept, tone, shot list, style bible
 ---
 
 # director

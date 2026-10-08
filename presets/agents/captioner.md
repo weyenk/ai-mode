@@ -2,6 +2,7 @@
 role: captioner
 profile: av-club
 model: captioner
+summary: Captions, titles, alt text, platform variants
 ---
 
 # captioner

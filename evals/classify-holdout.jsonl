@@ -1,0 +1,25 @@
+# Held-out set: do NOT tune against this. Run it after changing summaries to check the gains generalise.
+{"question": "role", "task": "Break the rewrite of our billing engine into phases with dependencies and risks", "expect": "architect"}
+{"question": "role", "task": "Decide where caching should live across our services and document the decision", "expect": "architect"}
+{"question": "role", "task": "Write the SQL migration and handler code for the new tags feature", "expect": "coder"}
+{"question": "role", "task": "Make the CLI return a non-zero exit code when validation fails", "expect": "coder"}
+{"question": "role", "task": "Turn this customer feedback into a prioritised backlog with epics", "expect": "product"}
+{"question": "role", "task": "Define success metrics and scope for the referral program", "expect": "product"}
+{"question": "role", "task": "Find out which OAuth libraries for Go are actively maintained and how they differ", "expect": "research"}
+{"question": "role", "task": "How do other SaaS products handle seat-based billing? Gather examples", "expect": "research"}
+{"question": "role", "task": "Update the API reference page to include the new pagination parameters", "expect": "docs"}
+{"question": "role", "task": "Write a migration guide for users upgrading from v1 to v2", "expect": "docs"}
+{"question": "role", "task": "Propose a strategy to catch regressions in our PDF export", "expect": "qa"}
+{"question": "role", "task": "Review these tests and tell me which assertions are weak", "expect": "qa"}
+{"question": "role", "task": "Do a secure code review of the password reset flow", "expect": "security"}
+{"question": "role", "task": "What are the abuse risks of our public invite-link feature?", "expect": "security"}
+{"question": "role", "task": "Give feedback on the typography and visual hierarchy of this landing page", "expect": "design"}
+{"question": "role", "task": "Is our new logo and colour palette cohesive across the app?", "expect": "design"}
+{"question": "role", "task": "Walk through the signup form from a first-time user's view and flag confusing moments", "expect": "ux"}
+{"question": "role", "task": "Where do users likely get stuck in the checkout? Suggest flow changes", "expect": "ux"}
+{"question": "layer", "task": "Add tests for the pure pricing calculation functions", "expect": "unit"}
+{"question": "layer", "task": "Render the Button component with each variant and verify interactions", "expect": "component"}
+{"question": "layer", "task": "Set up Pact tests between the billing service consumer and the invoices provider", "expect": "contract"}
+{"question": "layer", "task": "Snapshot the dashboard components and diff them on each PR", "expect": "visual-regression"}
+{"question": "layer", "task": "Measure assertion strength with mutation testing on the parser", "expect": "mutation"}
+{"question": "layer", "task": "Test that the agent skill picks the right tool for a set of scenarios", "expect": "ai-skill"}

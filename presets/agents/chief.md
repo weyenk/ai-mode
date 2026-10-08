@@ -28,8 +28,12 @@ After **`/superpowers:ai-mode-routing`**, run **`ai-mode ask <role> "…"`** in 
 | Situation | Action |
 | --- | --- |
 | Human **names a role** (`product`, `security`, `ux`, …) | Call that role **directly** — **skip jev** Stage A. |
-| Role **unclear** | **jev Stage A**: POST to `"$(ai-mode url)/systemone"` with `model: jev` and closed-set `questions.role` (see `presets/agents/jev.md`). Then call the chosen role via chat/completions. |
-| **`qa`** after jev chose it | Run **jev Stage B** (`test_layer`), load guideline(s), then call **`qa`** via chat/completions. |
+| Role **unclear** | **jev Stage A**: run `ai-mode classify role "<task>" --caller chief`. Read `choice` and `decision`; then call the chosen role with `ai-mode ask`. |
+| **`qa`** after jev chose it | Run **jev Stage B**: `ai-mode classify layer "<task>" --caller chief`. Read the `load:` guideline path(s), then call **`qa`** with `ai-mode ask`. |
+
+**`coder-xl` is not routed by jev** (it overlaps `coder`). Escalate to it yourself, only when the human asks for the heavy coder or `coder` has failed on an under-specified or very large job.
+
+**Reading `ai-mode classify`:** `decision: clear` → proceed with `choice`. `ambiguous` or `low-confidence` → ask the human **one** clarifying question, then re-run (for Stage B `ambiguous`, loading both listed guides is also fine). Pass the printed `trace=` / `span=` on your next call as `--trace <id> --parent <span>` so the chain shows up in `ai-mode trace`.
 
 **Preferred (human stays on chief):**
 

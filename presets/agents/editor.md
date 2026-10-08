@@ -2,6 +2,7 @@
 role: editor
 profile: av-club
 model: editor
+summary: Cut plan for video: order, transitions, pacing, music cues
 ---
 
 # editor

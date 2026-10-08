@@ -2,6 +2,7 @@
 role: show-notes
 profile: learning-center
 model: show-notes
+summary: Podcast titles, chapters, summaries from a script
 ---
 
 # show-notes

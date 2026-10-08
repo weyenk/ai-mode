@@ -49,7 +49,7 @@ If the human already named **`spec-specialist-review`** or an approved design sp
 
 - Active profile: `ai-mode which` / `ai-mode doctor`
 - Shell: `eval "$(ai-mode env)"` exports `OPENAI_BASE_URL` (optional for `ask`; it uses the active profile)
-- Jev endpoint (role unclear only): **`$(ai-mode url)/systemone`**
+- Routing (role unclear only): **`ai-mode classify role "<task>"`** (wraps jev `/v1/systemone`)
 
 ## Mandatory workflow (Qwen Code)
 
@@ -81,38 +81,30 @@ echo "one sentence on MVP scope" | ai-mode ask product --max-tokens 256
 | --- | --- |
 | Names a role (`product`, `security`, …) | Use that role; **skip jev** → go to Step 2 |
 | “Which specialist?” / domain unclear | **jev Stage A** first (below), then Step 2 with chosen role |
-| jev returns **`qa`** | **jev Stage B** for `test_layer`, load `presets/agents/qa/guidelines/<layer>.md`, then Step 2 with **`qa`** |
+| jev returns **`qa`** | **jev Stage B**: `ai-mode classify layer "<task>" --caller chief`, load the printed `load:` guideline file(s), then Step 2 with **`qa`** |
 
 ### jev Stage A (only when role unclear)
 
 ```bash
-eval "$(ai-mode env)"
-curl -sS "$(ai-mode url)/systemone" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "jev",
-    "state": "<clean task statement>",
-    "questions": {
-      "role": {
-        "type": "choice",
-        "instructions": "Which specialist should handle this task?",
-        "criteria": {
-          "product": "Specs, stories, prioritization",
-          "research": "APIs, spikes, competitive look",
-          "security": "Threat model, secure review",
-          "ux": "Flows, usability",
-          "design": "UI and visual critique",
-          "qa": "Tests and edge cases",
-          "docs": "Documentation prose",
-          "architect": "Plans and large codebase mapping",
-          "coder": "Implementation per plan"
-        }
-      }
-    }
-  }'
+ai-mode classify role "<clean task statement>" --caller chief
 ```
 
-Use the highest-probability role, then **Step 2** with that `ROLE`.
+Output (read `choice` and `decision`):
+
+```
+choice: qa
+confidence: 0.51
+decision: clear
+ranked: qa 0.55, coder 0.14, coder-xl 0.10, security 0.06
+trace=b833e5d0a36e span=8529d244
+```
+
+- `decision: clear` → use `choice`.
+- `ambiguous` / `low-confidence` → ask the human **one** clarifying question, then re-run.
+- Chain follow-up calls into the same trace: `ai-mode ask <role> "…" --trace <trace> --parent <span> --caller chief`.
+- `--json` for machine-readable output; `--short` prints only the role name.
+
+Use `choice` as `ROLE`, then **Step 2**.
 
 ### Step 4 — Fallback — `/model`
 

@@ -2,6 +2,7 @@
 role: ux
 profile: dev-shop
 model: ux
+summary: User flows, usability, journey friction, microcopy, interaction patterns and layout choices
 trigger: "Critique this UI design."
 ---
 

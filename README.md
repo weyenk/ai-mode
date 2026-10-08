@@ -19,21 +19,22 @@ Working in this repo (human or LLM)? Read [`AGENTS.md`](AGENTS.md).
 
 ```bash
 ./install.sh
-# ensures ~/.local/bin/ai-mode and ~/.config/ai-mode/config → this repo's presets/
+# builds dist/ai-mode (needs Go), links ~/.local/bin/ai-mode, and points
+# ~/.config/ai-mode/config at this repo's presets/
 ```
 
-### Go binary (no Python/venv)
+### Build
 
-A single static Go binary (stdlib only) with the same commands and state files as
-`bin/ai-mode`. Needs Go (`brew install go`).
+ai-mode is a single static Go binary (stdlib only, no runtime or environment setup).
+Needs Go to build (`brew install go`).
 
 ```bash
 make build      # → dist/ai-mode
 make test
-make install    # symlinks dist/ai-mode to ~/.local/bin/ai-mode (replaces the Python symlink)
+make install    # symlinks dist/ai-mode to ~/.local/bin/ai-mode
 ```
 
-#### Logging, traceability, observability (Go binary)
+#### Logging, traceability, observability 
 
 Every `ask`, `use`, `stop`, `restart` and `warm` appends a JSON line to
 `~/.local/state/ai-mode/events.jsonl` (rotated at 10 MiB). Each `ask` records latency,
@@ -42,11 +43,16 @@ cold-started, who asked, and the full request/response in `traces/<trace>/<span>
 (kept 14 days; `AI_MODE_CAPTURE=0` disables, `AI_MODE_RETAIN_DAYS=N` changes retention).
 
 ```bash
-ai-mode events [-f] [--kind ask] [--role R] [--status error] [--since 1h] [--json]
+ai-mode events [-f] [--kind ask|classify] [--role R] [--status error] [--since 1h] [--json]
 ai-mode stats [--since 24h] [--role R]     # p50/p95, tokens, tok/s, errors, truncations, warm times
 ai-mode trace [ID] [--full]                # call tree for a trace (default: latest); --list for recent
 ai-mode ps                                 # roles loaded/unloaded, ctx, last ask
 ```
+
+`ai-mode classify --eval evals/classify.jsonl [--min-accuracy 0.9]` scores jev's routing against
+labelled cases (accuracy, confidence, wrong-but-clear, confusions) without writing events; `make eval`
+runs the tuning set and the held-out set. See *Tuning jev's confidence* in
+[`presets/agents/jev.md`](presets/agents/jev.md).
 
 To link a chain (chief → specialist → specialist) into one trace, pass ids along:
 `T=$(ai-mode trace new); ai-mode ask product "..." --trace $T --caller chief -v` prints
@@ -55,7 +61,7 @@ To link a chain (chief → specialist → specialist) into one trace, pass ids a
 or hit a cold model.
 
 Presets are found via `$AI_MODE_PRESETS`, `~/.config/ai-mode/config`, or `<repo>/presets`
-next to the symlink-resolved binary. Not ported yet: the MCP server (`bin/ai-mode-mcp*`).
+next to the symlink-resolved binary.
 
 ## Usage
 
@@ -68,6 +74,8 @@ ai-mode doctor
 ai-mode agents                 # role guides
 ai-mode prompt product         # system prompt for a role
 ai-mode ask product "What is a user story in one sentence?"
+ai-mode classify role "Write edge-case tests for login rate limiting"   # jev picks the specialist
+ai-mode classify layer "Add tests for coupon validation"                 # jev picks the QA test layer
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 ```
 

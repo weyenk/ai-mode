@@ -2,6 +2,7 @@
 role: research
 profile: dev-shop
 model: research
+summary: Compare libraries, tools or approaches; investigate APIs and feasibility; competitive analysis; summarise tradeoffs; technical spikes
 ---
 
 # research

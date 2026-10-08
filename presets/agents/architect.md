@@ -2,6 +2,7 @@
 role: architect
 profile: dev-shop
 model: architect
+summary: Plan multi-step changes: migrations, system design, ADRs, mapping large codebases
 ---
 
 # architect
