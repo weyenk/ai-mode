@@ -22,6 +22,41 @@ Working in this repo (human or LLM)? Read [`AGENTS.md`](AGENTS.md).
 # ensures ~/.local/bin/ai-mode and ~/.config/ai-mode/config → this repo's presets/
 ```
 
+### Go binary (no Python/venv)
+
+A single static Go binary (stdlib only) with the same commands and state files as
+`bin/ai-mode`. Needs Go (`brew install go`).
+
+```bash
+make build      # → dist/ai-mode
+make test
+make install    # symlinks dist/ai-mode to ~/.local/bin/ai-mode (replaces the Python symlink)
+```
+
+#### Logging, traceability, observability (Go binary)
+
+Every `ask`, `use`, `stop`, `restart` and `warm` appends a JSON line to
+`~/.local/state/ai-mode/events.jsonl` (rotated at 10 MiB). Each `ask` records latency,
+token counts, gen/prompt tok/s, cached tokens, finish reason, whether the model was
+cold-started, who asked, and the full request/response in `traces/<trace>/<span>.json`
+(kept 14 days; `AI_MODE_CAPTURE=0` disables, `AI_MODE_RETAIN_DAYS=N` changes retention).
+
+```bash
+ai-mode events [-f] [--kind ask] [--role R] [--status error] [--since 1h] [--json]
+ai-mode stats [--since 24h] [--role R]     # p50/p95, tokens, tok/s, errors, truncations, warm times
+ai-mode trace [ID] [--full]                # call tree for a trace (default: latest); --list for recent
+ai-mode ps                                 # roles loaded/unloaded, ctx, last ask
+```
+
+To link a chain (chief → specialist → specialist) into one trace, pass ids along:
+`T=$(ai-mode trace new); ai-mode ask product "..." --trace $T --caller chief -v` prints
+`span=<id>`; use `--parent <id>` on follow-ups (or set `AI_MODE_TRACE_ID`,
+`AI_MODE_PARENT_SPAN`, `AI_MODE_CALLER`). Calls flagged `⚠` were truncated by `max_tokens`
+or hit a cold model.
+
+Presets are found via `$AI_MODE_PRESETS`, `~/.config/ai-mode/config`, or `<repo>/presets`
+next to the symlink-resolved binary. Not ported yet: the MCP server (`bin/ai-mode-mcp*`).
+
 ## Usage
 
 ```bash
