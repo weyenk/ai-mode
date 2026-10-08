@@ -21,6 +21,7 @@ _ai-mode() {
     'ask:Ask a role one question'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
+    'proxy:Run the debug logging proxy (normally via use --debug)'
     'events:Show structured event log'
     'trace:Show call tree for a trace id'
     'stats:Latency/token/error stats per role'

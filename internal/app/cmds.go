@@ -58,7 +58,7 @@ func cmdWhich(args []string) int {
 	}
 	p, found := getProfile(st.Profile)
 	pid := managedPID(st)
-	running := pid != 0 && found && portOpen(p.Host, p.Port)
+	running := pid != 0 && found && portOpen(p.Host, p.Port) && (!st.Debug || pidAlive(st.ProxyPID))
 
 	if *asJSON {
 		var pidV, baseV, portV, hostV, iniV, startedV any
@@ -91,6 +91,13 @@ func cmdWhich(args []string) int {
 		fmt.Printf("pid:      %d\n", pid)
 	} else {
 		fmt.Println("pid:      —")
+	}
+	if st.Debug {
+		state := "running"
+		if !pidAlive(st.ProxyPID) {
+			state = "DOWN (clients cannot reach the models; run: ai-mode use " + st.Profile + " --debug --force)"
+		}
+		fmt.Printf("mode:     DEBUG — proxy :%d → llama-server :%d, proxy %s\n", st.Port, st.UpstreamPort, state)
 	}
 	if running {
 		fmt.Println("server:   running")
@@ -150,6 +157,7 @@ type useOpts struct {
 	force       bool
 	timeout     float64
 	noWarm      bool
+	debug       bool
 	warmTimeout float64
 }
 
@@ -162,6 +170,7 @@ func addUseFlags(fs interface {
 	}
 	fs.Float64Var(&o.timeout, "timeout", 60, "Health wait seconds")
 	fs.BoolVar(&o.noWarm, "no-warm", false, "Skip prefetch after router is healthy")
+	fs.BoolVar(&o.debug, "debug", false, "Front the server with a logging proxy that records all model traffic (Qwen, curl, …)")
 	fs.Float64Var(&o.warmTimeout, "warm-timeout", 600, "Seconds to wait per model during warm (HF download)")
 }
 
@@ -211,7 +220,8 @@ func useProfile(name string, o useOpts) int {
 	st := loadState()
 	pid := managedPID(st)
 
-	if !o.force && st.Profile == p.Name && pid != 0 && portOpen(p.Host, p.Port) {
+	if !o.force && st.Profile == p.Name && pid != 0 && st.Debug == o.debug && portOpen(p.Host, p.Port) &&
+		(!o.debug || pidAlive(st.ProxyPID)) {
 		if _, healthy := getJSON(p.BaseURL()+"/models", 2*time.Second); healthy {
 			fmt.Printf("Already using %s at %s\n", p.Name, p.BaseURL())
 			writeActiveEnv(p)
@@ -220,7 +230,7 @@ func useProfile(name string, o useOpts) int {
 		}
 	}
 
-	if pid != 0 || st.PID != 0 {
+	if pid != 0 || st.PID != 0 || st.ProxyPID != 0 {
 		prev := st.Profile
 		if prev == "" {
 			prev = "previous"
@@ -238,20 +248,50 @@ func useProfile(name string, o useOpts) int {
 		return 1
 	}
 
-	fmt.Printf("Starting %s on %s…\n", p.Name, p.BaseURL())
-	newPID, err := startProfile(p)
+	// Debug mode: llama-server hides on port+10000 and the proxy owns the public port.
+	serverPort := p.Port
+	if o.debug {
+		serverPort = upstreamPort(p)
+		fmt.Printf("Starting %s in DEBUG mode: proxy %s:%d → llama-server :%d\n", p.Name, p.Host, p.Port, serverPort)
+	} else {
+		fmt.Printf("Starting %s on %s…\n", p.Name, p.BaseURL())
+	}
+	newPID, err := startProfile(p, serverPort)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
-	saveState(State{
+	newState := State{
 		Profile: p.Name, PID: newPID, Port: p.Port, Host: p.Host,
 		Ini: p.Ini, StartedAt: nowISO(), Log: p.LogFile(),
-	})
+	}
+	if o.debug {
+		newState.Debug, newState.UpstreamPort = true, serverPort
+	}
+	saveState(newState)
 	writeActiveEnv(p)
 
 	fmt.Printf("pid %d; waiting for health…\n", newPID)
-	if waitHealthy(p, secs(o.timeout)) {
+	healthy := false
+	if o.debug {
+		if waitHealthyAt(p.UpstreamBaseURL(), secs(o.timeout)) {
+			proxyPID, perr := startProxy(p)
+			if perr != nil {
+				fmt.Fprintf(os.Stderr, "llama-server is up but the debug proxy failed to start: %v\n", perr)
+				return 2
+			}
+			newState.ProxyPID = proxyPID
+			saveState(newState)
+			healthy = waitHealthy(p, 30*time.Second)
+			if !healthy {
+				fmt.Fprintf(os.Stderr, "debug proxy (pid %d) is not answering on %s; see %s\n", proxyPID, p.BaseURL(), p.ProxyLogFile())
+				return 2
+			}
+		}
+	} else {
+		healthy = waitHealthy(p, secs(o.timeout))
+	}
+	if healthy {
 		fmt.Printf("Active: %s → %s\n", p.Name, p.BaseURL())
 		if data, ok := getJSON(p.BaseURL()+"/models", 3*time.Second); ok {
 			var ids []string
@@ -271,6 +311,10 @@ func useProfile(name string, o useOpts) int {
 		}
 		fmt.Println(`Env:    eval "$(ai-mode env)"`)
 		fmt.Println("Logs:   ai-mode logs")
+		if o.debug {
+			fmt.Printf("DEBUG:  all chat traffic on :%d is recorded → ai-mode events -f / stats / review (proxy log: %s)\n", p.Port, p.ProxyLogFile())
+			fmt.Printf("        back to normal: ai-mode use %s\n", p.Name)
+		}
 		maybeWarmAfterUse(p, o)
 		return 0
 	}
@@ -336,6 +380,7 @@ func cmdRestart(args []string) int {
 		return 1
 	}
 	return lifecycle("restart", name, func() int {
+		o.debug = o.debug || loadState().Debug // restart keeps the current mode
 		stopCmd(false)
 		o.force = true
 		return useProfile(name, o)

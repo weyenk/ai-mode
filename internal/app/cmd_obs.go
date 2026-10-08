@@ -75,11 +75,20 @@ func eventLine(e Event) string {
 	}
 	if e.Kind == "ask" {
 		line += fmt.Sprintf("  in=%d out=%d", e.PromptTokens, e.CompletionTokens)
+		if e.TTFTMS > 0 {
+			line += fmt.Sprintf(" ttft=%s", fmtDur(e.TTFTMS))
+		}
+		if e.ToolCalls > 0 {
+			line += fmt.Sprintf(" tools=%d", e.ToolCalls)
+		}
 		if e.GenTPS > 0 {
 			line += fmt.Sprintf(" %.0ft/s", e.GenTPS)
 		}
 		if e.Caller != "" {
 			line += " by=" + e.Caller
+		}
+		if e.Source == "proxy" {
+			line += " via=proxy"
 		}
 	}
 	if e.Trace != "" {

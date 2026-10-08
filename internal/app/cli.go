@@ -35,6 +35,7 @@ func commands() map[string]command {
 		"ask":      {"Ask a role one question (chat/completions)", cmdAsk},
 		"classify": {"Ask jev to route: which role, or which QA test layer", cmdClassify},
 		"review":   {"Review recent calls: confirm/correct routing, rate answers", cmdReview},
+		"proxy":    {"Run the debug logging proxy in the foreground (normally started by `use --debug`)", cmdProxy},
 		"events":   {"Show the structured event log (calls, lifecycle)", cmdEvents},
 		"trace":    {"Show a call tree for a trace id (default: latest)", cmdTrace},
 		"stats":    {"Latency, token and error stats per role", cmdStats},

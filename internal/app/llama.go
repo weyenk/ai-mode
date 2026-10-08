@@ -59,10 +59,25 @@ func managedPID(st State) int {
 	return 0
 }
 
-// stopManaged SIGTERMs the managed server, escalating to SIGKILL after wait.
+// stopProxy stops the debug proxy if one is running.
+func stopProxy(st *State) {
+	if pidAlive(st.ProxyPID) {
+		_ = syscall.Kill(st.ProxyPID, syscall.SIGTERM)
+		for i := 0; i < 20 && pidAlive(st.ProxyPID); i++ {
+			time.Sleep(150 * time.Millisecond)
+		}
+		if pidAlive(st.ProxyPID) {
+			_ = syscall.Kill(st.ProxyPID, syscall.SIGKILL)
+		}
+	}
+	st.ProxyPID = 0
+}
+
+// stopManaged SIGTERMs the managed server (and debug proxy), escalating to SIGKILL after wait.
 func stopManaged(st *State, wait time.Duration) bool {
+	stopProxy(st)
 	clear := func() {
-		st.PID = 0
+		st.PID, st.Debug, st.UpstreamPort = 0, false, 0
 		saveState(*st)
 	}
 	if !pidAlive(st.PID) {
@@ -106,7 +121,7 @@ export OPENAI_API_KEY=${OPENAI_API_KEY:-local}
 }
 
 // startProfile launches llama-server detached in its own session and returns its pid.
-func startProfile(p Profile) (int, error) {
+func startProfile(p Profile, port int) (int, error) {
 	llama := findLlamaServer()
 	if llama == "" {
 		return 0, fmt.Errorf("llama-server not found on PATH (brew install llama.cpp?)")
@@ -114,8 +129,8 @@ func startProfile(p Profile) (int, error) {
 	if !isFile(p.Ini) {
 		return 0, fmt.Errorf("preset missing: %s", p.Ini)
 	}
-	if portOpen(p.Host, p.Port) {
-		return 0, fmt.Errorf("port %d already in use on %s.\nStop the other process or change port in %s.mode", p.Port, p.Host, p.Name)
+	if portOpen(p.Host, port) {
+		return 0, fmt.Errorf("port %d already in use on %s.\nStop the other process or change port in %s.mode", port, p.Host, p.Name)
 	}
 
 	ensureDirs()
@@ -123,7 +138,7 @@ func startProfile(p Profile) (int, error) {
 		"--models-preset", p.Ini,
 		"--models-max", strconv.Itoa(p.ModelsMax),
 		"--host", p.Host,
-		"--port", strconv.Itoa(p.Port),
+		"--port", strconv.Itoa(port),
 		"--jinja",
 	}
 	logf, err := os.OpenFile(p.LogFile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
@@ -147,9 +162,13 @@ func startProfile(p Profile) (int, error) {
 }
 
 func waitHealthy(p Profile, timeout time.Duration) bool {
+	return waitHealthyAt(p.BaseURL(), timeout)
+}
+
+func waitHealthyAt(baseURL string, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if _, ok := getJSON(p.BaseURL()+"/models", 1500*time.Millisecond); ok {
+		if _, ok := getJSON(baseURL+"/models", 1500*time.Millisecond); ok {
 			return true
 		}
 		time.Sleep(400 * time.Millisecond)
@@ -165,6 +184,7 @@ func getJSON(url string, timeout time.Duration) (map[string]any, bool) {
 		return nil, false
 	}
 	req.Header.Set("User-Agent", appName)
+	req.Header.Set(internalHeader, "1")
 	resp, err := (&http.Client{Timeout: timeout}).Do(req)
 	if err != nil {
 		return nil, false
@@ -191,6 +211,7 @@ func postJSON(url string, body any, timeout time.Duration) (map[string]any, erro
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", appName)
+	req.Header.Set(internalHeader, "1")
 	resp, err := (&http.Client{Timeout: timeout}).Do(req)
 	if err != nil {
 		return nil, err
@@ -235,4 +256,27 @@ func prettyJSON(v any) string {
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
 	return buf.String()
+}
+
+// startProxy launches `ai-mode proxy` detached, logging to <profile>.proxy.log.
+func startProxy(p Profile) (int, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return 0, err
+	}
+	ensureDirs()
+	logf, err := os.OpenFile(p.ProxyLogFile(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return 0, err
+	}
+	defer logf.Close()
+	cmd := exec.Command(exe, "proxy", "--profile", p.Name)
+	cmd.Stdout, cmd.Stderr = logf, logf
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := cmd.Start(); err != nil {
+		return 0, err
+	}
+	pid := cmd.Process.Pid
+	_ = cmd.Process.Release()
+	return pid, nil
 }

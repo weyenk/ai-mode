@@ -8,13 +8,16 @@ import (
 
 // State is persisted to state.json. Keys are stable across versions.
 type State struct {
-	Profile   string `json:"profile,omitempty"`
-	PID       int    `json:"pid,omitempty"`
-	Port      int    `json:"port,omitempty"`
-	Host      string `json:"host,omitempty"`
-	Ini       string `json:"ini,omitempty"`
-	StartedAt string `json:"started_at,omitempty"`
-	Log       string `json:"log,omitempty"`
+	Profile      string `json:"profile,omitempty"`
+	PID          int    `json:"pid,omitempty"`
+	Port         int    `json:"port,omitempty"`
+	Host         string `json:"host,omitempty"`
+	Ini          string `json:"ini,omitempty"`
+	StartedAt    string `json:"started_at,omitempty"`
+	Log          string `json:"log,omitempty"`
+	Debug        bool   `json:"debug,omitempty"` // debug proxy fronting the server
+	ProxyPID     int    `json:"proxy_pid,omitempty"`
+	UpstreamPort int    `json:"upstream_port,omitempty"` // llama-server's port in debug mode
 }
 
 func loadState() State {

@@ -84,6 +84,30 @@ ai-mode trace [ID] [--full]                # call tree for a trace (default: lat
 ai-mode ps                                 # roles loaded/unloaded, ctx, last ask
 ```
 
+### Debug mode: record traffic from Qwen Code and other clients
+
+`events`, `stats`, `trace` and `review` only see calls made through the `ai-mode` binary. Qwen Code talks to
+llama-server directly, so chief's own turns are invisible by default. To record them, start the profile in
+debug mode:
+
+```bash
+ai-mode use dev-shop --debug     # a logging proxy takes the public port; llama-server moves to port+10000
+ai-mode events -f                # watch chief's chat completions arrive (via=proxy)
+ai-mode use dev-shop             # back to normal: no proxy in the path
+```
+
+Qwen's `baseUrl` doesn't change. Each chat completion is recorded as an `ask` (`via=proxy`) with latency,
+time-to-first-token, tokens, tok/s, tool-call count, finish reason, and a payload that keeps the **last user
+message and the reply**, not the whole resent conversation (`AI_MODE_PROXY_CAPTURE=full` keeps everything).
+The CLI's own calls aren't double-logged. Streaming passes through unbuffered, and a client disconnect
+cancels the upstream request. `which` and `doctor` show the mode and flag a dead proxy; `restart` keeps the
+mode; the proxy log is `~/.local/state/ai-mode/logs/<profile>.proxy.log`. Payloads are capped at 500 MB total
+(`AI_MODE_TRACES_MAX_MB`), oldest first, on top of the 14-day retention.
+
+Caveats: switching modes restarts the server (and re-warms); requests from Qwen carry no trace ids, so each is
+its own trace (clients can send `X-AI-Mode-Trace` / `X-AI-Mode-Parent` headers); the logs hold your prompts and
+code in plaintext, so leave debug mode off when you don't need it.
+
 To link a chain (chief → specialist → specialist) into one trace, pass ids along:
 `T=$(ai-mode trace new); ai-mode ask product "..." --trace $T --caller chief -v` prints
 `span=<id>`; use `--parent <id>` on follow-ups (or set `AI_MODE_TRACE_ID`,

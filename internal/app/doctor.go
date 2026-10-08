@@ -121,6 +121,13 @@ func cmdDoctor(args []string) int {
 		active = "—"
 	}
 	fmt.Printf("Active profile: %s\nManaged pid:    %s\n", active, dash(pid))
+	if st.Debug {
+		alive := pidAlive(st.ProxyPID)
+		fmt.Printf("Debug proxy:    pid %s, :%d → llama-server :%d  %s\n", dash(st.ProxyPID), st.Port, st.UpstreamPort, flag(alive, "running", "DOWN"))
+		if !alive && pid != 0 {
+			issues = append(issues, fmt.Sprintf("debug proxy is down, so clients cannot reach %s on :%d. Run: ai-mode use %s --debug --force", st.Profile, st.Port, st.Profile))
+		}
+	}
 	if st.Profile != "" {
 		if p, ok := getProfile(st.Profile); ok {
 			up := portOpen(p.Host, p.Port)

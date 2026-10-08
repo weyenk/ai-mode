@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +44,9 @@ type Event struct {
 	Choice           string    `json:"choice,omitempty"`     // classify: jev's pick
 	Confidence       float64   `json:"confidence,omitempty"` // classify: jev's confidence
 	Decision         string    `json:"decision,omitempty"`   // classify: clear | ambiguous | low-confidence
+	Source           string    `json:"source,omitempty"`     // "proxy" when recorded by the debug proxy
+	TTFTMS           int64     `json:"ttft_ms,omitempty"`    // proxy: time to first response byte
+	ToolCalls        int       `json:"tool_calls,omitempty"` // proxy: tool calls in the reply
 }
 
 // isCall reports whether an event is a traced model call (a span in a trace).
@@ -124,11 +128,26 @@ func savePayload(trace, span string, request, response any) string {
 	return rel
 }
 
-// pruneTraces deletes payload dirs older than the retention window; it runs at
-// most once a day (guarded by a marker file).
+const defaultTracesMaxMB = 500
+
+func dirSize(dir string) (n int64) {
+	_ = filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
+		if err == nil && !d.IsDir() {
+			if info, err := d.Info(); err == nil {
+				n += info.Size()
+			}
+		}
+		return nil
+	})
+	return n
+}
+
+// pruneTraces deletes payload dirs older than the retention window, then the
+// oldest ones until the total is under AI_MODE_TRACES_MAX_MB. It runs at most
+// hourly (guarded by a marker file) so the debug proxy can call it per request.
 func pruneTraces() {
 	marker := filepath.Join(stateDir(), ".pruned")
-	if st, err := os.Stat(marker); err == nil && time.Since(st.ModTime()) < 24*time.Hour {
+	if st, err := os.Stat(marker); err == nil && time.Since(st.ModTime()) < time.Hour {
 		return
 	}
 	days := atoi(envOr("AI_MODE_RETAIN_DAYS", configValue("AI_MODE_RETAIN_DAYS")), defaultRetain)
@@ -137,6 +156,27 @@ func pruneTraces() {
 	for _, e := range entries {
 		if info, err := e.Info(); err == nil && e.IsDir() && info.ModTime().Before(cutoff) {
 			_ = os.RemoveAll(filepath.Join(tracesDir(), e.Name()))
+		}
+	}
+	// Size cap: drop oldest trace dirs first.
+	maxBytes := int64(atoi(envOr("AI_MODE_TRACES_MAX_MB", configValue("AI_MODE_TRACES_MAX_MB")), defaultTracesMaxMB)) << 20
+	if left, _ := os.ReadDir(tracesDir()); len(left) > 0 && dirSize(tracesDir()) > maxBytes {
+		type td struct {
+			name string
+			mod  time.Time
+		}
+		var dirs []td
+		for _, e := range left {
+			if info, err := e.Info(); err == nil && e.IsDir() {
+				dirs = append(dirs, td{e.Name(), info.ModTime()})
+			}
+		}
+		sort.Slice(dirs, func(i, j int) bool { return dirs[i].mod.Before(dirs[j].mod) })
+		for _, d := range dirs {
+			if dirSize(tracesDir()) <= maxBytes {
+				break
+			}
+			_ = os.RemoveAll(filepath.Join(tracesDir(), d.name))
 		}
 	}
 	_ = os.WriteFile(marker, nil, 0o644)
