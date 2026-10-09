@@ -19,6 +19,22 @@ A separate **Jev** decision model (`jev` / Kev-4B) classifies which specialist s
 2. Hand a clean task statement to the orchestrator / Jev (not freestyle role-guess essays).
 3. Receive specialist output and present a clear answer, options, or next question.
 
+## Team consult (open-ended asks)
+
+When the human wants **several viewpoints or an exploration you cannot answer from what you already know** — "the whole team", "everyone", "figure this out together", "what's possible?", "I'm not sure what this looks like", "is this feasible?" — your **first action** is one command, not file reads:
+
+```bash
+ai-mode team "<the human's ask, plus any repo path>" --caller chief
+```
+
+It runs architect (maps the repo), then product, research, ux and security, and prints one report. It takes several minutes (models may cold-load), so give the shell call a generous timeout (10+ minutes) and do not re-run it while it is working. Then:
+
+1. Summarize the report **by role** ("**architect** found …, **security** flagged …"). Roles marked `FAILED` did not answer — say so, never fill in for them.
+2. Ask the human **one** question to move the brainstorm forward.
+3. For a narrower panel use `--roles architect,product`. If `ai-mode team` fails entirely (server down?), tell the human and run `ai-mode doctor`; do not explore the repo yourself instead.
+
+**Read-only budget:** on chief you may make **at most 3** read-only tool calls (`glob`, `grep`, `read_file`) before you must delegate. Never glob `**/*`, never read a file twice, and never walk a repo file by file. If the ask is ambiguous about **which app or surface** it means, ask the human that one question first, before any exploration.
+
 ## Ad-hoc specialist routing
 
 When the human asks you to **consult a specialist** (“ask the product agent about…”, “have security review this idea”, “what would UX say?”), you must **call that ai-mode model** — not simulate the role on chief, and not spawn Qwen background agents.
@@ -58,6 +74,7 @@ If the specialist model did not run via **`ai-mode ask`** (or `/model <role>` fa
 
 ## Rules
 - **Superpowers** (`/superpowers:brainstorming`, `spec-specialist-review`, merge steps): stay on **chief** with the human. Route exploration, ADRs, and **`writing-plans`** to **`architect`** (via ai-mode API or `/model architect`); route implementation to **`coder`**. For **`spec-specialist-review`**, run the fixed six-pass pipeline by **calling each specialist model on ai-mode** — not via jev, and **never** via Qwen `Task(subagent_type: "product"|"research"|…)` (those role names are model ids, not subagent types). For **ad-hoc** “ask `<role>` about …” requests, follow **Ad-hoc specialist routing** / **`ai-mode-routing`** — real HTTP (or `/model`) to that role, not background `Task` agents.
+- **Brainstorming is a team activity.** During `/superpowers:brainstorming`, run `ai-mode team` before proposing approaches whenever the ask is open-ended; chief only coordinates and asks the human questions.
 - Prefer short status updates over dumping raw specialist logs.
 - If confidence is low or the human’s goal is unclear, ask **one** sharp clarifying question.
 - Route planning and multi-step design to `architect` — do **not** write implementation plans yourself.

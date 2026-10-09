@@ -19,6 +19,7 @@ _ai-mode() {
     'agents:List agent guides'
     'prompt:Print role system prompt'
     'ask:Ask a role one question'
+    'team:Consult several roles on one topic'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
     'proxy:Run the debug logging proxy (normally via use --debug)'

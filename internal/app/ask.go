@@ -30,6 +30,21 @@ func assistantText(msg map[string]any) string {
 	return ""
 }
 
+// askParams is one traced chat call to a role. cmdAsk and cmdTeam share runAsk.
+type askParams struct {
+	profile   Profile
+	role      string
+	user      string
+	maxTokens int
+	timeout   float64
+	asJSON    bool
+	raw       bool
+	verbose   bool
+	trace     string
+	parent    string
+	caller    string
+}
+
 func cmdAsk(args []string) int {
 	fs := newFlags("ask")
 	profile := fs.String("profile", "", "Profile (default: active)")
@@ -49,32 +64,51 @@ func cmdAsk(args []string) int {
 		return fail("usage: ai-mode ask <role> [message...] [--profile P] [--max-tokens N] [--timeout S] [--json] [--raw] [--trace ID] [--parent SPAN] [--caller NAME] [-v]")
 	}
 	role := pos[0]
-	if role == "jev" {
-		return fail("Role 'jev' is a router, not a chat model. Use chat/completions with another role.")
-	}
-
 	p, code := activeProfile(*profile, "Use: ai-mode use <name> or ai-mode ask --profile <name>")
 	if code != 0 {
 		return code
 	}
-	if !contains(iniSectionsFile(p.Ini), role) {
-		return fail("Role '%s' is not configured in %s", role, filepathBase(p.Ini))
-	}
-	_, _, system, code := agentForRole(role)
+	user := readUserMessage(pos[1:])
+	trace, parent := traceContext(*traceF, *parentF)
+	text, code := runAsk(askParams{
+		profile: p, role: role, user: user, maxTokens: *maxTokens, timeout: *timeout,
+		asJSON: *asJSON, raw: *raw, verbose: *verbose, trace: trace, parent: parent,
+		caller: firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli"),
+	})
 	if code != 0 {
 		return code
 	}
-	user := readUserMessage(pos[1:])
+	fmt.Print(text)
+	if !strings.HasSuffix(text, "\n") {
+		fmt.Println()
+	}
+	return 0
+}
+
+// runAsk validates the role, makes the traced chat call and returns the reply
+// text. Errors are printed to stderr and reflected in the exit code.
+func runAsk(a askParams) (string, int) {
+	p, role := a.profile, a.role
+	if role == "jev" {
+		return "", fail("Role 'jev' is a router, not a chat model. Use chat/completions with another role.")
+	}
+	if !contains(iniSectionsFile(p.Ini), role) {
+		return "", fail("Role '%s' is not configured in %s", role, filepathBase(p.Ini))
+	}
+	_, _, system, code := agentForRole(role)
+	if code != 0 {
+		return "", code
+	}
+	user := a.user
 	if user == "" {
-		return fail("Empty question: pass a message argument or pipe stdin.")
+		return "", fail("Empty question: pass a message argument or pipe stdin.")
 	}
 
 	// From here on the call is traced, success or failure.
-	trace, parent := traceContext(*traceF, *parentF)
 	ev := Event{
-		Kind: "ask", Trace: trace, Span: newSpanID(), Parent: parent,
-		Caller:  firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli"),
-		Profile: p.Name, Role: role, MaxTokens: *maxTokens,
+		Kind: "ask", Trace: a.trace, Span: newSpanID(), Parent: a.parent,
+		Caller:  a.caller,
+		Profile: p.Name, Role: role, MaxTokens: a.maxTokens,
 		PromptChars: len(user), SystemSHA: shortSHA(system),
 	}
 	start := time.Now()
@@ -87,7 +121,7 @@ func cmdAsk(args []string) int {
 		ev.Payload = savePayload(ev.Trace, ev.Span, req, resp)
 		emit(ev)
 		pruneTraces()
-		if *verbose {
+		if a.verbose {
 			fmt.Fprintf(os.Stderr, "trace=%s span=%s %s %dms in=%d out=%d finish=%s\n",
 				ev.Trace, ev.Span, ev.Status, ev.DurationMS, ev.PromptTokens, ev.CompletionTokens, ev.FinishReason)
 		}
@@ -97,13 +131,13 @@ func cmdAsk(args []string) int {
 		return code
 	}
 
-	hc := secs(*timeout)
+	hc := secs(a.timeout)
 	if hc > 30*time.Second {
 		hc = 30 * time.Second
 	}
 	models, reachable := getJSON(p.BaseURL()+"/models", hc)
 	if !reachable {
-		return finish(1, fmt.Sprintf("API not reachable at %s", p.BaseURL()), nil, nil)
+		return "", finish(1, fmt.Sprintf("API not reachable at %s", p.BaseURL()), nil, nil)
 	}
 	if items, _ := models["data"].([]any); items != nil {
 		for _, it := range items {
@@ -115,7 +149,7 @@ func cmdAsk(args []string) int {
 
 	body := map[string]any{
 		"model":      role,
-		"max_tokens": *maxTokens,
+		"max_tokens": a.maxTokens,
 		"messages": []map[string]string{
 			{"role": "system", "content": system},
 			{"role": "user", "content": user},
@@ -124,49 +158,45 @@ func cmdAsk(args []string) int {
 	if role != "architect" {
 		body["chat_template_kwargs"] = map[string]any{"enable_thinking": false}
 	}
-	data, err := postJSON(p.BaseURL()+"/chat/completions", body, secs(*timeout))
+	data, err := postJSON(p.BaseURL()+"/chat/completions", body, secs(a.timeout))
 	if err != nil {
-		return finish(1, err.Error(), body, nil)
+		return "", finish(1, err.Error(), body, nil)
 	}
 	recordUsage(&ev, data)
 
-	if *asJSON {
-		ev.ResponseChars = len(prettyJSON(data))
-		fmt.Print(prettyJSON(data))
-		return finish(0, "", body, data)
+	if a.asJSON {
+		out := prettyJSON(data)
+		ev.ResponseChars = len(out)
+		return out, finish(0, "", body, data)
 	}
 
 	choices, _ := data["choices"].([]any)
 	if len(choices) == 0 {
-		return finish(1, "No choices in response", body, data)
+		return "", finish(1, "No choices in response", body, data)
 	}
 	first := asMap(choices[0])
 	if first == nil {
-		return finish(1, "Invalid choice in response", body, data)
+		return "", finish(1, "Invalid choice in response", body, data)
 	}
 	msg := asMap(first["message"])
 	if msg == nil {
-		return finish(1, "No message in response choice", body, data)
+		return "", finish(1, "No message in response choice", body, data)
 	}
 
 	var text string
-	if *raw {
+	if a.raw {
 		if msg["content"] == nil {
-			return finish(1, "Empty message content", body, data)
+			return "", finish(1, "Empty message content", body, data)
 		}
 		text = asString(msg["content"])
 	} else if text = assistantText(msg); text == "" {
-		return finish(1, "Empty assistant content (content and reasoning_content)", body, data)
+		return "", finish(1, "Empty assistant content (content and reasoning_content)", body, data)
 	}
 	ev.ResponseChars = len(text)
 	if strings.TrimSpace(asString(msg["content"])) == "" {
 		ev.Detail = "content empty; used reasoning_content"
 	}
-	fmt.Print(text)
-	if !strings.HasSuffix(text, "\n") {
-		fmt.Println()
-	}
-	return finish(0, "", body, data)
+	return text, finish(0, "", body, data)
 }
 
 // recordUsage copies llama-server's usage/timings into the event.

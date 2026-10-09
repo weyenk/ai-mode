@@ -1,6 +1,6 @@
 ---
 name: ai-mode-routing
-description: "Consult an ai-mode specialist (product, security, research, ux, design, qa, docs, architect, coder) from chief. Use when the human says ask the product agent, route to specialist, talk to security, ai-mode role, or names any dev-shop specialist for an ad-hoc question — not for spec-specialist-review (use that skill) or brainstorming."
+description: "Consult ai-mode specialists (product, security, research, ux, design, qa, docs, architect, coder) from chief. Use when the human says ask the product agent, route to specialist, talk to security, ai-mode role, names any dev-shop specialist, or wants the whole team / everyone's input / to figure something out together (open-ended, early exploration) — not for spec-specialist-review (use that skill)."
 ---
 
 # ai-mode routing
@@ -21,9 +21,19 @@ That is the whole skill. Run the command **now** — do not ask the human anythi
 - Skill loaded, "Using ai-mode-routing…" announced, or "already loaded in context" does **not** count as consulting anyone.
 </HARD-GATE>
 
+## Whole team / open-ended asks
+
+If the human wants the **whole team**, "everyone's view", or an exploration you can't answer yourself ("what's possible?", "figure this out together"), run **one** command instead of several asks:
+
+```bash
+ai-mode team "<the human's ask + repo path>" --caller chief
+```
+
+It calls architect first (repo mapping), then product, research, ux, security, and prints a single report (also saved under `~/.local/state/ai-mode/team/`). `--roles a,b,c` narrows or reorders the panel. Summarize by role; a `FAILED` section means that role did not answer. Do **not** explore the repo on chief first: at most 3 read-only calls before delegating.
+
 ## Building the question
 
-The human names the role; **you write the question.** If the request is broad ("review this project for flaws"), do not ask what they mean — fill in a sensible default and send it. Specialists have large contexts and can read the repo; chief must not.
+For a single named role, the human names it and **you write the question.** If the request is broad ("review this project for flaws"), do not ask what they mean — fill in a sensible default and send it. Specialists have large contexts and can read the repo; chief must not.
 
 Examples:
 

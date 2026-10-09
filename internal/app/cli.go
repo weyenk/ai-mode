@@ -33,6 +33,7 @@ func commands() map[string]command {
 		"agents":   {"List agent markdown guides", cmdAgents},
 		"prompt":   {"Print system prompt for a role (agents/<role>.md)", cmdPrompt},
 		"ask":      {"Ask a role one question (chat/completions)", cmdAsk},
+		"team":     {"Consult several roles on one topic (architect first), print a combined report", cmdTeam},
 		"classify": {"Ask jev to route: which role, or which QA test layer", cmdClassify},
 		"review":   {"Review recent calls: confirm/correct routing, rate answers", cmdReview},
 		"proxy":    {"Run the debug logging proxy in the foreground (normally started by `use --debug`)", cmdProxy},

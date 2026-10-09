@@ -92,6 +92,7 @@ Verify any flag against `internal/app/` (or `ai-mode <cmd> -h`) before relying o
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode classify <role|layer> "<task>"` — jev routing (Stage A role / Stage B test layer) with a clear/ambiguous/low-confidence decision; traced. Roles need a `summary:` in `agents/<role>.md` to be routable (`chief`, `coder-xl`, `fast`, `jev` deliberately have none). `classify --eval evals/classify.jsonl` / `make eval` measures routing; tune summaries against it.
+- `ai-mode team "<topic>" [--roles a,b,c] [--max-tokens N] [--out FILE]` — sequential multi-role consult (default architect → product → research → ux → security; architect's findings feed the rest; roles absent from the profile are skipped). One report on stdout, saved under the state dir's `team/`. Chief's first move for open-ended "whole team" asks.
 - `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens`, `--profile`, pipe stdin).
 - `ai-mode stop [--force]` — stop the managed server.
 - `ai-mode use <profile> --debug` — front the server with a logging proxy on the public port (llama-server moves to port+10000) so Qwen/other clients' chat traffic shows up in `events`/`stats`/`review`. Off by default; `use <profile>` without the flag returns to normal. `restart` keeps the mode; `doctor` flags a dead proxy.
@@ -126,6 +127,8 @@ Don't put `enable_thinking` in a provider's `extra_body`: llama-server ignores i
 request, so it only looks like a toggle. Thinking is set per role in the preset ini via
 `chat-template-kwargs`. Only chat roles belong here (not `jev`, a router) and allow no Qwen
 `Agent(...)` subagents for specialist consults.
+
+**Open-ended asks** ("the whole team", "what's possible?"): chief runs **`ai-mode team "<ask>"`** first and may make at most 3 read-only tool calls before delegating (see `presets/agents/chief.md`).
 
 **Ad-hoc specialists:** When the human asks chief to consult **product**, **security**, or another role, chief must run **`ai-mode ask <role> "<question>"`** (or briefly `/model <role>`) — not Qwen `Task`/`Agent` subagents and not re-invoking **`using-superpowers`** as a delegate. Skill: [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) (symlinked like `spec-specialist-review`).
 

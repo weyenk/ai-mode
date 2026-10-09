@@ -42,8 +42,13 @@ ai-mode doctor
 ai-mode agents                 # role guides
 ai-mode prompt product         # system prompt for a role
 ai-mode ask product "What is a user story in one sentence?"
+ai-mode team "web version of the app?"   # architect maps the repo, then product/research/ux/security; one report
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 ```
+
+`team` runs its roles sequentially (architect first; its findings are passed on as shared context), prints one markdown
+report and saves it under `~/.local/state/ai-mode/team/`. `--roles a,b,c` changes the panel, `--out FILE` also writes there.
+A role that fails is marked `FAILED` in the report; all calls share one trace (`ai-mode trace`).
 
 Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `warm`, `init <name> --with-ini`,
 plus `classify`, `events`, `trace`, `stats`, `ps` and `review` below.
