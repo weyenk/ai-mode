@@ -15,7 +15,7 @@ Rationale, memory math, sampling defaults, and tuning levers:
 
 `jev` is **not** a chat model. Orchestrators must call System One with a closed criterion set (see `agents/jev.md`). Requires a llama.cpp build that exposes `/v1/systemone` (check with `ai-mode doctor`).
 
-**`models-max` is profile-specific:** `learning-center` and `av-club` use **3** (chief + jev + one specialist); **dev-shop** uses **5** (warm fills all slots — see below).
+**`models-max` is profile-specific:** `learning-center` and `av-club` use **3** (chief + jev + one specialist); **dev-shop** uses **6** (warm fills five; the sixth slot is `qa`, which shares the coder's weights, so calling it does not evict chief).
 
 ## dev-shop
 
@@ -24,18 +24,18 @@ Rationale, memory math, sampling defaults, and tuning levers:
 | chief | `lmstudio-community/Qwen3-30B-A3B-Instruct-2507-GGUF:Q4_K_M` | Sole user-facing POC (131k ctx, native 262k, **q4_0 KV**, non-thinking); routes via jev; delegates planning / monorepo reads to architect. **Test swap** from Qwen3-14B (capped at 40960 by llama-server) | 131k | ~22 (est.) |
 | jev | `ggml-org/Kev-4B-GGUF:Q4_K_M` | System One role classifier | 16k | ~3 |
 | fast | `Qwen/Qwen3-4B-GGUF:Q4_K_M` | Cheap instruct chat for classifiers, structured JSON, quick side-queries; **not** jev Stage A | 16k | ~3 |
-| coder | `lmstudio-community/Devstral-Small-2-24B-Instruct-2512-GGUF:Q4_K_M` | Agentic executor of architect's plans; Mistral (non-Qwen) so it is adversarial to architect; **64k** ctx + **q8_0** KV (native 256k); `coder-xl` for huge jobs | 64k | ~20 (est.) |
+| coder | `ggml-org/Qwen3.8-27B-GGUF:Q4_K_M` | Agentic executor of architect's plans; Qwen3.8-27B dense, thinking on (beat Devstral Small 2 in the 2026-10 graded bake-off); **128k** ctx + **q8_0** KV (native 256k); `coder-xl` for huge jobs | 128k | ~17 + ~6 KV |
 | coder-xl | Local Qwen3-Coder-Next UD-Q8 | Heavy coder for rare under-specified / large jobs; already on disk | 131k | ~40 |
 | product | `Qwen/Qwen3-14B-GGUF:Q4_K_M` | Specs/stories + spec review pass (YaRN ctx) | 64k | ~11 |
 | research | `unsloth/Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | Thinking variant for spikes / tradeoffs | 64k | ~25 |
 | docs | `unsloth/gemma-3-27b-it-GGUF:Q4_K_M` | Strong prose; 128k-class Gemma 3; auto mmproj unused for text | 64k | ~26 |
-| qa | `unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:Q4_K_M` | Code-aware test design (not Qwen2.5-Coder-7B) | 64k | ~21 |
+| qa | `ggml-org/Qwen3.8-27B-GGUF:Q4_K_M` (same GGUF as coder → weights shared via mmap) | Test design from requirements + `qa/guidelines`; strongest QA author in the 2026-10 bake-off; `reasoning_effort=medium` | 64k | ~2 extra (shared) |
 | security | `deer-sec/CyberStag-Security-26B-A4B-V1-Q4_K_M-GGUF` | Security-tuned MoE GGUF | 64k | ~28 |
 | design | `stefans71/frontend-design-expert-8b:Q4_K_M` | UI/frontend specialist (VL) + mmproj in repo | 16k | ~7 |
 | ux | same as design (alias) or VL general — see ini | Screenshot critique trigger phrase in agent md | 16k | ~7 |
-| architect | `bartowski/Qwen_Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | **Planning owner** — thinking model, native 256k ctx; alt `Qwen/Qwen3-32B-GGUF:Q4_K_M` (official, dense, YaRN>32k) | 256k | ~58 |
+| architect | `lmstudio-community/gemma-4-26B-A4B-it-GGUF:Q4_K_M` | **Planning owner** — Gemma 4 MoE, thinking on, native 256k ctx, **q8_0 KV**; non-Qwen so it is independent of the coder; previous `bartowski/Qwen_Qwen3-30B-A3B-Thinking-2507-GGUF:Q4_K_M` | 256k | ~20 |
 
-dev-shop **`warm = chief,jev,architect,coder,fast`** matches **`models-max = 5`**: orchestration, plan + execute, and **`fast`** (Qwen Auto-mode Stage 1) are resident at startup (~**98 GiB** reserved — see notes). Other ini roles load on demand and may evict a resident model until a slot frees.
+dev-shop **`warm = chief,jev,architect,coder,fast`** matches **`models-max = 6`** (five warm + `qa` on demand): orchestration, plan + execute, and **`fast`** (Qwen Auto-mode Stage 1) are resident at startup (~**70 GiB** RSS / ~77 GiB wired, measured 2026-10-08 — see notes). Other ini roles load on demand and may evict a resident model until a slot frees.
 
 ## learning-center
 

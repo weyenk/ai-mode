@@ -39,10 +39,12 @@ Everything runs **locally** on a Mac Studio M5 Max / 128 GB. No cloud models.
   (A) `questions.role` → specialist; (B) when role is `qa`, `questions.test_layer` →
   which guideline to load (`presets/agents/jev.md`). Never mix role and layer in one
   question. Needs llama.cpp `/v1/systemone` (`ai-mode doctor`).
-- **architect** (`Qwen3-30B-A3B-Thinking-2507`, 262144) — **owns planning**, ADRs, and
-  large codebase mapping. All multi-step design lives here, not chief.
-- **coder** (`Devstral-Small-2-24B`, 64k) — agentic executor of architect's plans; non-Qwen on
-  purpose so it is adversarial to architect.
+- **architect** (`Gemma-4-26B-A4B`, 262144) — **owns planning**, ADRs, and
+  large codebase mapping. All multi-step design lives here, not chief. Non-Qwen on purpose so it
+  is independent of the coder.
+- **coder** (`Qwen3.8-27B`, 131k, thinking on) — agentic executor of architect's plans; chosen over
+  Devstral Small 2, Gemma 4, Laguna-S-2.1 and Kimi-Linear in the 2026-10 bake-off (see `presets/.local/BAKEOFF-notes.md`).
+  **`qa`** runs the same Qwen3.8 GGUF (shared weights) and works from requirements + guidelines, not the plan.
 - **coder-xl** (local `Qwen3-Coder-Next` UD-Q8, 131k) — heavy coder for rare
   under-specified / large jobs; already on disk.
 - **specialists** — `product`, `research`, `docs`, `qa`, `security`, `design`, `ux`.
@@ -112,8 +114,13 @@ which produces `Context size has been exceeded` near the real limit with a misle
 “200k · 15% used” bar if `contextWindowSize` is wrong.
 
 Set **`contextWindowSize`** on every local role entry to match `presets/<profile>.ini`
-(`chief` → **131072**, `architect` → **262144**, `coder` → **65536**, etc.; see `presets/MODELS.md`). Restart or reload
+(`chief` → **131072**, `architect` → **262144**, `coder` → **131072**, etc.; see `presets/MODELS.md`). Restart or reload
 Qwen Code after editing. Stay on **chief** in the UI; routing to architect/coder is orchestration-side.
+
+**Compaction (Qwen Code 0.25):** auto-compaction is on by default and is measured against each entry's `contextWindowSize`,
+so keep those accurate. `~/.qwen/settings.json` sets `context.autoCompactThreshold` = 0.6 (default 0.85 is late for Gemma, which
+was reliable to ~127k and degraded near 246k) and `compactionModel` = `architect` (fast MoE, 262k window; `fast` is 16k and too small
+to summarize a long history). Manual: `/compress`, `/compress-fast`.
 
 Don't put `enable_thinking` in a provider's `extra_body`: llama-server ignores it at the top level of the
 request, so it only looks like a toggle. Thinking is set per role in the preset ini via
@@ -131,10 +138,14 @@ request, so it only looks like a toggle. Thinking is set per role in the preset 
 - **Keep `presets/MODELS.md` in sync** with the ini — catalog entries must match `[section]` blocks.
   Rationale and memory debugging go in `presets/.local/MODELS-notes.md`.
 - `models-max` caps resident models; warming still prefetches the rest. dev-shop uses
-  `models-max = 5` with **`warm = chief,jev,architect,coder,fast`** so orchestration, plan→execute,
-  and Qwen Auto-mode classifiers (~98 GiB) are resident at startup on 128 GB.
-- Thinking models (architect's Thinking-2507) keep thinking **on** — do **not** set
+  `models-max = 6` with **`warm = chief,jev,architect,coder,fast`** so orchestration, plan→execute,
+  and Qwen Auto-mode classifiers (~77 GiB wired measured at warm, ~81 GiB with `qa` loaded) are resident on 128 GB.
+  The sixth slot is `qa`: it runs the coder's Qwen3.8 GGUF (weights shared via mmap), so calling it adds ~2 GiB and
+  does not evict chief.
+  Don't pair a ~60 GiB architect (e.g. Laguna-S-2.1) with the other four: wired memory hit ~110 GiB and swap started.
+- Thinking models (architect's Gemma 4, coder's Qwen3.8) keep thinking **on** — do **not** set
   `enable_thinking=false` for them.
+  Cap runaway thinking with `reasoning-budget` (a valid preset key; architect 8192, coder 16384) instead.
 
 ## Model selection
 
@@ -142,8 +153,9 @@ request, so it only looks like a toggle. Thinking is set per role in the preset 
 - Where no official GGUF exists (Thinking-2507, Coder-30B-A3B), use trusted non-Unsloth
   quantizers (bartowski / lmstudio-community / ggml-org). The earlier Unsloth
   Qwen3-30B-A3B degeneration bit us — avoid it for those.
-- architect = `Qwen3-30B-A3B-Thinking-2507` @ ctx `262144` (official-only fallback:
-  `Qwen/Qwen3-32B-GGUF` @ 65536, YaRN beyond 32k).
+- architect = `Gemma-4-26B-A4B` @ ctx `262144`. In the end-to-end bake-off (architect spec → coder → QA-test fix loop) Gemma
+  specs + Qwen3.8 coder gave 6/6 fully-correct cells; Qwen3.8 as its own architect scored only 0.50 (over-specified or empty
+  specs). Laguna-S-2.1 (~60 GiB) and Kimi-Linear did not improve any role.
 
 ## Guardrails
 

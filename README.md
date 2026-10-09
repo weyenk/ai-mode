@@ -48,7 +48,7 @@ eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `warm`, `init <name> --with-ini`,
 plus `classify`, `events`, `trace`, `stats`, `ps` and `review` below.
 
-**Prefetch (avoid first-request HF downloads):** After the router is healthy, `ai-mode use dev-shop` sequentially warms the profile’s `warm = …` list (dev-shop default: `chief`, `jev`, `architect`, `coder`, `fast`). Each role is probed via `/v1/chat/completions` or `/v1/systemone` until its weight is downloaded/loaded. Override with `warm = …` in `<profile>.mode`, `ai-mode warm chief architect`, `ai-mode warm --all` (every ini section — large downloads), or skip with `--no-warm`. With dev-shop `models-max = 5`, those five models stay resident (~98 GiB); warming still prefetches other roles for the next request. Tune per-model wait with `--warm-timeout 900`.
+**Prefetch (avoid first-request HF downloads):** After the router is healthy, `ai-mode use dev-shop` sequentially warms the profile’s `warm = …` list (dev-shop default: `chief`, `jev`, `architect`, `coder`, `fast`). Each role is probed via `/v1/chat/completions` or `/v1/systemone` until its weight is downloaded/loaded. Override with `warm = …` in `<profile>.mode`, `ai-mode warm chief architect`, `ai-mode warm --all` (every ini section — large downloads), or skip with `--no-warm`. With dev-shop `models-max = 5`, those five models stay resident (~77 GiB wired); warming still prefetches other roles for the next request. Tune per-model wait with `--warm-timeout 900`.
 
 ## Routing (jev)
 
