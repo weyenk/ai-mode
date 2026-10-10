@@ -54,18 +54,20 @@ func TestSpliceQwenHook(t *testing.T) {
 		t.Fatalf("install: %v %v", changed, err)
 	}
 	s := string(out)
-	if !strings.Contains(s, `"ai-mode hook session-start"`) || !strings.Contains(s, `"echo hi"`) ||
+	if !strings.Contains(s, `"ai-mode hook session-start"`) || !strings.Contains(s, `"ai-mode hook prompt-expansion"`) ||
+		!strings.Contains(s, `"UserPromptExpansion"`) || !strings.Contains(s, `"echo hi"`) ||
 		!strings.Contains(s, `"PreToolUse"`) || !strings.Contains(s, `"chief"`) {
 		t.Fatalf("install lost settings or missed the hook:\n%s", s)
 	}
 
 	again, changed, _ := spliceQwenHook(out, true)
-	if changed || string(again) != s || strings.Count(s, qwenHookName+`"`) != 1 {
+	if changed || string(again) != s || strings.Count(s, `"name": "`+qwenHookName+`"`) != len(qwenHooks) {
 		t.Fatalf("second install should be a no-op:\n%s", again)
 	}
 
 	removed, changed, _ := spliceQwenHook(out, false)
-	if !changed || strings.Contains(string(removed), "session-start") || !strings.Contains(string(removed), `"echo hi"`) {
+	if !changed || strings.Contains(string(removed), "ai-mode hook") || strings.Contains(string(removed), "UserPromptExpansion") ||
+		!strings.Contains(string(removed), `"echo hi"`) {
 		t.Fatalf("remove:\n%s", removed)
 	}
 

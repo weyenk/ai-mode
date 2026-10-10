@@ -22,7 +22,7 @@ _ai-mode() {
     'team:Consult several roles on one topic'
     'amigos:Three Amigos refinement of one story'
     'setup-qwen:Install routing rules and SessionStart hook for Qwen Code'
-    'hook:Qwen Code hook entry point (session-start)'
+    'hook:Qwen Code hook entry point (session-start, prompt-expansion)'
     'plan:Lint a plan or verify a task is red then green'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
@@ -64,7 +64,7 @@ _ai-mode() {
       _values 'option' '--file' '--settings' '--print' '--remove'
       ;;
     hook)
-      _values 'event' 'session-start'
+      _values 'event' 'session-start' 'prompt-expansion'
       ;;
     prompt|ask)
       if [[ $words[CURRENT] == -* && $words[2] == ask ]]; then
