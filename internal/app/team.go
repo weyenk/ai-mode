@@ -87,13 +87,20 @@ func cmdTeam(args []string) int {
 	parentF := fs.String("parent", "", "Parent span id (default: $AI_MODE_PARENT_SPAN)")
 	callerF := fs.String("caller", "", "Who is asking, e.g. chief (default: $AI_MODE_CALLER or cli)")
 	verbose := fs.Bool("v", false, "Print trace/span ids and timings to stderr")
+	var ctxPaths stringList
+	fs.Var(&ctxPaths, "context", "File (full contents) or directory (file listing) given to architect (or the first role) as reference material; repeatable")
+	ctxMax := fs.Int("context-max-chars", defaultContextMaxChars, "Fail if the --context block is larger than this many characters")
 	pos, code, ok := parse(fs, args)
 	if !ok {
 		return code
 	}
 	topic := readUserMessage(pos)
 	if topic == "" {
-		return fail("usage: ai-mode team <topic...> [--roles a,b,c] [--max-tokens N] [--timeout S] [--out FILE] [--profile P] [--caller NAME] [-v]\n(or pipe the topic on stdin)")
+		return fail("usage: ai-mode team <topic...> [--context PATH]... [--roles a,b,c] [--max-tokens N] [--timeout S] [--out FILE] [--profile P] [--caller NAME] [-v]\n(or pipe the topic on stdin)")
+	}
+	ctxBlock, err := buildContext(ctxPaths, *ctxMax)
+	if err != nil {
+		return fail("%v", err)
 	}
 	p, code := activeProfile(*profile, "Use: ai-mode use <name> or ai-mode team --profile <name>")
 	if code != 0 {
@@ -117,6 +124,7 @@ func cmdTeam(args []string) int {
 		return fail("None of the requested roles (%s) are configured in %s", strings.Join(wanted, ","), filepathBase(p.Ini))
 	}
 
+	ctxRole := contextRole(roles)
 	cwd, _ := os.Getwd()
 	trace, parent := traceContext(*traceF, *parentF)
 	caller := firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli")
@@ -141,7 +149,7 @@ func cmdTeam(args []string) int {
 			ctxDigest = digest
 		}
 		text, c := runAsk(askParams{
-			profile: p, role: role, user: teamQuestion(role, topic, cwd, ctxDigest),
+			profile: p, role: role, user: teamPrompt(role, topic, cwd, ctxDigest, ctxRole, ctxBlock),
 			maxTokens: mt, timeout: *timeout, verbose: *verbose,
 			trace: trace, parent: parent, caller: caller,
 		})

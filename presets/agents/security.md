@@ -25,4 +25,4 @@ When routed by **`spec-specialist-review`**:
 
 - Read the design spec and targeted trust-boundary / data-flow excerpts only.
 - Emit `## security review` with **Blocking**, **Non-blocking**, **Proposed edits** (severity + exploit scenario + fix).
-- No implementation and no **`writing-plans`**.
+- No implementation and no **`drafting-plans`**.

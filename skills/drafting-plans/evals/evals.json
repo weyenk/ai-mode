@@ -1,0 +1,33 @@
+{
+  "skill_name": "drafting-plans",
+  "evals": [
+    {
+      "id": 1,
+      "eval_name": "three-amigos-feature",
+      "prompt": "The design spec at docs/superpowers/specs/2026-10-10-three-amigos-design.md is approved and chief has handed planning to you (architect). Write the implementation plan for it, following the drafting-plans skill. You may read files in this repo.",
+      "expected_output": "A saved plan under docs/superpowers/plans/ with the required header (including Context and Lint lines), Global Constraints, Review Focus (five items), a Boundaries table, one JSON task graph (kind contract|impl|integration|docs, packet code|spec, no wave field), a collision matrix, a scenario coverage table, and a full task packet per task. Contract tasks hold types/interfaces/fakes and are code packets that pass `ai-mode plan verify`; impl tasks depend only on contract tasks (the lint enforces it); most impl packets are spec packets; hot files (internal/app/cli.go, completions/_ai-mode, README.md, AGENTS.md) are owned only by an integration task; code packets have Phase A (tests + compiling stubs, expected failure is an assertion) and Phase B (implementation), spec packets give each scenario a Given/When/Then with its exact test name; `ai-mode plan lint` and `plan verify --task all` both exit 0; file paths cite real repo files and unverified ones are marked.",
+      "files": [
+        "docs/superpowers/specs/2026-10-10-three-amigos-design.md"
+      ],
+      "what_it_tests": "The full happy path on the real feature: contract-first waves, ownership, traceability, and grounding in the repo."
+    },
+    {
+      "id": 2,
+      "eval_name": "tiny-single-file-fix",
+      "prompt": "Small fix, plan it: `ai-mode ask <role> \"question\"` ignores piped stdin when a message argument is also given (internal/app/ask.go, readUserMessage). Make it append piped stdin to the message after a blank line, so `cat spec.md | ai-mode ask architect \"review this\"` works. Write the plan following the drafting-plans skill.",
+      "expected_output": "A deliberately small plan: one or two tasks in at most two waves, no wave-0 contract task and no integration task (no new boundary, no hot files), no PR stack beyond a single layer, owned files limited to internal/app/ask.go and a test file. Still tests-first: Phase A tests (e.g. TestReadUserMessage_S1_AppendsPipedStdin) fail on an assertion, then Phase B changes readUserMessage. The plan must not invent ceremony (extra layers, gates, boundary tables with entries) the change does not need.",
+      "files": [],
+      "what_it_tests": "Over-engineering: whether the skill scales down. A plan with a wave 0, an integration wave or three layers for a one-function fix is a failure."
+    },
+    {
+      "id": 3,
+      "eval_name": "two-commands-share-hot-files",
+      "prompt": "Plan adding two new subcommands, `ai-mode plan lint` and `ai-mode plan tdd-check`, as described in skills/drafting-plans/SKILL.md (Deterministic checks). Each is its own file in internal/app/. Both need registering in commands() and in completions/_ai-mode, and the README needs a line for each. Follow the drafting-plans skill; the two commands should be built in parallel.",
+      "expected_output": "The two command implementations are separate parallel tasks in the same wave with disjoint owned files; exactly one integration task owns internal/app/cli.go, completions/_ai-mode and README.md and registers both commands, in a later wave; the collision matrix shows no shared cell within a wave; the two parallel tasks each pass the skill's rule that other tasks hand the integration task a snippet instead of editing hot files; a shared `plan` dispatcher or shared parsing code is either a wave-0 contract task or owned by one task, never edited by both.",
+      "files": [
+        "skills/drafting-plans/SKILL.md"
+      ],
+      "what_it_tests": "Collision handling: the parallel tasks must not both edit the command registry, and shared helper code must have a single owner."
+    }
+  ]
+}

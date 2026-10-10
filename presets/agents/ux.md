@@ -29,4 +29,4 @@ When routed by **`spec-specialist-review`** (skip if no user-facing flows):
 
 - Read the design spec; optional screenshots with trigger phrase for VL critique.
 - Emit `## ux review` with **Blocking**, **Non-blocking**, **Proposed edits** (flows, IA, copy, errors).
-- No implementation and no **`writing-plans`**.
+- No implementation and no **`drafting-plans`**.

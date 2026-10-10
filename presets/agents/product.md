@@ -40,4 +40,4 @@ When routed by **`spec-specialist-review`**:
 
 - Read the approved design spec path plus minimal codebase context only.
 - Emit `## product review` with **Blocking**, **Non-blocking**, **Proposed edits** (scope, stories, acceptance criteria, metrics).
-- No implementation and no **`writing-plans`** — architect owns planning after the full review pipeline.
+- No implementation and no **`drafting-plans`** — architect owns planning after the full review pipeline.

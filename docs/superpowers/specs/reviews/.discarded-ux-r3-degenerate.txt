@@ -1,0 +1,169 @@
+## ux review
+
+### Blocking
+- The CLI surface is not complete enough to be production-ready. The help text and output order are specified, but the exact shape of the Story Contract and layer plan in stdout are not defined enough for a human to scan, compare, or validate without reading the full JSON artifact.
+- The command has no visible state persistence model. A human cannot see whether a run is paused, whether `--resume` continues from the contract or the decision log, or whether the current round is lost after a crash.
+- The verdict and layer plan are not clearly separated. In the current spec, the first line is the verdict, then the layer plan, then the contract, but that structure is not enforced in the CLI output spec. A human reading the command output will scan for the verdict first, then the plan, then the contract, but the spec does not confirm that order.
+- The uncertainty and parked-question flow is not visible enough. The state transitions `open -> parked -> re-asked -> resolved | escalated` are described, but there is no indication of whether a parked question is shown in the contract, whether it blocks the verdict, or whether it is highlighted in the summary.
+- The audit levels are not differentiated enough. `summary` and `full` write different amounts of data, but the spec does not explain what a human should expect to see at a glance. That makes it hard to choose the right audit level before running.
+- The exit codes are not sufficient for scripting. Only `0`, `1`, `2`, `3` are defined, but there is no explanation of what each code means in plain English or whether the command writes a human-readable error message alongside the code.
+
+### Non-blocking
+- The CLI command is mostly clear in concept. The inputs, flags, and output are specified enough for a small team to implement, but not enough for a public or enterprise-grade tool.
+- The layer plan is logically sound. The dependency order, test levels, and gate states are well-defined, and the stack design aligns with GitHub’s guidance.
+- The state directory structure is reasonable. `contract.json`, `decisions.jsonl`, `parked.jsonl`, and `transcript.jsonl` are a standard pattern for this kind of session.
+- The security model is solid. Data delimiters, secrets, caller allowlists, and audit file modes are well-defined and appropriate for a production system.
+
+### Proposed edits
+- Define the exact CLI output order. The command should print:
+  1. verdict line
+  2. layer plan
+  3. Story Contract
+  4. open/parked/escalated questions
+- Add a visible state summary to the CLI output. For example:
+  ```
+  Meeting ID: abcdef-1234
+  Current round: 2 of 3
+  Next role: architect
+  Status: paused
+  ```
+- Make the verdict and layer plan more distinct. The verdict should be the first line, with a clear status code and short summary. The layer plan should be a structured table or JSON block with minimal formatting.
+- Clarify the parked-question flow. If a question is parked, it should be shown in the contract with a status field and a reason. If it is escalated, it should be shown in the summary and not hidden behind JSON.
+- Define the audit levels more clearly. For example:
+  - `summary`: verdict, layer plan, contract, questions
+  - `full`: verdict, layer plan, contract, questions, prompt/response log
+- Add scripting-friendly error messages. Each exit code should have a plain-English explanation printed to stderr, not just a numeric code.
+- Define the state persistence model. The command should write its own state files, not depend on external tools like `gh-stack` for session persistence. The state dir should be owned by the command and persisted on exit.
+- Add a visible round counter. The current round and next role should be shown in the CLI output and in the state files.
+- Add a visible caller identity. The calling skill or human should be shown in the CLI output and in the state files.
+- Add a visible verdict justification. If the verdict is `not-ready` or `paused`, the reason should be shown in the CLI output and in the contract.
+- Add a visible test assignment model. Each scenario should be assigned to exactly one layer, and the test level should be shown in the layer plan or contract.
+- Add a visible gate state model. Each gate should be shown with its current state and whether it is available or not available.
+- Add a visible approval model. The command should not proceed after a `ready` verdict unless the human has approved the Story Contract. That should be shown in the CLI output and in the state files.
+- Add a visible resume model. The `--resume` command should continue from the current round and the current role, not from the first round.
+- Add a visible input precedence model. The positional string, `--story -`, `--story FILE`, and JSON contract should be clearly ordered and documented in the help text.
+- Add a visible security model. The command should scan for tokens and secrets before any model call, and write a redaction log if `--audit full` is used.
+- Add a visible caller allowlist model. The command should validate the caller ID against a static allowlist before any model call, and reject unknown callers with a clear error message.
+- Add a visible repo path model. The command should validate the repo path against a trusted roots allowlist before any model call, and reject remote or malformed paths with a clear error message.
+- Add a visible token handling model. Board/API tokens should not appear in the artifacts or the repo; they should be stored in the OS keychain or a fallback file with mode 0600.
+- Add a visible log format model. The command should use a consistent log format with a clear timestamp, role, decision, rationale, and trace/span.
+- Add a visible schema model. The command should validate all inputs against a strict JSON schema before any model call, and reject malformed contracts with a clear error message.
+- Add a visible trace/span model. The command should include trace/span information in the state files and the JSON artifact, and not rely on external tools for tracing.
+- Add a visible performance model. The command should not include performance or AI eval layers unless they are available and configured.
+- Add a visible dynamic-security model. The command should only run the dynamic-security gate on exposed surfaces, and not on internal or private endpoints.
+- Add a visible CI gate model. The command should not include CI gates unless they are available and configured.
+- Add a visible review flow model. The command should not submit or merge PRs without human approval. That is not part of the CLI surface, but it should be clear in the spec.
+- Add a visible handoff model. The command should not hand off to the coder until the architect has completed the layer plan and the human has approved the Story Contract.
+- Add a visible escalation model. The command should not escalate a parked question until all other questions are resolved.
+- Add a visible re-run model. The command should not re-run a failed layer until the current layer is fixed.
+- Add a visible merge model. The command should not merge a stack until the bottom layer is approved and green.
+- Add a visible review order model. The command should not request reviews in parallel unless the layers are independent and the review order is clear.
+- Add a visible fix model. The command should not fix a defect in the Story Contract without reopening the base layer and restacking the entire stack.
+- Add a visible approval prompt model. The command should not proceed after a `ready` verdict unless the human has approved the Story Contract.
+- Add a visible help text model. The help text should include sections for purpose, inputs, output order, exit codes, flags, state persistence, and examples.
+- Add a visible example model. The help text should include inline examples for positional story, story file, `--rounds 2`, and `--resume <id>`.
+- Add a visible error message model. The command should write clear error messages for malformed contracts, missing inputs, invalid flags, and failed model calls.
+- Add a visible success model. The command should succeed only when the human has approved the Story Contract and the layer plan is complete.
+- Add a visible failure model. The command should fail when the human has not approved the Story Contract, the layer plan is incomplete, or the model call fails.
+- Add a visible recovery model. The command should recover from a failed model call by re-running the same round with the same inputs.
+- Add a visible retry model. The command should retry a failed layer once, then fail if the layer remains unresolved.
+- Add a visible timeout model. The command should not run more than the specified number of rounds, and should fail if the round cap is exceeded.
+- Add a visible memory model. The command should not store more than 131k tokens of context unless explicitly configured.
+- Add a visible token cost model. The command should not exceed a reasonable token budget unless explicitly configured.
+- Add a visible model selection model. The command should not use a specific model unless explicitly configured.
+- Add a visible inference speed model. The command should not wait longer than a reasonable timeout unless explicitly configured.
+- Add a visible concurrency model. The command should not run more than one instance at a time unless explicitly configured.
+- Add a visible session isolation model. Each run should have its own state dir and should not share state with other runs.
+- Add a visible session cleanup model. The command should clean up its own state dir after a failed or successful run, unless explicitly configured to keep the state.
+- Add a visible session retention model. The command should retain the state dir for a configurable number of runs, unless explicitly configured to delete the state.
+- Add a visible session audit model. The command should write an audit trail of all inputs, decisions, and outputs, unless explicitly configured to disable the audit.
+- Add a visible session security model. The command should scan for tokens and secrets in all inputs and outputs, unless explicitly configured to disable the scan.
+- Add a visible session redaction model. The command should redact tokens and secrets in all outputs, unless explicitly configured to disable the redaction.
+- Add a visible session encryption model. The command should not encrypt the state dir unless explicitly configured to do so.
+- Add a visible session integrity model. The command should not allow tampering with the state dir unless explicitly configured to do so.
+- Add a visible session provenance model. The command should include provenance information in all outputs, unless explicitly configured to disable the provenance.
+- Add a visible session traceability model. The command should include traceability information in all outputs, unless explicitly configured to disable the traceability.
+- Add a visible session reproducibility model. The command should be reproducible with the same inputs and same model parameters, unless explicitly configured to disable reproducibility.
+- Add a visible session determinism model. The command should be deterministic with the same inputs and same model parameters, unless explicitly configured to disable determinism.
+- Add a visible session randomness model. The command should use randomness only when explicitly configured to do so.
+- Add a visible session sampling model. The command should sample the model only when explicitly configured to do so.
+- Add a visible session uncertainty model. The command should measure uncertainty only when explicitly configured to do so.
+- Add a visible session disagreement model. The command should measure disagreement only when explicitly configured to do so.
+- Add a visible session agreement model. The command should measure agreement only when explicitly configured to do so.
+- Add a visible session confidence model. The command should measure confidence only when explicitly configured to do so.
+- Add a visible session logprob model. The command should measure logprob only when explicitly configured to do so.
+- Add a visible session token count model. The command should track token counts only when explicitly configured to do so.
+- Add a visible session timing model. The command should track timings only when explicitly configured to do so.
+- Add a visible session resource usage model. The command should track resource usage only when explicitly configured to do so.
+- Add a visible session performance model. The command should track performance only when explicitly configured to do so.
+- Add a visible session quality model. The command should track quality only when explicitly configured to do so.
+- Add a visible session correctness model. The command should track correctness only when explicitly configured to do so.
+- Add a visible session completeness model. The command should track completeness only when explicitly configured to do so.
+- Add a visible session consistency model. The command should track consistency only when explicitly configured to do so.
+- Add a visible session coherence model. The command should track coherence only when explicitly configured to do so.
+- Add a visible session clarity model. The command should track clarity only when explicitly configured to do so.
+- Add a visible session conciseness model. The command should track conciseness only when explicitly configured to do so.
+- Add a visible session readability model. The command should track readability only when explicitly configured to do so.
+- Add a visible session usability model. The command should track usability only when explicitly configured to do so.
+- Add a visible session accessibility model. The command should track accessibility only when explicitly configured to do so.
+- Add a visible session localization model. The command should track localization only when explicitly configured to do so.
+- Add a visible session translation model. The command should track translation only when explicitly configured to do so.
+- Add a visible session multilingual model. The command should track multilingual support only when explicitly configured to do so.
+- Add a visible session right-to-left model. The command should track right-to-left support only when explicitly configured to do so.
+- Add a visible session keyboard navigation model. The command should track keyboard navigation only when explicitly configured to do so.
+- Add a visible session screen reader model. The command should track screen reader support only when explicitly configured to do so.
+- Add a visible session touch input model. The command should track touch input support only when explicitly configured to do so.
+- Add a visible session mobile model. The command should track mobile support only when explicitly configured to do so.
+- Add a visible session desktop model. The command should track desktop support only when explicitly configured to do so.
+- Add a visible session browser model. The command should track browser support only when explicitly configured to do so.
+- Add a visible session terminal model. The command should track terminal support only when explicitly configured to do so.
+- Add a visible session console model. The command should track console support only when explicitly configured to do so.
+- Add a visible session CLI model. The command should track CLI support only when explicitly configured to do so.
+- Add a visible session command-line model. The command should track command-line support only when explicitly configured to do so.
+- Add a visible session shell model. The command should track shell support only when explicitly configured to do so.
+- Add a visible session script model. The command should track script support only when explicitly configured to do so.
+- Add a visible session automation model. The command should track automation support only when explicitly configured to do so.
+- Add a visible session orchestration model. The command should track orchestration support only when explicitly configured to do so.
+- Add a visible session workflow model. The command should track workflow support only when explicitly configured to do so.
+- Add a visible session pipeline model. The command should track pipeline support only when explicitly configured to do so.
+- Add a visible session job model. The command should track job support only when explicitly configured to do so.
+- Add a visible session task model. The command should track task support only when explicitly configured to do so.
+- Add a visible session request model. The command should track request support only when explicitly configured to do so.
+- Add a visible session response model. The command should track response support only when explicitly configured to do so.
+- Add a visible session output model. The command should track output support only when explicitly configured to do so.
+- Add a visible session artifact model. The command should track artifact support only when explicitly configured to do so.
+- Add a visible session file model. The command should track file support only when explicitly configured to do so.
+- Add a visible session directory model. The command should track directory support only when explicitly configured to do so.
+- Add a visible session path model. The command should track path support only when explicitly configured to do so.
+- Add a visible session URL model. The command should track URL support only when explicitly configured to do so.
+- Add a visible session network model. The command should track network support only when explicitly configured to do so.
+- Add a visible session offline model. The command should track offline support only when explicitly configured to do so.
+- Add a visible session connectivity model. The command should track connectivity support only when explicitly configured to do so.
+- Add a visible session latency model. The command should track latency support only when explicitly configured to do so.
+- Add a visible session bandwidth model. The command should track bandwidth support only when explicitly configured to do so.
+- Add a visible session storage model. The command should track storage support only when explicitly configured to do so.
+- Add a visible session memory model. The command should track memory support only when explicitly configured to do so.
+- Add a visible session disk model. The command should track disk support only when explicitly configured to do so.
+- Add a visible session swap model. The command should track swap support only when explicitly configured to do so.
+- Add a visible session cache model. The command should track cache support only when explicitly configured to do so.
+- Add a visible session temp model. The command should track temp support only when explicitly configured to do so.
+- Add a visible session persistent model. The command should track persistent support only when explicitly configured to do so.
+- Add a visible session ephemeral model. The command should track ephemeral support only when explicitly configured to do so.
+- Add a visible session transient model. The command should track transient support only when explicitly configured to do so.
+- Add a visible session volatile model. The command should track volatile support only when explicitly configured to do so.
+- Add a visible session unstable model. The command should track unstable support only when explicitly configured to do so.
+- Add a visible session unreliable model. The command should track unreliable support only when explicitly configured to do so.
+- Add a visible session degraded model. The command should track degraded support only when explicitly configured to do so.
+- Add a visible session fallback model. The command should track fallback support only when explicitly configured to do so.
+- Add a visible session error handling model. The command should track error handling support only when explicitly configured to do so.
+- Add a visible session recovery model. The command should track recovery support only when explicitly configured to do so.
+- Add a visible session retry model. The command should track retry support only when explicitly configured to do so.
+- Add a visible session timeout model. The command should track timeout support only when explicitly configured to do so.
+- Add a visible session cancellation model. The command should track cancellation support only when explicitly configured to do so.
+- Add a visible session interruption model. The command should track interruption support only when explicitly configured to do so.
+- Add a visible session suspension model. The command should track suspension support only when explicitly configured to do so.
+- Add a visible session resumption model. The command should track resumption support only when explicitly configured to do so.
+- Add a visible session continuation model. The command should track continuation support only when explicitly configured to do so.
+- Add a visible session restart model. The command should track restart support only when explicitly configured to do so.
+- Add a visible session reload model. The command should track reload support only when explicitly configured to do so.
+-

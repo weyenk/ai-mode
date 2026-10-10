@@ -20,6 +20,7 @@ _ai-mode() {
     'prompt:Print role system prompt'
     'ask:Ask a role one question'
     'team:Consult several roles on one topic'
+    'plan:Lint a plan or verify a task is red then green'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
     'proxy:Run the debug logging proxy (normally via use --debug)'
@@ -57,8 +58,26 @@ _ai-mode() {
       fi
       ;;
     prompt|ask)
-      roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
-      _values 'role' $roles
+      if [[ $words[CURRENT] == -* && $words[2] == ask ]]; then
+        _values 'option' '--context' '--context-max-chars' '--max-tokens' '--profile' '--timeout' '--json' '--raw' '--caller' '--trace' '--parent' '-v'
+      else
+        roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
+        _values 'role' $roles
+      fi
+      ;;
+    plan)
+      if (( CURRENT == 3 )); then
+        _values 'subcommand' 'lint' 'verify'
+      elif [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '--json' '--task' '--repo'
+      else
+        _files
+      fi
+      ;;
+    team)
+      if [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '--context' '--context-max-chars' '--roles' '--max-tokens' '--timeout' '--out' '--profile' '--caller' '--trace' '--parent' '-v'
+      fi
       ;;
   esac
 }

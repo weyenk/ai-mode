@@ -1,14 +1,14 @@
 ---
 name: spec-specialist-review
-description: "Run after brainstorming wrote a design spec and the human approved it for multi-role review (before writing-plans). Sequential product → research → security → ux → design → architect passes with ai-mode role prompts. Chief merges; architect owns writing-plans."
+description: "Run after brainstorming wrote a design spec and the human approved it for multi-role review (before drafting-plans). Sequential product → research → security → ux → design → architect passes with ai-mode role prompts. Chief merges; architect owns drafting-plans."
 ---
 
 # Spec specialist review
 
-Multi-role review gate between **brainstorming** (design spec) and **writing-plans** (implementation plan).
+Multi-role review gate between **brainstorming** (design spec) and **drafting-plans** (implementation plan).
 
 <HARD-GATE>
-Do NOT invoke `writing-plans`, write implementation code, or start execution until:
+Do NOT invoke `drafting-plans`, write implementation code, or start execution until:
 1. This review pipeline completes (or roles are explicitly skipped with reason),
 2. Findings are merged into the design spec,
 3. The human re-approves the updated spec.
@@ -47,7 +47,7 @@ Human stays on **chief**. For each role in order `product` → `research` → `s
 2. POST to `"$(ai-mode url)/chat/completions"` with JSON:
    - `"model": "<role>"` (same string as the ini section)
    - `"messages"`: `[{"role":"system","content": "<SYSTEM>"}, {"role":"user","content": "<SPEC_PATH + pass instruction>"}]`
-3. User message for the pass: absolute or repo-relative path to the approved design spec, plus a short lens-specific instruction (e.g. “Review for security threats; emit Blocking / Non-blocking / Proposed edits.”).
+3. User message for the pass: the approved design spec **text** (a model cannot open a path; with the CLI use `--context $SPEC_PATH`), plus a short lens-specific instruction (e.g. “Review for security threats; emit Blocking / Non-blocking / Proposed edits.”).
 4. Parse the assistant reply into the section template below; optionally save to `docs/superpowers/specs/reviews/…`.
 
 Example (adjust paths and escape as needed):
@@ -140,7 +140,7 @@ Run in order. Skip a pass only with an explicit **N/A** reason in the output.
 - Apply **Proposed edits** that the human would expect pre-plan.
 - Keep blocking items visible in spec **Open questions / Risks** until resolved.
 
-Do not invoke `writing-plans` during merge.
+Do not invoke `drafting-plans` during merge.
 
 ### 3. Human re-approval
 
@@ -155,10 +155,10 @@ If the human requests changes, update the spec and re-run only the affected revi
 Only after re-approval:
 
 - Switch to **`architect`** model.
-- Invoke **`writing-plans`** (not `chief`, not `coder`).
+- Invoke **`drafting-plans`** (not `chief`, not `coder`).
 
 ```text
-/superpowers:writing-plans
+/superpowers:drafting-plans
 ```
 
 Architect owns the implementation plan; coder executes later via executing-plans / subagent flows.
@@ -176,7 +176,7 @@ digraph spec_review {
     "architect review" -> "chief merges into spec";
     "chief merges into spec" -> "Human re-approves?";
     "Human re-approves?" -> "chief merges into spec" [label="changes"];
-    "Human re-approves?" -> "architect + writing-plans" [label="yes"];
+    "Human re-approves?" -> "architect + drafting-plans" [label="yes"];
 }
 ```
 
@@ -187,7 +187,7 @@ With `eval "$(ai-mode env)"` and dev-shop running (`ai-mode use dev-shop`):
 ```bash
 ai-mode url                 # → http://127.0.0.1:<port>/v1
 ai-mode prompt product      # system prompt for product pass
-ai-mode prompt architect    # architect pass + before writing-plans / large exploration
+ai-mode prompt architect    # architect pass + before drafting-plans / large exploration
 # POST body: model = role name (ini [section]), messages = system + user (see Option A)
 curl -sS "$(ai-mode url)/chat/completions" -H "Content-Type: application/json" -d '…'
 ```
@@ -198,5 +198,5 @@ curl -sS "$(ai-mode url)/chat/completions" -H "Content-Type: application/json" -
 
 - **One lens at a time** — product does not threat-model; security does not rewrite UX copy unless security-relevant.
 - **No implementation** — reviews improve the spec; they do not edit production code.
-- **Blocking vs non-blocking** — blocking must be resolved or explicitly accepted by the human before `writing-plans`.
+- **Blocking vs non-blocking** — blocking must be resolved or explicitly accepted by the human before `drafting-plans`.
 - **YAGNI** — do not expand scope during review; flag scope creep as non-blocking or blocking per product judgment.

@@ -1,0 +1,3 @@
+## research review
+### Blocking
+None. The spec correctly states that logprobs availability is an open issue requiring a spike (not claimed as available), with fallbacks specified. CI gates explicitly state "AI evals and performance have no harness yet: `not-available`". GitHub stacking guidance is accurately cited and followed (dependency-based layers

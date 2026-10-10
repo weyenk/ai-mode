@@ -42,9 +42,18 @@ ai-mode doctor
 ai-mode agents                 # role guides
 ai-mode prompt product         # system prompt for a role
 ai-mode ask product "What is a user story in one sentence?"
-ai-mode team "web version of the app?"   # architect maps the repo, then product/research/ux/security; one report
+ai-mode team "web version of the app?" --context internal/app --context README.md   # architect gets a file listing + README, then product/research/ux/security; one report
+ai-mode ask architect "Where are commands registered?" --context internal/app/cli.go   # ground a role in real code
+ai-mode plan lint docs/superpowers/plans/my-plan.md          # check a drafting-plans document (structure, ownership, scenario coverage)
+ai-mode plan verify docs/superpowers/plans/my-plan.md --task all   # apply each code task to a copy of the repo: must be red, then green
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 ```
+
+Roles are plain chat models: they cannot open files or run commands, they only see the prompt. `--context PATH` (repeatable, on `ask` and `team`)
+puts a **file's contents** or a **directory's file listing** into the prompt as reference material, so answers are grounded in the real repo
+instead of guessed. Likely-secret files (`.env*`, `*.pem`, `*.key`, `id_rsa*`) and binaries are refused, `.git`/`node_modules`/`vendor`/`dist`
+are skipped, and a context over `--context-max-chars` (default 200000) is an error, never a silent truncation. `team` gives the context to
+architect (or the first role if architect is not on the panel); the others get architect's findings.
 
 `team` runs its roles sequentially (architect first; its findings are passed on as shared context), prints one markdown
 report and saves it under `~/.local/state/ai-mode/team/`. `--roles a,b,c` changes the panel, `--out FILE` also writes there.
@@ -167,6 +176,6 @@ After brainstorming writes `docs/superpowers/specs/…-design.md` and you approv
 
 1. `/superpowers:spec-specialist-review` — product → research → security → ux → design → architect
 2. **`chief`** merges reviews into the spec; you re-approve
-3. Chief routes **`/superpowers:writing-plans`** to **`architect`**
+3. Chief routes **`/superpowers:drafting-plans`** to **`architect`**
 
 Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md) (symlinked into `~/.qwen/extensions/superpowers/skills/`). Brainstorming overlay: backup at `~/.qwen/.../brainstorming/SKILL.md.bak`.
