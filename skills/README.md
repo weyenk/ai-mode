@@ -10,19 +10,15 @@
 
 ## Install for Qwen Code
 
-Symlink into the Superpowers extension so the skills resolve:
+Symlink into Qwen Code's personal skills dir. These are independent of the Superpowers extension, which is currently disabled
+(`qwen extensions disable superpowers`); the skills resolve as `ai-mode-routing`, not `superpowers:ai-mode-routing`.
 
 ```bash
-ln -sfn "$(pwd)/skills/spec-specialist-review" \
-  ~/.qwen/extensions/superpowers/skills/spec-specialist-review
-ln -sfn "$(pwd)/skills/testing-guidelines" \
-  ~/.qwen/extensions/superpowers/skills/testing-guidelines
-ln -sfn "$(pwd)/skills/ai-mode-routing" \
-  ~/.qwen/extensions/superpowers/skills/ai-mode-routing
-ln -sfn "$(pwd)/skills/pr-stack" \
-  ~/.qwen/extensions/superpowers/skills/pr-stack
-ln -sfn "$(pwd)/skills/drafting-plans" \
-  ~/.qwen/extensions/superpowers/skills/drafting-plans
+mkdir -p ~/.qwen/skills
+for s in spec-specialist-review testing-guidelines ai-mode-routing pr-stack drafting-plans; do
+  ln -sfn "$(pwd)/skills/$s" ~/.qwen/skills/$s
+done
 ```
 
-Brainstorming is patched in place under `~/.qwen/extensions/superpowers/skills/brainstorming/` (original backed up as `SKILL.md.bak`). Re-apply after Superpowers extension upgrades if needed.
+Routing rules that must apply in every session come from `ai-mode setup-qwen` (`~/.qwen/QWEN.md`), not from a skill.
+`spec-specialist-review` still expects brainstorming/writing-plans from Superpowers; re-enable it (`qwen extensions enable superpowers`) to use that pipeline.

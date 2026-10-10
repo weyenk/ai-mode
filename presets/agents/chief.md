@@ -41,7 +41,7 @@ When the human asks you to **consult a specialist** (“ask the product agent ab
 
 When the human names a role, **write the question yourself** (their words + repo path + desired output shape) and run it — do not ask them to specify it, and never use `AskUserQuestion`, `Agent`, or `Task` for this.
 
-After **`/superpowers:ai-mode-routing`**, run **`ai-mode ask <role> "…"`** in the **same turn** before synthesis or memory updates — announcing the skill is not a substitute for that Shell command.
+After the **`ai-mode-routing`** skill, run **`ai-mode ask <role> "…"`** in the **same turn** before synthesis or memory updates — announcing the skill is not a substitute for that Shell command.
 
 | Situation | Action |
 | --- | --- |
@@ -60,7 +60,7 @@ After **`/superpowers:ai-mode-routing`**, run **`ai-mode ask <role> "…"`** in 
 
 **Fallback:** `/model <role>` for that consultation only, then **`/model chief`** before continuing the session.
 
-**Invoke skill:** for Qwen Code, use **`/superpowers:ai-mode-routing`** (or follow `skills/ai-mode-routing/SKILL.md`) when the human explicitly wants a specialist consulted — this is **not** a substitute for `spec-specialist-review` or `brainstorming`.
+**Invoke skill:** for Qwen Code, use the **`ai-mode-routing`** skill (or follow `skills/ai-mode-routing/SKILL.md`) when the human explicitly wants a specialist consulted — this is **not** a substitute for `spec-specialist-review` or `brainstorming`.
 
 <HARD-GATE>
 **NEVER** use these as stand-ins for ai-mode specialists:

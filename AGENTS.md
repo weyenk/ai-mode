@@ -72,7 +72,7 @@ need to switch Qwen Code models for routing.
 3. **chief merges** reviews into the spec; you re-approve.
 4. Chief routes **`drafting-plans`** to **architect**.
 
-Skill sources (symlinked into `~/.qwen/extensions/superpowers/skills/`):
+Skill sources (symlinked into `~/.qwen/skills/`; Superpowers itself is disabled for now, and routing rules come from `ai-mode setup-qwen`):
 
 - [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md)
 - [`skills/ai-mode-routing/SKILL.md`](skills/ai-mode-routing/SKILL.md) — ad-hoc “ask product/security/…” from chief
@@ -93,6 +93,7 @@ Verify any flag against `internal/app/` (or `ai-mode <cmd> -h`) before relying o
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode classify <role|layer> "<task>"` — jev routing (Stage A role / Stage B test layer) with a clear/ambiguous/low-confidence decision; traced. Roles need a `summary:` in `agents/<role>.md` to be routable (`chief`, `coder-xl`, `fast`, `jev` deliberately have none). `classify --eval evals/classify.jsonl` / `make eval` measures routing; tune summaries against it.
 - `ai-mode team "<topic>" [--context PATH]... [--roles a,b,c] [--max-tokens N] [--out FILE]` — sequential multi-role consult (default architect → product → research → ux → security; architect's findings feed the rest; roles absent from the profile are skipped). One report on stdout, saved under the state dir's `team/`. Chief's first move for open-ended "whole team" asks.
+- `ai-mode setup-qwen [--file PATH] [--print] [--remove]` — install/refresh the routing rules (source: `internal/app/qwen_block.md`) as a marked block in `~/.qwen/QWEN.md`, which Qwen Code loads in every session, so `team`/`ask`/`classify` routing doesn't depend on any skill being invoked. Idempotent; keeps your own text outside the markers. Re-run after editing the block.
 - `ai-mode plan lint <plan.md> [--json]` — check a `skills/drafting-plans` document: sections, JSON task graph (waves are computed and printed), impl tasks depend only on contract tasks, no ownership overlap between parallel tasks, hot files owned by one integration task, every scenario covered by exactly one task with the id in the test name, each packet using the promised test names, and every quoted spec excerpt appearing verbatim in the spec named by the `**Spec:**` header. `--skeleton` skips the per-packet checks. Exit 0 clean, 2 findings.
 - `ai-mode plan verify <plan.md> --task Tnn|all [--repo DIR] [--json]` — on a temporary copy of the repo, apply a **code** packet's ancestors, then Phase A (must compile and fail on an assertion), then Phase B (gofmt, `go vet`, green, full `go test ./...`). Contract tasks skip the red step; spec packets report `n/a`. Exit 0 verified/n/a, 2 failed. `make plan-example` runs both on the worked example.
 - `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens`, `--profile`, pipe stdin when no message argument is given). **Roles are plain chat models with no file or shell tools: they only see the prompt.** Ground them with `--context PATH` (repeatable; a file's contents or a directory's file listing; secret-looking files and binaries refused; over `--context-max-chars`, default 200000, is an error). Never tell a role to "read" or "explore" a path without supplying it.
@@ -115,6 +116,11 @@ Qwen Code does **not** infer context from llama-server’s `meta.n_ctx` for thes
 llama-server still enforces each role’s `ctx-size` from the preset ini — e.g. chief **131072**,
 which produces `Context size has been exceeded` near the real limit with a misleading
 “200k · 15% used” bar if `contextWindowSize` is wrong.
+
+**Known issue (open):** a fresh Qwen Code session on `chief` still showed a **200.0k** context bar (2026-10-09) even though
+`~/.qwen/settings.json` has `contextWindowSize` = 131072 on the `chief` entry. The session header read "API Key | chief", so
+the session may not be resolving the model through `modelProviders`. Until fixed, the percent-used bar and auto-compaction
+(measured against the window) are wrong for chief. Not yet diagnosed.
 
 Set **`contextWindowSize`** on every local role entry to match `presets/<profile>.ini`
 (`chief` → **131072**, `architect` → **262144**, `coder` → **131072**, etc.; see `presets/MODELS.md`). Restart or reload
