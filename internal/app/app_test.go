@@ -332,3 +332,20 @@ func TestExportReviews(t *testing.T) {
 		t.Fatal("second export must not duplicate")
 	}
 }
+
+func TestBaseURLWildcardHost(t *testing.T) {
+	for host, want := range map[string]string{
+		"0.0.0.0":      "http://127.0.0.1:8080/v1",
+		"::":           "http://127.0.0.1:8080/v1",
+		"127.0.0.1":    "http://127.0.0.1:8080/v1",
+		"192.168.4.34": "http://192.168.4.34:8080/v1",
+	} {
+		p := Profile{Host: host, Port: 8080}
+		if got := p.BaseURL(); got != want {
+			t.Errorf("BaseURL(%q) = %q, want %q", host, got, want)
+		}
+	}
+	if got := (Profile{Host: "0.0.0.0", Port: 8080}).UpstreamBaseURL(); got != "http://127.0.0.1:18080/v1" {
+		t.Errorf("UpstreamBaseURL = %q", got)
+	}
+}
