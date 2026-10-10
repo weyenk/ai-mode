@@ -175,5 +175,8 @@ request, so it only looks like a toggle. Thinking is set per role in the preset 
 - **Don't commit or push unless the user explicitly asks.**
 - **Don't invent CLI flags** — confirm in `internal/app/`.
 - Don't expose the API beyond `127.0.0.1` without care; weights can be large downloads.
+  dev-shop deliberately uses `host = 0.0.0.0` so the web UI is reachable from other Macs on the LAN **and**
+  Qwen Code's `127.0.0.1` baseUrls keep working. Don't bind to a specific LAN IP: that drops loopback (breaking
+  Qwen Code) and fails to start if DHCP hands out a new address.
 - Keep `README.md`, `MODELS.md`, `agents/*.md`, and `completions/_ai-mode` consistent when
   you change roles or commands.

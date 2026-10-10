@@ -5,6 +5,17 @@ description: "Write the implementation plan for an approved spec or Story Contra
 
 # Drafting plans (ai-mode)
 
+<CHIEF-STOP>
+If you are **chief** (the front door in Qwen Code), do not follow anything below this block: no announcement, no repo
+reads, no plan. Hand off instead:
+
+- **No approved spec** (an idea, "not sure what's possible", "research market fit"): tell the human a plan needs an
+  approved spec first, then run `ai-mode team "<the ask plus the repo path>" --caller chief` to start the brainstorm.
+- **Approved spec:** run `ai-mode ask architect "Write the implementation plan for this spec with the drafting-plans
+  skill." --context <spec> --context <Story Contract, if any> --caller chief`, or tell the human to `/model architect`
+  and re-run `/drafting-plans` there so architect can read the repo and run `ai-mode plan lint`. Then summarize.
+</CHIEF-STOP>
+
 Derived from `superpowers:writing-plans` (bite-sized steps, no placeholders, TDD), changed for our setup:
 **architect plans, qa and coder execute, executors are small local models, work should run in parallel without
 colliding, and the architect has no compiler.** That last fact shapes the whole skill: whatever code architect writes is

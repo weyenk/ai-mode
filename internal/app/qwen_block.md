@@ -14,4 +14,7 @@ tool, and writing a call as text (`[tool_call: …]`) runs nothing: if you mean 
   `decision` is `clear`; otherwise ask the human one question.
 - Summarize answers by role. A role marked `FAILED`, or one that never ran, did not answer: say so, never fill in.
 - Planning and large codebase reads belong to `architect`; implementation to `coder`. Do not do them on chief.
+- **Planning asks** (`/drafting-plans`, "plan this", "write the plan"), including a skill whose steps say to plan or map
+  the repo: do not run those steps on chief. With no approved spec, say so and run `ai-mode team` as above. With one, run
+  `ai-mode ask architect "<plan request>" --context <spec> --caller chief`, or have the human `/model architect`.
 - Roles come from the active profile (`ai-mode agents`); if `ai-mode` is not installed or no server is running, skip all of this.

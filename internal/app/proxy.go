@@ -35,7 +35,7 @@ const (
 func upstreamPort(p Profile) int { return p.Port + 10000 }
 
 func (p Profile) UpstreamBaseURL() string {
-	return fmt.Sprintf("http://%s:%d/v1", p.Host, upstreamPort(p))
+	return fmt.Sprintf("http://%s:%d/v1", p.ClientHost(), upstreamPort(p))
 }
 
 func (p Profile) ProxyLogFile() string { return logDir() + "/" + p.Name + ".proxy.log" }
@@ -413,7 +413,7 @@ func cmdProxy(args []string) int {
 		*listen = fmt.Sprintf("%s:%d", p.Host, p.Port)
 	}
 	if *upstream == "" {
-		*upstream = fmt.Sprintf("%s:%d", p.Host, upstreamPort(p))
+		*upstream = fmt.Sprintf("%s:%d", p.ClientHost(), upstreamPort(p))
 	}
 	target, err := url.Parse("http://" + *upstream)
 	if err != nil {
