@@ -21,7 +21,8 @@ _ai-mode() {
     'ask:Ask a role one question'
     'team:Consult several roles on one topic'
     'amigos:Three Amigos refinement of one story'
-    'setup-qwen:Install routing rules into ~/.qwen/QWEN.md'
+    'setup-qwen:Install routing rules and SessionStart hook for Qwen Code'
+    'hook:Qwen Code hook entry point (session-start)'
     'plan:Lint a plan or verify a task is red then green'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
@@ -60,7 +61,10 @@ _ai-mode() {
       fi
       ;;
     setup-qwen)
-      _values 'option' '--file' '--print' '--remove'
+      _values 'option' '--file' '--settings' '--print' '--remove'
+      ;;
+    hook)
+      _values 'event' 'session-start'
       ;;
     prompt|ask)
       if [[ $words[CURRENT] == -* && $words[2] == ask ]]; then

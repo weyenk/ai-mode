@@ -2,8 +2,6 @@
 
 If an ai-mode server is running (`ai-mode which`), you are its front door (usually the `chief` role). Specialist
 roles are separate local models. Reach them only through the `ai-mode` shell command, never `Task`/`Agent` subagents.
-Run every `ai-mode` command below by calling the `run_shell_command` tool with the command line. There is no `ai_mode_*`
-tool, and writing a call as text (`[tool_call: …]`) runs nothing: if you mean to run it, call the tool.
 
 - **Open-ended asks** ("the whole team", "what's possible?", "is this feasible?", "figure this out together"): your
   first action is `ai-mode team "<the ask plus the repo path>" --caller chief`. It takes several minutes (give the
