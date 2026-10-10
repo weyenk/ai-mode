@@ -45,3 +45,40 @@ func TestSpliceQwenBlock(t *testing.T) {
 		t.Fatal("unterminated block should error")
 	}
 }
+
+func TestSpliceQwenHook(t *testing.T) {
+	user := []byte(`{"model":{"name":"chief"},"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"echo hi","name":"mine"}]}],"PreToolUse":[]}}`)
+
+	out, changed, err := spliceQwenHook(user, true)
+	if err != nil || !changed {
+		t.Fatalf("install: %v %v", changed, err)
+	}
+	s := string(out)
+	if !strings.Contains(s, `"ai-mode hook session-start"`) || !strings.Contains(s, `"echo hi"`) ||
+		!strings.Contains(s, `"PreToolUse"`) || !strings.Contains(s, `"chief"`) {
+		t.Fatalf("install lost settings or missed the hook:\n%s", s)
+	}
+
+	again, changed, _ := spliceQwenHook(out, true)
+	if changed || string(again) != s || strings.Count(s, qwenHookName+`"`) != 1 {
+		t.Fatalf("second install should be a no-op:\n%s", again)
+	}
+
+	removed, changed, _ := spliceQwenHook(out, false)
+	if !changed || strings.Contains(string(removed), "session-start") || !strings.Contains(string(removed), `"echo hi"`) {
+		t.Fatalf("remove:\n%s", removed)
+	}
+
+	fresh, changed, err := spliceQwenHook(nil, true)
+	if err != nil || !changed || !strings.Contains(string(fresh), `"startup|clear|compact"`) {
+		t.Fatalf("empty settings: %v %v\n%s", changed, err, fresh)
+	}
+	gone, _, _ := spliceQwenHook(fresh, false)
+	if strings.TrimSpace(string(gone)) != "{}" {
+		t.Fatalf("removing the only hook should leave {}: %s", gone)
+	}
+
+	if _, _, err := spliceQwenHook([]byte("{not json"), true); err == nil {
+		t.Fatal("invalid JSON should error")
+	}
+}
