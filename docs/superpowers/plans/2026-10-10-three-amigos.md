@@ -104,7 +104,7 @@ An unknown kind is an error. At level `full` every line is passed through the se
 
 **Resume.** `--resume <id>` makes the wiring read `<stateDir>/amigos/<id>/contract.json` into a `Snapshot` and set `meetingOptions.Resume`; `meetingOptions.MeetingID` is that id (or a fresh one for a new meeting). The loop continues from `Resume.Contract` at round `Resume.State.Round + 1`; `Rounds` is the total budget, so a resume with `Rounds` 2 after round 1 runs exactly one more round. Parked questions are re-asked at the start of that round.
 
-**After the loop** (wiring, T12): the contract's `Gates` come from `planGates(in.Constraints.Exposed)`; `assignTestLayers` fills each layer's `TestLevel` from the classifier; `validateLayerPlan` must pass, otherwise a `ready` verdict is downgraded to `not-ready` with an `open` question that names the problem.
+**After the loop** (wiring, T12): the contract's `Gates` come from `planGates(in.Constraints.Exposed)`; `assignTestLayers` fills each layer's `TestLevel` from the classifier; `validateLayerPlan` must pass, otherwise a `ready` verdict is downgraded to `not-ready` with an `open` question that names the problem. The result is written back as the final `contract` snapshot (state kept), so the saved contract has the gates, test levels and final verdict. A sampled question records its agreement `Score`; each decision entry carries a UTC timestamp and a rationale (the role's `ready` opinion and any disagreements).
 
 ## Task graph
 

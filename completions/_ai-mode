@@ -20,6 +20,7 @@ _ai-mode() {
     'prompt:Print role system prompt'
     'ask:Ask a role one question'
     'team:Consult several roles on one topic'
+    'amigos:Three Amigos refinement of one story'
     'setup-qwen:Install routing rules into ~/.qwen/QWEN.md'
     'plan:Lint a plan or verify a task is red then green'
     'classify:Route a task with jev (role or QA layer)'
@@ -71,9 +72,9 @@ _ai-mode() {
       ;;
     plan)
       if (( CURRENT == 3 )); then
-        _values 'subcommand' 'lint' 'verify'
+        _values 'subcommand' 'lint' 'verify' 'apply'
       elif [[ $words[CURRENT] == -* ]]; then
-        _values 'option' '--json' '--task' '--repo'
+        _values 'option' '--json' '--task' '--repo' '--phase'
       else
         _files
       fi

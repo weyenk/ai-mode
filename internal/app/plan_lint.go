@@ -290,15 +290,17 @@ func ancestors(tasks []planTask) map[string]map[string]bool {
 // cmdPlan dispatches `ai-mode plan <lint|verify>`.
 func cmdPlan(args []string) int {
 	if len(args) == 0 {
-		return fail("usage: ai-mode plan lint <plan.md> [--json]\n       ai-mode plan verify <plan.md> --task Tnn [--repo DIR] [--json]")
+		return fail("usage: ai-mode plan lint <plan.md> [--json]\n       ai-mode plan verify <plan.md> --task Tnn [--repo DIR] [--json]\n       ai-mode plan apply <plan.md> --task Tnn [--phase A|B|all] [--repo DIR]")
 	}
 	switch args[0] {
 	case "lint":
 		return cmdPlanLint(args[1:])
 	case "verify":
 		return cmdPlanVerify(args[1:])
+	case "apply":
+		return cmdPlanApply(args[1:])
 	}
-	return fail("unknown plan subcommand %q (want lint or verify)", args[0])
+	return fail("unknown plan subcommand %q (want lint, verify or apply)", args[0])
 }
 
 func cmdPlanLint(args []string) int {

@@ -34,6 +34,7 @@ func commands() map[string]command {
 		"prompt":     {"Print system prompt for a role (agents/<role>.md)", cmdPrompt},
 		"ask":        {"Ask a role one question (chat/completions)", cmdAsk},
 		"team":       {"Consult several roles on one topic (architect first), print a combined report", cmdTeam},
+		"amigos":     {"Run a Three Amigos refinement on one story (product, qa, architect)", cmdAmigos},
 		"setup-qwen": {"Install the ai-mode routing rules into ~/.qwen/QWEN.md (Qwen Code)", cmdSetupQwen},
 		"classify":   {"Ask jev to route: which role, or which QA test layer", cmdClassify},
 		"plan":       {"Check a drafting-plans document: lint its structure, verify a task is red then green", cmdPlan},
