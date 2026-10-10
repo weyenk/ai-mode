@@ -50,6 +50,9 @@ eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 report and saves it under `~/.local/state/ai-mode/team/`. `--roles a,b,c` changes the panel, `--out FILE` also writes there.
 A role that fails is marked `FAILED` in the report; all calls share one trace (`ai-mode trace`).
 
+To make Qwen Code's chief reach for `team`/`ask`/`classify` in any workflow (not only inside a skill), run `ai-mode setup-qwen` once;
+it adds a marked routing block to `~/.qwen/QWEN.md` (`--print` shows it, `--remove` undoes it).
+
 Also: `stop`, `restart`, `logs [-f] [-n] [--role NAME] [--no-annotate]`, `url`, `models`, `warm`, `init <name> --with-ini`,
 plus `classify`, `events`, `trace`, `stats`, `ps` and `review` below.
 
@@ -169,4 +172,4 @@ After brainstorming writes `docs/superpowers/specs/…-design.md` and you approv
 2. **`chief`** merges reviews into the spec; you re-approve
 3. Chief routes **`/superpowers:writing-plans`** to **`architect`**
 
-Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md) (symlinked into `~/.qwen/extensions/superpowers/skills/`). Brainstorming overlay: backup at `~/.qwen/.../brainstorming/SKILL.md.bak`.
+Skill source: [`skills/spec-specialist-review/SKILL.md`](skills/spec-specialist-review/SKILL.md) (symlinked into `~/.qwen/skills/`; Superpowers is disabled for now).

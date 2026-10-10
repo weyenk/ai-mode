@@ -20,6 +20,7 @@ _ai-mode() {
     'prompt:Print role system prompt'
     'ask:Ask a role one question'
     'team:Consult several roles on one topic'
+    'setup-qwen:Install routing rules into ~/.qwen/QWEN.md'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
     'proxy:Run the debug logging proxy (normally via use --debug)'
@@ -55,6 +56,9 @@ _ai-mode() {
         models=(${(f)"$(ai-mode models 2>/dev/null | grep -v '^---')"})
         _values 'model' $models
       fi
+      ;;
+    setup-qwen)
+      _values 'option' '--file' '--print' '--remove'
       ;;
     prompt|ask)
       roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
