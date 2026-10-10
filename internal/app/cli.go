@@ -36,6 +36,7 @@ func commands() map[string]command {
 		"team":       {"Consult several roles on one topic (architect first), print a combined report", cmdTeam},
 		"setup-qwen": {"Install the ai-mode routing rules into ~/.qwen/QWEN.md (Qwen Code)", cmdSetupQwen},
 		"classify":   {"Ask jev to route: which role, or which QA test layer", cmdClassify},
+		"plan":       {"Check a drafting-plans document: lint its structure, verify a task is red then green", cmdPlan},
 		"review":     {"Review recent calls: confirm/correct routing, rate answers", cmdReview},
 		"proxy":      {"Run the debug logging proxy in the foreground (normally started by `use --debug`)", cmdProxy},
 		"events":     {"Show the structured event log (calls, lifecycle)", cmdEvents},

@@ -24,4 +24,4 @@ When routed by **`spec-specialist-review`** (skip if no unknowns):
 
 - Read the design spec; investigate only open technical/market unknowns cited there.
 - Emit `## research review` with **Blocking**, **Non-blocking**, **Proposed edits** (facts vs inferences vs unknowns).
-- No implementation and no **`writing-plans`**.
+- No implementation and no **`drafting-plans`**.

@@ -70,7 +70,7 @@ need to switch Qwen Code models for routing.
 2. **`/superpowers:spec-specialist-review`** → sequential passes: product → research →
    security → ux → design → architect. Each emits Blocking / Non-blocking / Proposed edits.
 3. **chief merges** reviews into the spec; you re-approve.
-4. Chief routes **`writing-plans`** to **architect**.
+4. Chief routes **`drafting-plans`** to **architect**.
 
 Skill sources (symlinked into `~/.qwen/skills/`; Superpowers itself is disabled for now, and routing rules come from `ai-mode setup-qwen`):
 
@@ -92,9 +92,11 @@ Verify any flag against `internal/app/` (or `ai-mode <cmd> -h`) before relying o
   section (large downloads). `--warm-timeout <s>` per model.
 - `ai-mode prompt <role>` — print a role's system prompt (body only; `--raw`/`--json` for more).
 - `ai-mode classify <role|layer> "<task>"` — jev routing (Stage A role / Stage B test layer) with a clear/ambiguous/low-confidence decision; traced. Roles need a `summary:` in `agents/<role>.md` to be routable (`chief`, `coder-xl`, `fast`, `jev` deliberately have none). `classify --eval evals/classify.jsonl` / `make eval` measures routing; tune summaries against it.
-- `ai-mode team "<topic>" [--roles a,b,c] [--max-tokens N] [--out FILE]` — sequential multi-role consult (default architect → product → research → ux → security; architect's findings feed the rest; roles absent from the profile are skipped). One report on stdout, saved under the state dir's `team/`. Chief's first move for open-ended "whole team" asks.
+- `ai-mode team "<topic>" [--context PATH]... [--roles a,b,c] [--max-tokens N] [--out FILE]` — sequential multi-role consult (default architect → product → research → ux → security; architect's findings feed the rest; roles absent from the profile are skipped). One report on stdout, saved under the state dir's `team/`. Chief's first move for open-ended "whole team" asks.
 - `ai-mode setup-qwen [--file PATH] [--print] [--remove]` — install/refresh the routing rules (source: `internal/app/qwen_block.md`) as a marked block in `~/.qwen/QWEN.md`, which Qwen Code loads in every session, so `team`/`ask`/`classify` routing doesn't depend on any skill being invoked. Idempotent; keeps your own text outside the markers. Re-run after editing the block.
-- `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens`, `--profile`, pipe stdin).
+- `ai-mode plan lint <plan.md> [--json]` — check a `skills/drafting-plans` document: sections, JSON task graph (waves are computed and printed), impl tasks depend only on contract tasks, no ownership overlap between parallel tasks, hot files owned by one integration task, every scenario covered by exactly one task with the id in the test name, each packet using the promised test names, and every quoted spec excerpt appearing verbatim in the spec named by the `**Spec:**` header. `--skeleton` skips the per-packet checks. Exit 0 clean, 2 findings.
+- `ai-mode plan verify <plan.md> --task Tnn|all [--repo DIR] [--json]` — on a temporary copy of the repo, apply a **code** packet's ancestors, then Phase A (must compile and fail on an assertion), then Phase B (gofmt, `go vet`, green, full `go test ./...`). Contract tasks skip the red step; spec packets report `n/a`. Exit 0 verified/n/a, 2 failed. `make plan-example` runs both on the worked example.
+- `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens`, `--profile`, pipe stdin when no message argument is given). **Roles are plain chat models with no file or shell tools: they only see the prompt.** Ground them with `--context PATH` (repeatable; a file's contents or a directory's file listing; secret-looking files and binaries refused; over `--context-max-chars`, default 200000, is an error). Never tell a role to "read" or "explore" a path without supplying it.
 - `ai-mode stop [--force]` — stop the managed server.
 - `ai-mode use <profile> --debug` — front the server with a logging proxy on the public port (llama-server moves to port+10000) so Qwen/other clients' chat traffic shows up in `events`/`stats`/`review`. Off by default; `use <profile>` without the flag returns to normal. `restart` keeps the mode; `doctor` flags a dead proxy.
 - Observability: `events`, `trace`, `stats`, `ps`, and `review` (label real calls; `--export` → eval cases). See README.

@@ -33,7 +33,7 @@ It calls architect first (repo mapping), then product, research, ux, security, a
 
 ## Building the question
 
-For a single named role, the human names it and **you write the question.** If the request is broad ("review this project for flaws"), do not ask what they mean — fill in a sensible default and send it. Specialists have large contexts and can read the repo; chief must not.
+For a single named role, the human names it and **you write the question.** If the request is broad ("review this project for flaws"), do not ask what they mean — fill in a sensible default and send it. Specialists have large contexts but cannot read files by themselves (they only see the prompt); chief must not explore either. Hand them the material with `--context`.
 
 Examples:
 
@@ -50,7 +50,7 @@ cat docs/superpowers/specs/foo-design.md | ai-mode ask product "Review this spec
 
 Rules of thumb:
 - Include the human's words, the repo path or file paths, and the output shape you want (ranked list, yes/no + reasons, …).
-- Pass **paths**, not file contents, for anything large; for `architect` give the path and let it explore.
+- Roles cannot open paths. Ground them with `--context <file>` (full contents) and `--context <dir>` (file listing), repeatable; a context over the limit is an error, so pick the files that matter.
 - Use `--max-tokens 4096` or more for reviews and plans.
 - One role per call. For several roles, run several calls and synthesize.
 

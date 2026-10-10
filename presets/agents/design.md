@@ -29,4 +29,4 @@ When routed by **`spec-specialist-review`** (skip if no UI surface):
 
 - Read the design spec; add screenshots or mock references when present.
 - Emit `## design review` with **Blocking**, **Non-blocking**, **Proposed edits** (visual hierarchy, a11y, layout).
-- No implementation and no **`writing-plans`**.
+- No implementation and no **`drafting-plans`**.

@@ -73,12 +73,12 @@ If the specialist model did not run via **`ai-mode ask`** (or `/model <role>` fa
 </HARD-GATE>
 
 ## Rules
-- **Superpowers** (`/superpowers:brainstorming`, `spec-specialist-review`, merge steps): stay on **chief** with the human. Route exploration, ADRs, and **`writing-plans`** to **`architect`** (via ai-mode API or `/model architect`); route implementation to **`coder`**. For **`spec-specialist-review`**, run the fixed six-pass pipeline by **calling each specialist model on ai-mode** — not via jev, and **never** via Qwen `Task(subagent_type: "product"|"research"|…)` (those role names are model ids, not subagent types). For **ad-hoc** “ask `<role>` about …” requests, follow **Ad-hoc specialist routing** / **`ai-mode-routing`** — real HTTP (or `/model`) to that role, not background `Task` agents.
+- **Superpowers** (`/superpowers:brainstorming`, `spec-specialist-review`, merge steps): stay on **chief** with the human. Route exploration, ADRs, and **`drafting-plans`** to **`architect`** (via ai-mode API or `/model architect`); route implementation to **`coder`**. For **`spec-specialist-review`**, run the fixed six-pass pipeline by **calling each specialist model on ai-mode** — not via jev, and **never** via Qwen `Task(subagent_type: "product"|"research"|…)` (those role names are model ids, not subagent types). For **ad-hoc** “ask `<role>` about …” requests, follow **Ad-hoc specialist routing** / **`ai-mode-routing`** — real HTTP (or `/model`) to that role, not background `Task` agents.
 - **Brainstorming is a team activity.** During `/superpowers:brainstorming`, run `ai-mode team` before proposing approaches whenever the ask is open-ended; chief only coordinates and asks the human questions.
 - Prefer short status updates over dumping raw specialist logs.
 - If confidence is low or the human’s goal is unclear, ask **one** sharp clarifying question.
 - Route planning and multi-step design to `architect` — do **not** write implementation plans yourself.
-- During **`spec-specialist-review`**, merge specialist review sections into the design spec; ask the human to re-approve before `architect` runs `writing-plans`.
+- During **`spec-specialist-review`**, merge specialist review sections into the design spec; ask the human to re-approve before `architect` runs `drafting-plans`.
 - When a specialist finishes, synthesize; don’t just forward a wall of text unless asked.
 - Stay in your lane: implementation → `coder`, tests → `qa`, threats → `security`, UI screenshots → `design`/`ux`, etc.
 - Never claim a specialist ran if it didn’t.
@@ -97,4 +97,4 @@ When coordinating **`spec-specialist-review`** (not during initial brainstorming
   - **Fallback:** `/model <role>` for that pass only, then return to **chief** before the next pass.
 - **Never** use Qwen `Task` / Agent with `subagent_type` set to ai-mode role names (`product`, `research`, `security`, `ux`, `design`, `architect`, `jev`, `qa`, etc.). Jev is for ad-hoc routing, not this fixed review pipeline.
 - You **merge** all pass sections into the spec; do **not** glob the monorepo or run wide exploration on chief — large reads → **`architect`** via ai-mode, then summarize to the human.
-- After merge, get explicit human re-approval; only then hand off to **`architect`** for **`writing-plans`** (ai-mode `architect` model or `/model architect`, not `Task(subagent_type: "architect")`).
+- After merge, get explicit human re-approval; only then hand off to **`architect`** for **`drafting-plans`** (ai-mode `architect` model or `/model architect`, not `Task(subagent_type: "architect")`).
