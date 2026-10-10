@@ -66,7 +66,16 @@ type Profile struct {
 	ModelsMax   int
 }
 
-func (p Profile) BaseURL() string { return fmt.Sprintf("http://%s:%d/v1", p.Host, p.Port) }
+func (p Profile) BaseURL() string { return fmt.Sprintf("http://%s:%d/v1", p.ClientHost(), p.Port) }
+
+// ClientHost is the address clients should dial: a wildcard bind (0.0.0.0 / ::)
+// listens on every interface, but isn't a usable destination, so use loopback.
+func (p Profile) ClientHost() string {
+	if p.Host == "0.0.0.0" || p.Host == "::" {
+		return "127.0.0.1"
+	}
+	return p.Host
+}
 func (p Profile) LogFile() string { return filepath.Join(logDir(), p.Name+".log") }
 
 func atoi(s string, def int) int {

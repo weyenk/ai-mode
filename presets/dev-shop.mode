@@ -2,5 +2,5 @@
 description = Coding studio — chief + Kev-4B jev router + specialists
 port = 8080
 models-max = 6
-host = 192.168.4.34
+host = 0.0.0.0
 warm = chief,jev,architect,coder,fast
