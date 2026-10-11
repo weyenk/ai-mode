@@ -294,6 +294,9 @@ const storyPlanAdaptations = `Pipeline adaptations of the skill (they win over t
 - Header lines: **Spec:** %s (the Story Contract rendered as markdown; quote it for spec excerpts) and **Story Contract:** %s, and **Context:** tools.
 - Scenarios are the Story Contract's: S<n> is example n of the contract (listed under "## Scenarios" in the spec file). Every one
   is covered by exactly one task, and its test name carries the id, e.g. TestTimer_S3_LongBreakAfterFourth.
+- When several scenarios check one behaviour with different values, one table-driven test may cover them: its name lists
+  every id it covers (TestDurations_S3_S4_S9_RejectOutOfRange), and each of those scenarios still gets its own coverage row
+  naming that test.
 - Put "hot_files":["go.mod","README.md"] in the task graph. Leave out "branch": the pipeline names the stack branches.
 - stack_layer is the Story Contract's layer number (its "## Layer plan"); every task gets one.
 - Keep it small: one contract task (code packet: shared types, interfaces, and stubbed function variables or stub functions

@@ -230,3 +230,14 @@ func TestLoop_SampleTakesTheOnlyAnswerEvenIfTheQuestionIsReworded(t *testing.T) 
 		t.Fatalf("answers %v", got)
 	}
 }
+
+func TestLoop_SameExampleUnderAnotherRuleIsNotAdded(t *testing.T) {
+	o := runLoop(1, 1.0, map[string][]Turn{
+		"product":   {{Rules: []string{"r1", "r1 (reworded)"}}},
+		"qa":        {{Examples: []Example{{Rule: "r1", Text: "Given -focus -1, when it starts, then it errors."}, {Rule: "r1 (reworded)", Text: "given  -focus -1, when it starts, then it errors"}}}},
+		"architect": {{}},
+	}, nil, nil, nil)
+	if len(o.c.Examples) != 1 {
+		t.Fatalf("want 1 example, got %+v", o.c.Examples)
+	}
+}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -87,5 +88,28 @@ func TestLayerPlan_S36_JevAdapterMapsChoice(t *testing.T) {
 	}
 	if _, err := newJevClassifier(Profile{}, bad).TestLayer("x"); err == nil {
 		t.Fatal("classifier error must surface")
+	}
+}
+
+func TestLayerPlan_RepairAssignsLeftoverExamplesByRule(t *testing.T) {
+	c := StoryContract{
+		Rules:     []string{"r1", "r2"},
+		Examples:  []Example{{Rule: "r1", Text: "a"}, {Rule: "r2", Text: "b"}, {Rule: "r1", Text: "c"}, {Rule: "r2", Text: "d"}, {Rule: "r3", Text: "e"}},
+		LayerPlan: []Layer{{N: 1, Name: "core", Scenarios: []int{1, 1, 9}}, {N: 2, Name: "cli", Scenarios: []int{2, 1}}},
+	}
+	notes := repairLayerPlan(&c)
+	if err := validateLayerPlan(c); err != nil {
+		t.Fatalf("repaired plan still invalid: %v (%v)", err, notes)
+	}
+	if fmt.Sprint(c.LayerPlan[0].Scenarios) != "[1 3]" || fmt.Sprint(c.LayerPlan[1].Scenarios) != "[2 4 5]" {
+		t.Fatalf("layers %+v", c.LayerPlan)
+	}
+	if len(notes) == 0 {
+		t.Fatal("a repair should say what it changed")
+	}
+	empty := StoryContract{Examples: []Example{{Rule: "r", Text: "x"}}}
+	repairLayerPlan(&empty)
+	if len(empty.LayerPlan) != 0 {
+		t.Fatal("no layer plan to repair: leave it for validation to report")
 	}
 }

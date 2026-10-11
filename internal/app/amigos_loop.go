@@ -143,7 +143,7 @@ func (l *loopRun) merge(round int, role string, t Turn) error {
 		}
 	}
 	for _, e := range t.Examples {
-		if !slices.Contains(c.Examples, e) {
+		if !slices.Contains(c.Examples, e) && !hasExampleText(c.Examples, e.Text) {
 			c.Examples = append(c.Examples, e)
 		}
 	}
@@ -295,4 +295,19 @@ func findQuestion(c *StoryContract, text string) int {
 		}
 	}
 	return -1
+}
+
+// hasExampleText reports whether an example with the same text (ignoring case, spacing and end punctuation) exists,
+// whatever rule it was filed under: roles re-send examples under reworded rules, which duplicated scenarios.
+func hasExampleText(xs []Example, text string) bool {
+	norm := func(s string) string {
+		return strings.Trim(strings.Join(strings.Fields(strings.ToLower(s)), " "), ".!; ")
+	}
+	n := norm(text)
+	for _, x := range xs {
+		if norm(x.Text) == n {
+			return true
+		}
+	}
+	return false
 }
