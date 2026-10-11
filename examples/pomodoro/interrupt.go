@@ -2,14 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 )
-
-// errSIGINTNotImplemented is returned by the handleSIGINTFn stub so the red
-// tests fail on a clear signal rather than silently producing empty output.
-var errSIGINTNotImplemented = errors.New("handleSIGINTFn: not implemented")
 
 // handleSIGINTFn handles a SIGINT (Ctrl-C) while a session is in flight.
 //
@@ -23,14 +18,14 @@ var errSIGINTNotImplemented = errors.New("handleSIGINTFn: not implemented")
 //
 // out is the writer the timer uses for its in-place status line; writing the
 // completion message there guarantees the shell prompt lands on a fresh line
-// with no timer remnant.
-//
-// This is a Phase A (test-first) stub: it performs no I/O and returns 0 with
-// errSIGINTNotImplemented so every interrupt test fails on its assertion.
+// with no timer remnant. The returned int is the exit status (always 0 on a
+// clean interrupt); the error is nil.
 func handleSIGINTFn(t *Timer, ctx context.Context, out io.Writer) (int, error) {
-	_ = fmt.Sprint() // keep fmt import available for the real implementation
-	_ = t
-	_ = ctx
-	_ = out
-	return 0, errSIGINTNotImplemented
+	// Clear the in-place status line and print the completion message. Only
+	// fully finished focus sessions are counted; the interrupted one is not.
+	_, err := fmt.Fprintf(out, "\r\x1b[KCompleted %d focus sessions\n", t.completedFocus)
+	if err != nil {
+		return 1, err
+	}
+	return 0, nil
 }
