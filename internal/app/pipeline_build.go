@@ -252,7 +252,7 @@ func stageImplement(pl *pipeline, c *card) (string, cardNote, error) {
 
 	// 1. architect writes the story plan
 	planRel := strings.TrimSuffix(storyRel, ".md") + ".plan.md"
-	if err := pl.writeStoryPlan(c, mod, planRel, contractMD, storyDonePhases(&st, c.ID)); err != nil {
+	if err := pl.writeStoryPlan(c, mod, planRel, contractMD, storyDonePhases(&st, c.ID), committedTasks(&st, mod, c.ID)); err != nil {
 		return "", cardNote{}, fmt.Errorf("story plan: %w", err)
 	}
 	for _, rel := range []string{planRel, strings.TrimSuffix(planRel, ".md") + ".json"} {
@@ -367,16 +367,18 @@ func drafttingPlansRules() string {
 
 // writeStoryPlan has architect write the story plan as JSON inside the worktree module; it is rendered to the
 // drafting-plans markdown and must pass lint, the pipeline's checks and plan verify.
-func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string, done map[string]string) error {
+func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string, done map[string]string, committed map[string]*committedTask) error {
 	jsonRel := strings.TrimSuffix(planRel, ".md") + ".json"
-	check := func() []string { return storyPlanCheck(mod, jsonRel, contractMD, done) }
+	check := func() []string {
+		return append(committedPlanCheck(mod, jsonRel, committed), storyPlanCheck(mod, jsonRel, contractMD, done)...)
+	}
 	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err == nil && len(check()) == 0 {
 		return nil // a retried stage keeps a plan that already passes
 	}
 	contract, _ := os.ReadFile(filepath.Join(mod, contractMD))
 	task := fmt.Sprintf(`Write the implementation plan for story %s ("%s"), following the drafting-plans rules below, as JSON in %s.
 It is the only file you may write. Read the module's code first (list_files, read_file): the plan builds on what exists.
-
+`+committedNote(committed)+`
 %s
 
 <drafting_plans_rules>
@@ -391,6 +393,64 @@ The Story Contract (data from the amigos meeting; it is your spec):
 	cmds := [][]string{{"ai-mode", "plan", "render"}, {"ai-mode", "plan", "verify"}, {"go", "build"}, {"go", "vet"}}
 	_, err := pl.runAgentIn(mod, "architect", "", task, []string{jsonRel}, nil, cmds, 40, check)
 	return err
+}
+
+// committedNote tells architect which tasks of a re-planned story are already committed and must stay as they are.
+func committedNote(committed map[string]*committedTask) string {
+	if len(committed) == 0 {
+		return ""
+	}
+	var ids []string
+	for id := range committed {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var b strings.Builder
+	b.WriteString("\nThis story was started before: these tasks are already committed on the stack. Keep each one in the plan exactly as\n" +
+		"committed (same id, owns these files, covers the scenarios of these tests with these test names); plan only the rest:\n")
+	for _, id := range ids {
+		fmt.Fprintf(&b, "- %s: files %s; tests %s\n", id, strings.Join(committed[id].Files, ", "), firstNonEmpty(strings.Join(committed[id].Tests, ", "), "none"))
+	}
+	return b.String()
+}
+
+// committedPlanCheck: every committed task is in the plan, owns its committed files, and names only tests that exist.
+func committedPlanCheck(mod, jsonRel string, committed map[string]*committedTask) []string {
+	if len(committed) == 0 {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(mod, jsonRel))
+	if err != nil {
+		return nil
+	}
+	pj, err := parseStoryPlanJSON(data)
+	if err != nil {
+		return nil // storyPlanCheck reports it
+	}
+	byID := map[string]storyTaskJSON{}
+	for _, t := range pj.Tasks {
+		byID[t.ID] = t
+	}
+	var out []string
+	for id, ct := range committed {
+		t, ok := byID[id]
+		if !ok {
+			out = append(out, fmt.Sprintf("%s is already committed (files %s) but is missing from the plan; keep it as committed", id, strings.Join(ct.Files, ", ")))
+			continue
+		}
+		for _, f := range ct.Files {
+			if !contains(t.Owns, f) {
+				out = append(out, fmt.Sprintf("%s is already committed with %s; its owns must include %s (keep the task as committed)", id, f, f))
+			}
+		}
+		for _, sc := range t.Scenarios {
+			if !contains(ct.Tests, sc.Test) {
+				out = append(out, fmt.Sprintf("%s is already committed; its scenario %s must name an existing test (%s), not %s", id, sc.ID, strings.Join(ct.Tests, ", "), sc.Test))
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // storyPlanCheck renders the JSON plan, collects lint and pipeline findings, then runs plan verify on code packets.
@@ -563,6 +623,55 @@ func storyDonePhases(st *stackState, story string) map[string]string {
 		}
 		if rank[phase] > rank[out[m[1]]] {
 			out[m[1]] = phase
+		}
+	}
+	return out
+}
+
+// committedTask is what a story's commits on the stack hold for one task.
+type committedTask struct {
+	Files []string // module-relative paths the task's commits touched
+	Tests []string // Test functions with a scenario id defined in its test files
+}
+
+var reScenarioTestFunc = regexp.MustCompile(`func\s+(Test\w*_S\d+\w*)\s*\(`)
+
+// committedTasks reads which files each committed task of a story touched, and the scenario tests in them.
+func committedTasks(st *stackState, mod, story string) map[string]*committedTask {
+	out := map[string]*committedTask{}
+	log, err := gitIn(mod, "log", "--format=%x00%B%x01", "--name-only", "--relative", st.baseRef()+".."+st.tip(), "--", ".")
+	if err != nil {
+		return out
+	}
+	for _, rec := range strings.Split(log, "\x00") {
+		parts := strings.SplitN(rec, "\x01", 2)
+		if len(parts) != 2 || !strings.Contains(parts[0], "Story: "+story) {
+			continue
+		}
+		m := reTaskTrailer.FindStringSubmatch(parts[0])
+		if m == nil {
+			continue
+		}
+		ct := out[m[1]]
+		if ct == nil {
+			ct = &committedTask{}
+			out[m[1]] = ct
+		}
+		for _, f := range strings.Fields(parts[1]) {
+			if !contains(ct.Files, f) {
+				ct.Files = append(ct.Files, f)
+			}
+		}
+	}
+	for _, ct := range out {
+		sort.Strings(ct.Files)
+		for _, f := range ct.Files {
+			if strings.HasSuffix(f, "_test.go") {
+				data, _ := os.ReadFile(filepath.Join(mod, f))
+				for _, m := range reScenarioTestFunc.FindAllStringSubmatch(string(data), -1) {
+					ct.Tests = append(ct.Tests, m[1])
+				}
+			}
 		}
 	}
 	return out

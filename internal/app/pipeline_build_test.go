@@ -308,3 +308,29 @@ func TestImplementStage_StuckGreenIsTriagedAndAWrongTestFixedAsReview(t *testing
 		t.Fatalf("commits:\n%s", log)
 	}
 }
+
+func TestReplan_CommittedTasksMustStayAsCommitted(t *testing.T) {
+	pl, st := buildFixture(t)
+	var calls []string
+	pl.newAgent = scriptedAgents(t, &calls)
+	if _, _, err := stageImplement(pl, &st); err != nil {
+		t.Fatal(err)
+	}
+	stack, _ := pl.loadStack("C0003")
+	wtMod := filepath.Join(stack.Worktree, "examples", "demo")
+	got := committedTasks(&stack, wtMod, "C0004")
+	if got["T02"] == nil || strings.Join(got["T02"].Files, ",") != "add.go,add_test.go" || strings.Join(got["T02"].Tests, ",") != "TestAdd_S1_SumsTwoNumbers" {
+		t.Fatalf("committed %+v", got["T02"])
+	}
+	moved := strings.Replace(strings.Replace(demoStoryPlanJSON, `"add.go", "add_test.go"`, `"sum.go", "sum_test.go"`, 1), "TestAdd_S1_SumsTwoNumbers", "TestSum_S1_Two", 1)
+	os.WriteFile(filepath.Join(wtMod, "docs/pipeline/stories/C0004-add.plan.json"), []byte(moved), 0o644)
+	f := strings.Join(committedPlanCheck(wtMod, "docs/pipeline/stories/C0004-add.plan.json", got), "\n")
+	for _, want := range []string{"owns must include add.go", "must name an existing test (TestAdd_S1_SumsTwoNumbers), not TestSum_S1_Two"} {
+		if !strings.Contains(f, want) {
+			t.Errorf("missing %q in:\n%s", want, f)
+		}
+	}
+	if note := committedNote(got); !strings.Contains(note, "T02: files add.go, add_test.go; tests TestAdd_S1_SumsTwoNumbers") {
+		t.Fatalf("note %q", note)
+	}
+}
