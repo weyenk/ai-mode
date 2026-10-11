@@ -2,11 +2,10 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "needs-human",
+  "stage": "amigos",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
-  "prev_stage": "amigos",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0004-core-timer-engine.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
@@ -14,7 +13,7 @@
     "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T16:44:31Z",
+  "updated": "2026-10-11T16:47:22Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -75,6 +74,17 @@
       ],
       "why": "Verdict paused from meeting 20261011-163641-1a66c1; ready: ; 1 rules, 8 examples; layers: 1 Core Timer Engine [functional] examples [1 2 3 4 5 6 7 8]; no flag. Escalated: [escalated] What is the exact human-readable format of the status line for each state (Focus vs ShortBreak vs LongBreak)? The spec example shows 'Session 1: 25:00' and 'Break: 05:00' but S2 requires distinguishing a long break — should it print 'Long Break: 15:00', 'Break: 15:00 (long)', or reuse 'Break: 15:00' so the user can tell them apart? | [parked] What is the exact output format of the completed-focus count on SIGINT (e.g., 'Completed focus sessions: 3' vs '3 sessions completed') and does it also print the current partial session duration or the current state label? | [parked] What exit code does the program return on graceful SIGINT exit — 0 or a non-zero like 130 (bash convention for Ctrl-C)? Tests asserting the exit path need a concrete value. | [parked] Does the 24-hour maximum apply per-duration (focus, short, long each ≤ 24h) or to the sum of a full cycle? The story says 'maximum session length', which is ambiguous between a single phase and a cycle.",
       "next": "The requester answers with `ai-mode pipeline answer C0004 \"\u003canswer\u003e\"`, which adds it to the story and re-runs amigos."
+    },
+    {
+      "ts": "2026-10-11T16:47:22Z",
+      "by": "requester (answered by the operator, Claude, from the original request)",
+      "stage": "needs-human → amigos",
+      "done": "The requester answered.",
+      "artifacts": [
+        "docs/pipeline/stories/C0004-core-timer-engine.md"
+      ],
+      "why": "Status lines, updated in place each second: a focus session shows 'Session N: MM:SS' (N counts focus sessions from 1), a short break shows 'Break: MM:SS', a long break shows 'Long break: MM:SS'. On Ctrl-C it prints exactly one line, 'Completed N focus sessions' (only fully finished focus sessions co…",
+      "next": "Amigos runs again with the answer in the story."
     }
   ]
 }
