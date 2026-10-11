@@ -57,6 +57,10 @@ instead of guessed. Likely-secret files (`.env*`, `*.pem`, `*.key`, `id_rsa*`) a
 are skipped, and a context over `--context-max-chars` (default 200000) is an error, never a silent truncation. `team` gives the context to
 architect (or the first role if architect is not on the panel); the others get architect's findings.
 
+`ask --max-tokens` defaults to 2048; architect always gets at least 10240 so its thinking leaves room for an answer. A reply cut
+off at the limit ends with a `⚠ … cut off at --max-tokens N` line on stderr asking for a larger value, so a calling agent raises
+the limit instead of re-running the same command.
+
 `team` runs its roles sequentially (architect first; its findings are passed on as shared context), prints one markdown
 report and saves it under `~/.local/state/ai-mode/team/`. `--roles a,b,c` changes the panel, `--out FILE` also writes there.
 A role that fails is marked `FAILED` in the report; all calls share one trace (`ai-mode trace`).

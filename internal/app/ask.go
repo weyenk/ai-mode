@@ -43,12 +43,14 @@ type askParams struct {
 	trace     string
 	parent    string
 	caller    string
+	// onTruncated receives the max_tokens notice; nil prints it to stderr at once.
+	onTruncated func(notice string)
 }
 
 func cmdAsk(args []string) int {
 	fs := newFlags("ask")
 	profile := fs.String("profile", "", "Profile (default: active)")
-	maxTokens := fs.Int("max-tokens", 2048, "Max tokens")
+	maxTokens := fs.Int("max-tokens", 2048, "Max tokens (architect gets at least "+fmt.Sprint(architectMinTokens)+" for thinking)")
 	timeout := fs.Float64("timeout", 600, "Request timeout seconds")
 	asJSON := fs.Bool("json", false, "Print full API response JSON")
 	raw := fs.Bool("raw", false, "Print message.content only (no reasoning fallback)")
@@ -79,11 +81,17 @@ func cmdAsk(args []string) int {
 	if code != 0 {
 		return code
 	}
+	mt := *maxTokens
+	if role == "architect" && mt < architectMinTokens {
+		mt = architectMinTokens
+	}
 	trace, parent := traceContext(*traceF, *parentF)
+	var notice string
 	text, code := runAsk(askParams{
-		profile: p, role: role, user: user, maxTokens: *maxTokens, timeout: *timeout,
+		profile: p, role: role, user: user, maxTokens: mt, timeout: *timeout,
 		asJSON: *asJSON, raw: *raw, verbose: *verbose, trace: trace, parent: parent,
-		caller: firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli"),
+		caller:      firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli"),
+		onTruncated: func(n string) { notice = n },
 	})
 	if code != 0 {
 		return code
@@ -91,6 +99,10 @@ func cmdAsk(args []string) int {
 	fmt.Print(text)
 	if !strings.HasSuffix(text, "\n") {
 		fmt.Println()
+	}
+	// After the text, so it sits where the reply stops.
+	if notice != "" {
+		fmt.Fprintln(os.Stderr, notice)
 	}
 	return 0
 }
@@ -137,6 +149,13 @@ func runAsk(a askParams) (string, int) {
 		}
 		if errMsg != "" {
 			fmt.Fprintln(os.Stderr, errMsg)
+		}
+		if n := truncationNotice(role, a.maxTokens, ev.FinishReason); n != "" {
+			if a.onTruncated != nil {
+				a.onTruncated(n)
+			} else {
+				fmt.Fprintln(os.Stderr, n)
+			}
 		}
 		return code
 	}
@@ -207,6 +226,17 @@ func runAsk(a askParams) (string, int) {
 		ev.Detail = "content empty; used reasoning_content"
 	}
 	return text, finish(0, "", body, data)
+}
+
+// truncationNotice explains a reply cut off by max_tokens. Without it a caller
+// (chief in Qwen Code) sees half an answer with no reason and re-runs the
+// identical command until loop detection halts the session.
+func truncationNotice(role string, maxTokens int, finishReason string) string {
+	if finishReason != "length" {
+		return ""
+	}
+	return fmt.Sprintf("⚠ %s's reply was cut off at --max-tokens %d (finish_reason=length); the text above is incomplete. "+
+		"Re-run with a larger --max-tokens (e.g. %d), not the same command.", role, maxTokens, maxTokens*2)
 }
 
 // recordUsage copies llama-server's usage/timings into the event.
