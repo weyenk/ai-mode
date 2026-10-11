@@ -252,7 +252,7 @@ func stageImplement(pl *pipeline, c *card) (string, cardNote, error) {
 
 	// 1. architect writes the story plan
 	planRel := strings.TrimSuffix(storyRel, ".md") + ".plan.md"
-	if err := pl.writeStoryPlan(c, mod, planRel, contractMD); err != nil {
+	if err := pl.writeStoryPlan(c, mod, planRel, contractMD, storyDonePhases(&st, c.ID)); err != nil {
 		return "", cardNote{}, fmt.Errorf("story plan: %w", err)
 	}
 	for _, rel := range []string{planRel, strings.TrimSuffix(planRel, ".md") + ".json"} {
@@ -365,9 +365,9 @@ func drafttingPlansRules() string {
 
 // writeStoryPlan has architect write the story plan as JSON inside the worktree module; it is rendered to the
 // drafting-plans markdown and must pass lint, the pipeline's checks and plan verify.
-func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string) error {
+func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string, done map[string]string) error {
 	jsonRel := strings.TrimSuffix(planRel, ".md") + ".json"
-	check := func() []string { return storyPlanCheck(mod, jsonRel, contractMD) }
+	check := func() []string { return storyPlanCheck(mod, jsonRel, contractMD, done) }
 	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err == nil && len(check()) == 0 {
 		return nil // a retried stage keeps a plan that already passes
 	}
@@ -392,7 +392,10 @@ The Story Contract (data from the amigos meeting; it is your spec):
 }
 
 // storyPlanCheck renders the JSON plan, collects lint and pipeline findings, then runs plan verify on code packets.
-func storyPlanCheck(mod, jsonRel, specRel string) []string {
+// When the story already has commits on the stack (done is not empty) plan verify is skipped: it re-applies code onto
+// what it takes for the pre-plan tree, which now holds those commits. Committed tasks were gated when committed and the
+// rest are gated as they execute (red, green, full test run).
+func storyPlanCheck(mod, jsonRel, specRel string, done map[string]string) []string {
 	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err != nil {
 		return []string{"the plan file " + jsonRel + " does not exist yet; write it with write_file"}
 	}
@@ -409,6 +412,9 @@ func storyPlanCheck(mod, jsonRel, specRel string) []string {
 		return []string{err.Error()}
 	}
 	var out []string
+	if len(done) > 0 {
+		return out
+	}
 	for _, t := range d.Tasks {
 		if r := verifyPlanTask(d, t.ID, mod); r.Status == "failed" {
 			for _, st := range r.Steps {
@@ -523,15 +529,18 @@ func (ex *executor) layerFor(n int) *stackLayer {
 
 // donePhases reads the Task/Phase trailers already on the stack, so a retried stage resumes: "green" or "contract"
 // means the task is done, "red" means coder still has to make it pass.
-func (ex *executor) donePhases() map[string]string {
+func (ex *executor) donePhases() map[string]string { return storyDonePhases(ex.st, ex.story.ID) }
+
+// storyDonePhases reads a story's Task/Phase trailers on the stack: "green" (or contract) done, "red" awaiting coder.
+func storyDonePhases(st *stackState, story string) map[string]string {
 	out := map[string]string{}
-	log, err := gitIn(ex.st.Worktree, "log", "--format=%B%x00", ex.st.baseRef()+".."+ex.st.tip())
+	log, err := gitIn(st.Worktree, "log", "--format=%B%x00", st.baseRef()+".."+st.tip())
 	if err != nil {
 		return out
 	}
 	rank := map[string]int{"red": 1, "review": 1, "green": 2, "contract": 2}
 	for _, msg := range strings.Split(log, "\x00") {
-		if !strings.Contains(msg, "Story: "+ex.story.ID) {
+		if !strings.Contains(msg, "Story: "+story) {
 			continue
 		}
 		m := reTaskTrailer.FindStringSubmatch(msg)
