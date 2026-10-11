@@ -23,7 +23,7 @@ _empty_
 
 | Card | Type | Stage | Parent | Title | Latest note |
 | --- | --- | --- | --- | --- | --- |
-| C0004 | story | review | C0003 | Core Timer Engine | handoff → review (bot-chief): Opened 1 draft PR(s), one per layer: https://github.com/weyenk/ai-mode/pull/19. |
+| C0004 | story | review | C0003 | Core Timer Engine | review (operator (Claude)): Correction to the hand-off note above: it was invented by chief (fixed in the pipeline since). The facts: one draft PR, https://github.com/weyenk/ai-mode/pull/19 (layer 1, branch simple-pomodoro-timer-01-core-timer-engine, tasks T01-T06, 22 contract scenarios with tests written first, 2 contract amendments by architect). There is no time-zone support and there are no PRs #20/#21. main is still an empty stub here; the CLI story C0005 wires it, stacked on this PR. |
 
 ## done
 
