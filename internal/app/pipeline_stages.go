@@ -4,12 +4,6 @@ import "errors"
 
 var errStageNotBuilt = errors.New("stage not built yet")
 
-func stageSpecSplit(pl *pipeline, c *card) (string, cardNote, error) {
-	return "", cardNote{}, errStageNotBuilt
-}
-func stageSpecWrite(pl *pipeline, c *card) (string, cardNote, error) {
-	return "", cardNote{}, errStageNotBuilt
-}
 func stageFeaturePlan(pl *pipeline, c *card) (string, cardNote, error) {
 	return "", cardNote{}, errStageNotBuilt
 }

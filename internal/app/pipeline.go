@@ -222,17 +222,18 @@ func mdCell(s string) string {
 type stageFunc func(pl *pipeline, c *card) (next string, note cardNote, err error)
 
 type pipeline struct {
-	target  string // the Go module the pipeline builds (absolute)
-	docs    string // <target>/docs/pipeline
-	board   fileBoard
-	stages  map[string]stageFunc // "<type>:<stage>"
-	profile Profile
-	trace   string
-	ask     func(role, user string, maxTokens int) (string, error) // one consult; tests replace it
-	log     io.Writer
-	git     bool // commit artifacts after each tick
-	push    bool // push the pipeline branch after each commit
-	now     func() string
+	target   string // the Go module the pipeline builds (absolute)
+	docs     string // <target>/docs/pipeline
+	board    fileBoard
+	stages   map[string]stageFunc // "<type>:<stage>"
+	profile  Profile
+	trace    string
+	ask      func(role, user string, maxTokens int) (string, error) // one consult; tests replace it
+	newAgent func(spec agentSpec) (*agentSession, error)            // an agent-mode role; tests replace it
+	log      io.Writer
+	git      bool // commit artifacts after each tick
+	push     bool // push the pipeline branch after each commit
+	now      func() string
 }
 
 func (pl *pipeline) logf(format string, a ...any) {
@@ -490,7 +491,49 @@ func newPipeline(repo string, git, push bool) (*pipeline, error) {
 		}
 		return text, nil
 	}
+	pl.newAgent = func(s agentSpec) (*agentSession, error) { return newRoleAgent(pl.profile, s, pl.trace, "pipeline") }
 	return pl, nil
+}
+
+// runAgentChecked runs role as an agent on task in the target, then check; while check reports findings the same
+// conversation continues with them (twice at most). Findings left after that are an error.
+func (pl *pipeline) runAgentChecked(role, task string, owns []string, cmds [][]string, maxTurns int, check func() []string) error {
+	return pl.runAgentCheckedSystem(role, "", task, owns, cmds, maxTurns, check)
+}
+
+// runAgentCheckedSystem is runAgentChecked with a task-specific system prompt instead of the role's guide.
+func (pl *pipeline) runAgentCheckedSystem(role, system, task string, owns []string, cmds [][]string, maxTurns int, check func() []string) error {
+	_, err := pl.runAgentIn(pl.target, role, system, task, owns, nil, cmds, maxTurns, check)
+	return err
+}
+
+// runAgentIn is the general form: any root, read-only patterns, and the last result.
+func (pl *pipeline) runAgentIn(root, role, system, task string, owns, readOnly []string, cmds [][]string, maxTurns int, check func() []string) (agentResult, error) {
+	spec := agentSpec{Role: role, Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds, MaxTurns: maxTurns, MaxWall: 45 * time.Minute, Log: pl.log}
+	if system != "" {
+		spec.System = system + agentRulesFor(owns, cmds)
+	}
+	a, err := pl.newAgent(spec)
+	if err != nil {
+		return agentResult{}, err
+	}
+	pl.logf("  agent %s: %s", role, firstLine(task))
+	res, err := a.Run(task)
+	for attempt := 0; ; attempt++ {
+		if err != nil {
+			return res, err
+		}
+		f := check()
+		if len(f) == 0 {
+			pl.logf("  agent %s %s after %d turns: %s", role, res.Stopped, res.Turns, firstLine(res.Summary))
+			return res, nil
+		}
+		if attempt == 2 {
+			return res, fmt.Errorf("%s stopped (%s) and the check still fails: %s", role, res.Stopped, strings.Join(f, "; "))
+		}
+		pl.logf("  agent %s: check found %d problem(s), continuing: %s", role, len(f), firstLine(f[0]))
+		res, err = a.Continue("A check of your work found problems. Fix them, check again, then call finish:\n- " + strings.Join(f, "\n- "))
+	}
 }
 
 const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
