@@ -2,12 +2,16 @@
   "id": "C0002",
   "title": "Pomodoro CLI",
   "type": "spec",
-  "stage": "spec",
+  "stage": "planning",
   "context": "hobby",
   "parent": "C0001",
   "order": 1,
+  "artifacts": {
+    "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
+    "spec-reviews": "docs/pipeline/specs/reviews/"
+  },
   "created": "2026-10-11T16:14:36Z",
-  "updated": "2026-10-11T16:14:36Z",
+  "updated": "2026-10-11T16:17:12Z",
   "notes": [
     {
       "ts": "2026-10-11T16:14:36Z",
@@ -16,6 +20,23 @@
       "done": "Spec card created from the request split.",
       "why": "Implementation of the terminal-based timer logic, flag parsing, and signal handling.",
       "next": "architect writes the spec; six specialists review it; chief merges."
+    },
+    {
+      "ts": "2026-10-11T16:17:12Z",
+      "by": "bot-architect",
+      "stage": "spec → planning",
+      "done": "Spec written by architect (5 scenarios), reviewed by product, research, security, ux, design, architect, merged by chief.",
+      "artifacts": [
+        "docs/pipeline/specs/C0002-pomodoro-cli.md",
+        "docs/pipeline/specs/reviews/C0002-product.md",
+        "docs/pipeline/specs/reviews/C0002-research.md",
+        "docs/pipeline/specs/reviews/C0002-security.md",
+        "docs/pipeline/specs/reviews/C0002-ux.md",
+        "docs/pipeline/specs/reviews/C0002-design.md",
+        "docs/pipeline/specs/reviews/C0002-architect.md"
+      ],
+      "why": "0 blocking review item(s) raised; chief's decisions are in the spec's Review log.",
+      "next": "architect writes the feature plan: contracts, stories with their scenarios, flags; `ai-mode plan lint --feature` must pass."
     }
   ]
 }
