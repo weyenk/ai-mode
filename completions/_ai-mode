@@ -68,7 +68,7 @@ _ai-mode() {
       ;;
     prompt|ask)
       if [[ $words[CURRENT] == -* && $words[2] == ask ]]; then
-        _values 'option' '--context' '--context-max-chars' '--max-tokens' '--profile' '--timeout' '--json' '--raw' '--caller' '--trace' '--parent' '-v'
+        _values 'option' '--context' '--context-max-chars' '--no-auto-context' '--max-tokens' '--profile' '--timeout' '--json' '--raw' '--caller' '--trace' '--parent' '-v'
       else
         roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
         _values 'role' $roles
@@ -85,7 +85,7 @@ _ai-mode() {
       ;;
     team)
       if [[ $words[CURRENT] == -* ]]; then
-        _values 'option' '--context' '--context-max-chars' '--roles' '--max-tokens' '--timeout' '--out' '--profile' '--caller' '--trace' '--parent' '-v'
+        _values 'option' '--context' '--context-max-chars' '--no-auto-context' '--roles' '--max-tokens' '--timeout' '--out' '--profile' '--caller' '--trace' '--parent' '-v'
       fi
       ;;
   esac

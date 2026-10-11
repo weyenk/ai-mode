@@ -222,3 +222,80 @@ func TestCmdAsk_ContextAloneIsNotAQuestion(t *testing.T) {
 		t.Fatalf("a context with no question must be an empty-question error, got %d: %q", code, msg)
 	}
 }
+
+func TestNamedFiles_FindsRepoFilesTheQuestionMentions(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	write(t, filepath.Join(dir, "docs/specs/board-design.md"), "spec")
+	write(t, filepath.Join(dir, "README.md"), "readme")
+	write(t, filepath.Join(dir, "given.go"), "x")
+	write(t, filepath.Join(dir, ".env.local"), "SECRET=1")
+	write(t, filepath.Join(dir, "blob.bin"), "a\x00b")
+	// The shape chief sent in a captured failure: a literal \n before the path.
+	q := `Review for threats.\n\nSpec path: docs/specs/board-design.md. Also see @README.md, given.go, .env.local, blob.bin, docs/specs/, e.g. missing.md`
+	got := namedFiles(q, []string{"./given.go"})
+	want := []string{"docs/specs/board-design.md", "README.md"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("got %v, want %v (no dirs, secrets, binaries, missing files or paths already in --context)", got, want)
+	}
+}
+
+func TestNamedFiles_IgnoresFilesOutsideTheWorkingDirectory(t *testing.T) {
+	outside := filepath.Join(t.TempDir(), "settings.json")
+	write(t, outside, "{}")
+	chdir(t, t.TempDir())
+	if got := namedFiles("check "+outside, nil); len(got) != 0 {
+		t.Fatalf("a file outside the working directory must not be attached, got %v", got)
+	}
+}
+
+func TestCmdAsk_NamedFileOverTheLimitSaysItWasAutoAttached(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	write(t, filepath.Join(dir, "big.md"), strings.Repeat("x", 5000))
+	var code int
+	msg := captureStderr(t, func() {
+		code = cmdAsk([]string{"security", "review big.md", "--context-max-chars", "1000"})
+	})
+	if code != 1 || !strings.Contains(msg, "big.md") || !strings.Contains(msg, "--no-auto-context") {
+		t.Fatalf("want exit 1 naming the auto-attached file and the opt-out, got %d: %q", code, msg)
+	}
+}
+
+func chdir(t *testing.T, dir string) {
+	t.Helper()
+	old, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chdir(old) })
+}
+
+func TestCmdTeam_NamedFileOverTheLimitSaysItWasAutoAttached(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	write(t, filepath.Join(dir, "big.md"), strings.Repeat("x", 5000))
+	var code int
+	msg := captureStderr(t, func() {
+		code = cmdTeam([]string{"review big.md", "--context-max-chars", "1000"})
+	})
+	if code != 1 || !strings.Contains(msg, "big.md") || !strings.Contains(msg, "--no-auto-context") {
+		t.Fatalf("want exit 1 naming the auto-attached file and the opt-out, got %d: %q", code, msg)
+	}
+}
+
+func TestCallerContext_NoAutoLeavesNamedFilesOut(t *testing.T) {
+	dir := t.TempDir()
+	chdir(t, dir)
+	write(t, filepath.Join(dir, "spec.md"), "MARKER")
+	if block, err := callerContext("ask", "review spec.md", nil, 100000, true); err != nil || block != "" {
+		t.Fatalf("--no-auto-context: want no block, got %q, %v", block, err)
+	}
+	block, err := callerContext("ask", "review spec.md", nil, 100000, false)
+	if err != nil || !strings.Contains(block, "MARKER") {
+		t.Fatalf("want the named file in the block, got %q, %v", block, err)
+	}
+}

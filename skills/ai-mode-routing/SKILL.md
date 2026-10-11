@@ -50,7 +50,7 @@ cat docs/superpowers/specs/foo-design.md | ai-mode ask product "Review this spec
 
 Rules of thumb:
 - Include the human's words, the repo path or file paths, and the output shape you want (ranked list, yes/no + reasons, …).
-- Roles cannot open paths. Ground them with `--context <file>` (full contents) and `--context <dir>` (file listing), repeatable; a context over the limit is an error, so pick the files that matter.
+- Roles cannot open paths. Ground them with `--context <file>` (full contents) and `--context <dir>` (file listing), repeatable; a context over the limit is an error, so pick the files that matter. A repo file path written in the question is attached automatically, but pass `--context` anyway. If a role replies that it is waiting for the content, re-run with `--context <file>`; never ask the human to paste it.
 - Use `--max-tokens 4096` or more for reviews and plans.
 - One role per call. For several roles, run several calls and synthesize.
 

@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -134,6 +135,26 @@ func withContext(user, block string) string {
 	return block + "\n\nQUESTION:\n" + user
 }
 
+// callerContext builds the context block from the --context paths plus, unless
+// noAuto, the repo files the text names. Each auto-attached file is noted on stderr.
+func callerContext(cmd, text string, paths []string, maxChars int, noAuto bool) (string, error) {
+	var auto []string
+	if !noAuto {
+		auto = namedFiles(text, paths)
+	}
+	block, err := buildContext(append(append([]string{}, paths...), auto...), maxChars)
+	if err != nil {
+		if len(auto) > 0 {
+			return "", fmt.Errorf("%v (attached because the text names them: %s; pass --no-auto-context to skip them)", err, strings.Join(auto, ", "))
+		}
+		return "", err
+	}
+	for _, f := range auto {
+		fmt.Fprintf(os.Stderr, "ai-mode %s: attached %s as --context (named in the question; roles cannot open paths)\n", cmd, f)
+	}
+	return block, nil
+}
+
 // askUser combines the question with any --context paths.
 func askUser(user string, ctxPaths []string, maxChars int) (string, error) {
 	block, err := buildContext(ctxPaths, maxChars)
@@ -141,6 +162,54 @@ func askUser(user string, ctxPaths []string, maxChars int) (string, error) {
 		return "", err
 	}
 	return withContext(user, block), nil
+}
+
+// pathRun matches runs of path characters; a literal "\n" (backslash) or a quote ends a run.
+var pathRun = regexp.MustCompile(`[\w~./-]+`)
+
+// namedFiles returns the files under the working directory that the question names
+// but explicit does not already cover. Chief writes "Spec path: docs/x.md" and
+// forgets --context, and the role, which cannot open paths, answers "standing by
+// for the spec content" (captured 2026-10-10). Directories, secret-looking names,
+// binaries and anything outside the working directory are skipped.
+func namedFiles(user string, explicit []string) []string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+	home, _ := os.UserHomeDir()
+	seen := map[string]bool{}
+	for _, p := range explicit {
+		if a, err := filepath.Abs(p); err == nil {
+			seen[a] = true
+		}
+	}
+	var out []string
+	for _, tok := range pathRun.FindAllString(user, -1) {
+		tok = strings.TrimRight(tok, ".")
+		if !strings.ContainsAny(tok, "/.") {
+			continue
+		}
+		p := tok
+		if strings.HasPrefix(p, "~/") && home != "" {
+			p = filepath.Join(home, p[2:])
+		}
+		a, err := filepath.Abs(p)
+		if err != nil || seen[a] || !strings.HasPrefix(a, cwd+string(filepath.Separator)) {
+			continue
+		}
+		seen[a] = true
+		st, err := os.Stat(a)
+		if err != nil || !st.Mode().IsRegular() || secretLikeName(filepath.Base(a)) {
+			continue
+		}
+		data, err := os.ReadFile(a)
+		if err != nil || bytes.IndexByte(data[:min(len(data), 8000)], 0) >= 0 {
+			continue
+		}
+		out = append(out, tok)
+	}
+	return out
 }
 
 // contextRole picks which team role receives the context block: architect (the repo

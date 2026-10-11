@@ -56,6 +56,8 @@ puts a **file's contents** or a **directory's file listing** into the prompt as 
 instead of guessed. Likely-secret files (`.env*`, `*.pem`, `*.key`, `id_rsa*`) and binaries are refused, `.git`/`node_modules`/`vendor`/`dist`
 are skipped, and a context over `--context-max-chars` (default 200000) is an error, never a silent truncation. `team` gives the context to
 architect (or the first role if architect is not on the panel); the others get architect's findings.
+`ask` and `team` also attach any file under the working directory that the question names (e.g. `Spec path: docs/x-design.md`) as if it were
+passed with `--context`, and says so on stderr; the same secret/binary rules apply. (`team` gives them to the context role). `--no-auto-context` turns this off.
 
 `ask --max-tokens` defaults to 2048; architect always gets at least 10240 so its thinking leaves room for an answer. A reply cut
 off at the limit ends with a `⚠ … cut off at --max-tokens N` line on stderr asking for a larger value, so a calling agent raises
