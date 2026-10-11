@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 )
@@ -27,10 +26,12 @@ func completionMessage(n int) string {
 // and returns the process exit status. Per R3/R6/R8 the count is only the fully
 // finished focus sessions, so the interrupted session is never counted.
 //
-// This is a Phase A test-first stub: it compiles but implements no behaviour,
-// so every completion test fails on its assertion (empty output, non-zero
-// status) rather than on a build error. The real implementation lands in the
-// green phase.
+// The count is t.completedFocus: only focus sessions that fully elapsed before
+// the interrupt are counted; the interrupted session (if any) is not (R8).
 var runCompletion = func(t *Timer, ctx context.Context, out io.Writer) (int, error) {
-	return 1, errors.New("completion not implemented")
+	_, err := fmt.Fprint(out, completionClear+completionMessage(t.completedFocus))
+	if err != nil {
+		return 1, err
+	}
+	return 0, nil
 }
