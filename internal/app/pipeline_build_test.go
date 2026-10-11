@@ -57,6 +57,9 @@ func buildFixture(t *testing.T) (*pipeline, card) {
 		t.Fatal(err)
 	}
 	pl.board.save(st)
+	pl.ask = func(role, user string, n int) (string, error) {
+		return "Looks consistent.\n```json\n{\"approve\": true, \"problems\": []}\n```", nil
+	}
 	gitT(t, root, "checkout", "-q", "-b", "pipe")
 	gitT(t, root, "add", "-A")
 	gitT(t, root, "commit", "-q", "-m", "fixture")
@@ -224,5 +227,84 @@ func TestReviewStage_BlockingCommentFixedInTheLayerThenApproved(t *testing.T) {
 	}
 	if !strings.Contains(note.Done, "1 fix round") {
 		t.Fatalf("note %+v", note)
+	}
+}
+
+func TestImplementStage_TestReviewSendsContradictionsBackToQA(t *testing.T) {
+	pl, st := buildFixture(t)
+	wrong := strings.Replace(demoTest, "Add(2, 3); got != 5", "Add(2, 3); got != 6", 1)
+	reviews := []string{
+		"```json\n{\"approve\": false, \"problems\": [{\"test\": \"TestAdd_S1_SumsTwoNumbers\", \"scenario\": \"S1\", \"problem\": \"2+3 is 5, not 6\", \"fix\": \"assert 5\"}]}\n```",
+		"```json\n{\"approve\": true, \"problems\": []}\n```",
+	}
+	pl.ask = func(role, user string, n int) (string, error) {
+		r := reviews[0]
+		reviews = reviews[1:]
+		return r, nil
+	}
+	pl.newAgent = func(s agentSpec) (*agentSession, error) {
+		var replies []agentMsg
+		switch s.Role {
+		case "architect":
+			replies = []agentMsg{call("1", "write_file", map[string]any{"path": "docs/pipeline/stories/C0004-add.plan.json", "content": demoStoryPlanJSON})}
+		case "qa":
+			replies = []agentMsg{
+				call("1", "write_file", map[string]any{"path": "add_test.go", "content": wrong}),
+				call("2", "write_file", map[string]any{"path": "add.go", "content": "package demo\n\n// Add is a stub.\nfunc Add(a, b int) int { return 0 }\n"}),
+				call("3", "finish", map[string]any{"summary": "red"}),
+				call("4", "write_file", map[string]any{"path": "add_test.go", "content": demoTest}),
+			}
+		case "coder":
+			replies = []agentMsg{call("1", "write_file", map[string]any{"path": "add.go", "content": "package demo\n\n// Add returns a+b.\nfunc Add(a, b int) int { return a + b }\n"})}
+		}
+		return &agentSession{spec: s, chat: &scriptedChat{replies: append(replies, call("9", "finish", map[string]any{"summary": "done"}))}}, nil
+	}
+	if next, note, err := stageImplement(pl, &st); err != nil || next != "architect-review" {
+		t.Fatalf("next=%s err=%v note=%+v", next, err, note)
+	}
+	cm, _ := os.ReadFile(pl.abs(st.Artifacts["contract-md"]))
+	if !strings.Contains(string(cm), "## Amendments") || !strings.Contains(string(cm), "2+3 is 5, not 6 → assert 5") {
+		t.Fatalf("amendment not recorded:\n%s", cm)
+	}
+}
+
+func TestImplementStage_StuckGreenIsTriagedAndAWrongTestFixedAsReview(t *testing.T) {
+	pl, st := buildFixture(t)
+	wrong := strings.Replace(demoTest, "Add(2, 3); got != 5", "Add(2, 3); got != 6", 1)
+	pl.ask = func(role, user string, n int) (string, error) {
+		if strings.Contains(user, "could not make task") {
+			return "```json\n{\"cause\": \"test\", \"problems\": [{\"test\": \"TestAdd_S1_SumsTwoNumbers\", \"scenario\": \"S1\", \"problem\": \"expects 6\", \"fix\": \"expect 5\"}], \"diagnosis\": \"the code is right\"}\n```", nil
+		}
+		return "```json\n{\"approve\": true, \"problems\": []}\n```", nil // a review that missed it
+	}
+	qaRuns := 0
+	pl.newAgent = func(s agentSpec) (*agentSession, error) {
+		var replies []agentMsg
+		switch s.Role {
+		case "architect":
+			replies = []agentMsg{call("1", "write_file", map[string]any{"path": "docs/pipeline/stories/C0004-add.plan.json", "content": demoStoryPlanJSON})}
+		case "qa":
+			qaRuns++
+			if qaRuns == 1 {
+				replies = []agentMsg{
+					call("1", "write_file", map[string]any{"path": "add_test.go", "content": wrong}),
+					call("2", "write_file", map[string]any{"path": "add.go", "content": "package demo\n\n// Add is a stub.\nfunc Add(a, b int) int { return 0 }\n"}),
+				}
+			} else {
+				replies = []agentMsg{call("1", "write_file", map[string]any{"path": "add_test.go", "content": demoTest})}
+			}
+		case "coder":
+			replies = []agentMsg{call("1", "write_file", map[string]any{"path": "add.go", "content": "package demo\n\n// Add returns a+b.\nfunc Add(a, b int) int { return a + b }\n"})}
+		}
+		return &agentSession{spec: s, chat: &scriptedChat{replies: append(replies, call("9", "finish", map[string]any{"summary": "done"}))}}, nil
+	}
+	if next, note, err := stageImplement(pl, &st); err != nil || next != "architect-review" {
+		t.Fatalf("next=%s err=%v note=%+v", next, err, note)
+	}
+	stack, _ := pl.loadStack("C0003")
+	wtMod := filepath.Join(stack.Worktree, "examples", "demo")
+	log := gitT(t, wtMod, "log", "--format=%s", stack.BaseSHA+".."+stack.Layers[0].Branch)
+	if !strings.Contains(log, "fix(contract): T02 tests follow architect's ruling") || !strings.HasPrefix(log, "feat(T02)") {
+		t.Fatalf("commits:\n%s", log)
 	}
 }

@@ -521,16 +521,34 @@ func (pl *pipeline) runAgentCheckedSystem(role, system, task string, owns []stri
 
 // runAgentIn is the general form: any root, read-only patterns, and the last result.
 func (pl *pipeline) runAgentIn(root, role, system, task string, owns, readOnly []string, cmds [][]string, maxTurns int, check func() []string) (agentResult, error) {
+	a, err := pl.startAgent(root, role, system, owns, readOnly, cmds, maxTurns)
+	if err != nil {
+		return agentResult{}, err
+	}
+	return pl.drive(a, task, false, check)
+}
+
+// startAgent makes a session without running it, so a caller can drive it more than once (e.g. after a review).
+func (pl *pipeline) startAgent(root, role, system string, owns, readOnly []string, cmds [][]string, maxTurns int) (*agentSession, error) {
 	spec := agentSpec{Role: role, Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds, MaxTurns: maxTurns, MaxWall: 45 * time.Minute, Log: pl.log}
 	if system != "" {
 		spec.System = system + agentRulesFor(owns, cmds)
 	}
-	a, err := pl.newAgent(spec)
-	if err != nil {
-		return agentResult{}, err
+	return pl.newAgent(spec)
+}
+
+// drive runs msg (as the first task, or continuing the conversation) and then check; while check reports findings the
+// conversation continues with them, twice at most. Findings left after that are an error.
+func (pl *pipeline) drive(a *agentSession, msg string, cont bool, check func() []string) (agentResult, error) {
+	role := a.spec.Role
+	pl.logf("  agent %s: %s", role, firstLine(msg))
+	var res agentResult
+	var err error
+	if cont {
+		res, err = a.Continue(msg)
+	} else {
+		res, err = a.Run(msg)
 	}
-	pl.logf("  agent %s: %s", role, firstLine(task))
-	res, err := a.Run(task)
 	for attempt := 0; ; attempt++ {
 		if err != nil {
 			return res, err
