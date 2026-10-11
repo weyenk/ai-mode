@@ -35,11 +35,24 @@ func TestUncertainty_JudgedAgreementGroupsSameDecision(t *testing.T) {
 		t.Fatalf("2 of 3: got %v", got)
 	}
 	fa.Answers["fast"] = `{"groups": [[1, 2, 3]]}`
-	if got := (judgedEngine{ask: fa, role: "fast"}).Score("q", []string{"a", "a", ""}); math.Abs(got-2.0/3.0) > 1e-9 {
-		t.Fatalf("an empty answer agrees with nothing: got %v", got)
+	if got := (judgedEngine{ask: fa, role: "fast"}).Score("q", []string{"a", "a", ""}); got != 1 {
+		t.Fatalf("an empty sample is left out, not counted as dissent: got %v", got)
 	}
 	fa.Answers["fast"] = "I cannot tell."
 	if got := (judgedEngine{ask: fa, role: "fast"}).Score("q", []string{"yes", "yes", "no"}); math.Abs(got-2.0/3.0) > 1e-9 {
 		t.Fatalf("an unusable judge falls back to exact match: got %v", got)
+	}
+}
+
+func TestUncertainty_EmptySamplesDoNotCountAndTwoThirdsResolves(t *testing.T) {
+	fa := &fakeAsker{Answers: map[string]string{"fast": `{"groups": [[1, 2]]}`}}
+	if got := (judgedEngine{ask: fa, role: "fast"}).Score("q", []string{"No, use flag.Value", "No: implement flag.Value", ""}); got != 1 {
+		t.Fatalf("two agreeing answers and one empty sample: got %v, want 1", got)
+	}
+	if got := (judgedEngine{ask: fa, role: "fast"}).Score("q", []string{"", "", "yes"}); got != 0 {
+		t.Fatalf("one real answer is not agreement: got %v", got)
+	}
+	if 2.0/3.0 < parkThreshold {
+		t.Fatalf("a two-thirds majority must resolve a question (threshold %v)", parkThreshold)
 	}
 }

@@ -37,9 +37,17 @@ type judgedEngine struct {
 var _ uncertaintyEngine = judgedEngine{}
 
 func (j judgedEngine) Score(question string, answers []string) float64 {
-	if len(answers) == 0 {
+	// an empty sample is a turn that did not answer, not a dissenting answer
+	var real []string
+	for _, a := range answers {
+		if strings.TrimSpace(a) != "" {
+			real = append(real, a)
+		}
+	}
+	if len(real) < 2 {
 		return 0
 	}
+	answers = real
 	var b strings.Builder
 	fmt.Fprintf(&b, "Several team members answered the same question. Group the answers that give the same decision or value, ignoring wording, length and rationale. An empty answer belongs to no group.\n\nQuestion: %s\n\nAnswers:\n", question)
 	for i, a := range answers {

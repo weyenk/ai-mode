@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	parkThreshold = 0.7
+	// parkThreshold: a question resolves when at least two thirds of the non-empty samples agree (by decision, see judgedEngine)
+	parkThreshold = 0.66
 	sampleCount   = 3
 )
 
