@@ -27,6 +27,10 @@ Announce: "I'm using the ai-mode drafting-plans skill to create the implementati
 
 <HARD-GATE>
 - Input is an **approved** spec and, when one exists, its Story Contract and `layer_plan[]`. Otherwise stop and ask.
+- **Scenarios first.** Planning needs numbered scenarios (S1, S2, ...): from the Story Contract, or from a numbered
+  Scenarios section in the spec. If neither exists, stop and ask chief to run `ai-mode amigos` (the `three-amigos` skill)
+  or to add the section; do not invent scenarios from prose. (In the project-types run, deriving them from prose was the
+  step architect did worst: its first skeleton covered about 3 of 10 spec areas.)
 - Before handing the plan to anyone: `ai-mode plan lint <plan>` exits 0 **and** `ai-mode plan verify <plan> --task all`
   exits 0 (a task reported `n/a` is fine; `failed` is not). Quote both results in the plan header.
 - No placeholders (TBD, TODO, "add appropriate error handling", "similar to Task N", "write tests for the above").
@@ -50,6 +54,26 @@ Announce: "I'm using the ai-mode drafting-plans skill to create the implementati
 4. **Tests carry the story.** Every Story Contract scenario S<n> is covered by exactly one task, and the test name contains
    its id (`Test<Area>_S<n>_<Slug>`). Tests are written first and must be seen failing for the right reason.
 
+## Decomposition recipe
+
+The pattern that made the 2026-10-11 project-types plan work after two failed skeletons. Start from it:
+
+- **One contract task (wave 0, code packet).** It holds the shared types, any embedded data files, and, for every function
+  another task needs, a package-level **function variable** with a stub (`var loadThingFn = func(dir string) (Thing, error)
+  { return Thing{}, errNotImplemented }`). Stubs that can fail return a "not implemented" error, so a test expecting "nothing
+  found" still starts red. A fact two tasks both need (for example the repo root) is a field in the contract type, not
+  something each task re-derives.
+- **One impl task per new source file and its test file.** It assigns its real function to the contract's variable in an
+  `init()` in its own file, and its tests fake the other variables (save and restore with `t.Cleanup`). So every impl task
+  depends only on the contract.
+- **One owner per existing file.** Changes to several existing files for one behaviour go in one task (integration when it
+  wires others' work), at most about 5 owned files.
+- **Test pure functions.** When behaviour sits in a command that reads stdin, server state or the network, the packet names
+  a pure function to extract (for example `sessionStartContext(input []byte, running bool) string`) and tests that.
+- **"Nothing changes" tests must still start red:** assert that a collaborator was consulted (a spy on its function
+  variable) or that a new rule is present, not only that output is unchanged.
+- **Hot files** in one integration task with a small registration test.
+
 ## Who writes the code
 
 | Packet kind | Used for | What the packet contains | Checked by |
@@ -59,20 +83,26 @@ Announce: "I'm using the ai-mode drafting-plans skill to create the implementati
 
 Why: architect cannot compile or run tests, and in practice about half of its long code blocks fail to build. qa and
 coder run the compiler. You may put code in a spec packet, but then mark it `packet: code` so `plan verify` checks it; do
-not leave unchecked code in a plan.
+not leave unchecked code in a plan. `plan lint` warns on every impl task that is a code packet (the project-types skeleton
+made 7 of 9 tasks code packets; its contract packet alone failed `plan verify` twice before chief rewrote it).
 
 ## Process (staged, with the tools in the loop)
 
 1. **Read** the spec, Story Contract and `layer_plan[]`; list the scenario ids.
 2. **Get repo context** (see below); map the existing boundaries, patterns, test style and hot files.
 3. **Stage 1, the skeleton** (this is where plans go wrong: lint can check a graph but not judge a decomposition, so have chief or the human read the task list and scenarios before Stage 2; in the first real run architect on its own produced a bundled "adapters" task, thin scenarios and interfaces declared in a test file): header, Global Constraints, Review Focus, Boundaries, the JSON task graph, and the scenario
-   coverage table. Run `ai-mode plan lint` (it prints the computed waves) and fix every ERR before going on. Do not write
-   `wave` numbers; the tool computes them.
+   coverage table. Run `ai-mode plan lint --fix` (it prints the computed waves) and fix every ERR before going on. Do not
+   write `wave` numbers; the tool computes them.
 4. **Stage 2, packets in dependency order:** contract tasks first. After each **code** packet run
    `ai-mode plan verify <plan> --task Tnn`. On `failed`, read the failing step, fix the root cause (not the symptom) and
    re-run. After 4 failed attempts do not leave unchecked code in the plan: downgrade the task to a **spec packet** (change `packet` to `spec` in the graph) or escalate to the human. Later packets copy signatures from the
    verified packets they depend on.
 5. **Finish:** `plan lint` and `plan verify --task all` both clean; map tasks to stack layers (`skills/pr-stack`).
+
+Always lint with `--fix` first. It repairs, in place, what a model without tools gets wrong mechanically: it gofmts every
+whole-file Go block, removes backticks wrapped around an excerpt line, and restores excerpt quotes that differ from the
+spec only in markup (backticks, asterisks) or spacing. It never changes words; for a quote that still fails it prints
+`did you mean "<closest spec phrase>"`, so copy that phrase.
 
 ## Plan document
 
@@ -160,6 +190,14 @@ agentic client that can read files (Qwen Code with `/model architect`), or have 
 `ai-mode ask architect "..." --context <file>... --context <dir>` (a file's contents, a directory's file listing; over
 `--context-max-chars` is an error, so pick the relevant files and the existing test style). State in the plan header which you
 had. If you had only the spec, mark every file path and signature **unverified** and do not invent them.
+
+**Keep each call's context to its stage.** A small model's attention thins as the prompt grows (the project-types Stage 1
+call carried about 100k characters, including the 22k-character worked example, and missed most of the spec):
+
+- **Stage 1:** the spec, this skill, `--context <dir>` listings of the packages touched, and only the files whose
+  signatures the graph names. Not the worked example (read it once if you have never seen one) and not unrelated files.
+- **Stage 2:** one packet per call, with the files that packet owns or reads and the verified contract packet; not the
+  whole repo context again.
 
 ## Self-review (what the tools cannot see)
 

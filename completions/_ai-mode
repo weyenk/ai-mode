@@ -78,7 +78,7 @@ _ai-mode() {
       if (( CURRENT == 3 )); then
         _values 'subcommand' 'lint' 'verify' 'apply'
       elif [[ $words[CURRENT] == -* ]]; then
-        _values 'option' '--json' '--task' '--repo' '--phase'
+        _values 'option' '--json' '--task' '--repo' '--phase' '--skeleton' '--fix'
       else
         _files
       fi

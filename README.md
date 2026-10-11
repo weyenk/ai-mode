@@ -46,6 +46,7 @@ ai-mode team "web version of the app?" --context internal/app --context README.m
 ai-mode amigos "As a user I can upload an avatar"   # Three Amigos refinement of one story; exit 0 ready, 2 not-ready, 3 paused, 1 error
 ai-mode ask architect "Where are commands registered?" --context internal/app/cli.go   # ground a role in real code
 ai-mode plan lint docs/superpowers/plans/my-plan.md          # check a drafting-plans document (structure, ownership, scenario coverage)
+ai-mode plan lint --fix docs/superpowers/plans/my-plan.md    # first repair gofmt and excerpt markup in place, then check
 ai-mode plan verify docs/superpowers/plans/my-plan.md --task all   # apply each code task to a copy of the repo: must be red, then green
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 ```
