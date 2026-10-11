@@ -44,6 +44,7 @@ type agentRequest struct {
 	Tools           []map[string]any
 	MaxTokens       int
 	ReasoningEffort string // chat_template_kwargs.reasoning_effort for this request; "" keeps the preset's
+	ThinkingBudget  int    // thinking_budget_tokens for this request; 0 keeps the server's reasoning-budget
 }
 
 type agentReply struct {
@@ -68,9 +69,10 @@ type agentSpec struct {
 	MaxTurns  int
 	MaxWall   time.Duration
 	MaxTokens int
-	// ReasoningEffort is sent per request (low | medium | high); "" keeps the preset's. A per-request token budget is
-	// ignored by llama-server, but the effort level is honoured and is what keeps a thinking model's turns short.
+	// ReasoningEffort (low | medium | high) and ThinkingBudget (tokens) are sent per request; empty/0 keep the preset's.
+	// llama-server honours thinking_budget_tokens per request, so a cap needs no server restart.
 	ReasoningEffort string
+	ThinkingBudget  int
 	Transcript      string    // JSONL file of every message; "" for none
 	Log             io.Writer // one progress line per tool call; nil for none
 }
@@ -194,7 +196,7 @@ func (a *agentSession) loop() (agentResult, error) {
 		if a.spec.MaxWall > 0 && time.Since(a.start) > a.spec.MaxWall {
 			return a.result("timeout", ""), nil
 		}
-		rep, err := a.chat.Complete(agentRequest{Model: a.spec.Role, Messages: a.msgs, Tools: agentToolDefs(), MaxTokens: maxTokens, ReasoningEffort: a.spec.ReasoningEffort})
+		rep, err := a.chat.Complete(agentRequest{Model: a.spec.Role, Messages: a.msgs, Tools: agentToolDefs(), MaxTokens: maxTokens, ReasoningEffort: a.spec.ReasoningEffort, ThinkingBudget: a.spec.ThinkingBudget})
 		a.turns++
 		turnsThisRun++
 		if err != nil {
@@ -690,6 +692,10 @@ func (c llamaChat) Complete(req agentRequest) (agentReply, error) {
 	if req.ReasoningEffort != "" {
 		body["chat_template_kwargs"] = map[string]any{"reasoning_effort": req.ReasoningEffort}
 	}
+	if req.ThinkingBudget > 0 {
+		body["thinking_budget_tokens"] = req.ThinkingBudget
+		body["reasoning_budget_message"] = "I have enough information, so I will act now."
+	}
 	ev := Event{Kind: "agent", Trace: c.trace, Span: newSpanID(), Caller: c.caller, Profile: c.profile, Role: req.Model, MaxTokens: req.MaxTokens}
 	start := time.Now()
 	ev.TS = start.UTC()
@@ -753,6 +759,7 @@ func cmdAgent(args []string) int {
 	maxWall := fs.Duration("max-wall", 30*time.Minute, "Wall-clock budget")
 	maxTokens := fs.Int("max-tokens", 32768, "max_tokens per model turn (thinking roles need room)")
 	effort := fs.String("effort", "", "reasoning_effort per request: low | medium | high (default: the preset's)")
+	thinkBudget := fs.Int("think-budget", 0, "thinking_budget_tokens per request (default: the server's reasoning-budget)")
 	transcript := fs.String("transcript", "", "Write the conversation as JSONL here (default: <state>/agent/...)")
 	asJSON := fs.Bool("json", false, "Print the result as JSON")
 	profile := fs.String("profile", "", "Profile (default: active)")
@@ -790,7 +797,7 @@ func cmdAgent(args []string) int {
 	}
 	root, _ := filepath.Abs(*repo)
 	a, err := newRoleAgent(p, agentSpec{Role: pos[0], Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds,
-		MaxTurns: *maxTurns, MaxWall: *maxWall, MaxTokens: *maxTokens, ReasoningEffort: *effort, Transcript: *transcript, Log: os.Stderr},
+		MaxTurns: *maxTurns, MaxWall: *maxWall, MaxTokens: *maxTokens, ReasoningEffort: *effort, ThinkingBudget: *thinkBudget, Transcript: *transcript, Log: os.Stderr},
 		os.Getenv("AI_MODE_TRACE_ID"), firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli"))
 	if err != nil {
 		return fail("%v", err)

@@ -232,6 +232,7 @@ type pipeline struct {
 	newAgent func(spec agentSpec) (*agentSession, error)              // an agent-mode role; tests replace it
 	amigos   func(dir, story string, rounds int) (int, string, error) // `ai-mode amigos --story`; tests replace it
 	effort   map[string]string                                        // per-role reasoning_effort for agent turns
+	budget   map[string]int                                           // per-role thinking_budget_tokens for agent turns
 	log      io.Writer
 	git      bool // commit artifacts after each tick
 	push     bool // push the pipeline branch after each commit
@@ -507,9 +508,16 @@ func newPipeline(repo string, git, push bool) (*pipeline, error) {
 	// qa and coder (Qwen3.8) think at ~24 tok/s; on the first run a few 16-20k-token deliberations took most of the
 	// build time. In the tool loop the compiler and tests give the feedback, so their agent turns think at low effort.
 	pl.effort = map[string]string{"qa": "low", "coder": "low"}
+	// Low effort still left single turns of 16-26k thinking tokens (12-19 minutes); a per-request budget caps them.
+	pl.budget = map[string]int{"qa": 8192, "coder": 8192}
 	if e := os.Getenv("AI_MODE_AGENT_EFFORT"); e != "" {
 		for _, r := range []string{"qa", "coder"} {
 			pl.effort[r] = e
+		}
+	}
+	if b, err := strconv.Atoi(os.Getenv("AI_MODE_AGENT_THINK_BUDGET")); err == nil {
+		for _, r := range []string{"qa", "coder"} {
+			pl.budget[r] = b
 		}
 	}
 	pl.amigos = amigosExec
@@ -540,7 +548,7 @@ func (pl *pipeline) runAgentIn(root, role, system, task string, owns, readOnly [
 // startAgent makes a session without running it, so a caller can drive it more than once (e.g. after a review).
 func (pl *pipeline) startAgent(root, role, system string, owns, readOnly []string, cmds [][]string, maxTurns int) (*agentSession, error) {
 	spec := agentSpec{Role: role, Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds, MaxTurns: maxTurns, MaxWall: 45 * time.Minute, Log: pl.log,
-		ReasoningEffort: pl.effort[role]}
+		ReasoningEffort: pl.effort[role], ThinkingBudget: pl.budget[role]}
 	if system != "" {
 		spec.System = system + agentRulesFor(owns, cmds)
 	}
