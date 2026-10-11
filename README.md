@@ -71,7 +71,11 @@ To make Qwen Code's chief reach for `team`/`ask`/`classify` in any workflow (not
 it adds a marked routing block to `~/.qwen/QWEN.md` and three hooks to `~/.qwen/settings.json` (`--print` shows all of it,
 `--remove` undoes it). A `UserPromptExpansion` hook (`ai-mode hook prompt-expansion`) also appends a chief stop to
 `/drafting-plans`, whose planning text otherwise outweighs the session-start rule, and a `PreToolUse` hook
-(`ai-mode hook pre-tool-use`) denies chief's `skill` tool call to `drafting-plans`, pointing it at `ai-mode ask architect`. The hook runs `ai-mode hook session-start`, which injects a short rule (the way Superpowers
+(`ai-mode hook pre-tool-use`) keeps chief to routing: it denies chief's `skill` call to `drafting-plans` and `enter_plan_mode`
+(both pointing it at `ai-mode ask architect`), `write_file`/`edit` and shell redirects outside `docs/`, and shell commands that
+delete or move files (`rm`, `mv`, `cp`, `tee`, `sed -i`), run `make clean`, change dependencies (`go get`, `go mod`), change git
+state, or stop/restart the server (`ai-mode use|stop|restart`). Other models (`/model coder`) are not limited. Re-run
+`ai-mode setup-qwen` after upgrading so the hook's matcher covers these tools. The hook runs `ai-mode hook session-start`, which injects a short rule (the way Superpowers
 injects `using-superpowers`) while an ai-mode server is running: chief's first output must be a real tool call, and
 open-ended asks go through the `ai-mode-routing` skill to `ai-mode team`. Without it, chief copies the text-form example
 calls in Qwen Code's built-in prompt (`[tool_call: read_file for ...]`) and nothing runs.
