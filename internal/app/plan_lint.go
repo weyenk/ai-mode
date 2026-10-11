@@ -53,6 +53,9 @@ func lintPlanOpts(d *planDoc, skeleton bool) []planFinding {
 		if t.Packet != "code" && t.Packet != "spec" {
 			errf("%s has packet %q; want code | spec", t.ID, t.Packet)
 		}
+		if t.Kind == "impl" && t.Packet == "code" {
+			warnf("%s is an impl task with a code packet: architect cannot compile, so prefer a spec packet and let qa and coder write the code (keep code only if plan verify passes)", t.ID)
+		}
 		for _, dep := range t.DependsOn {
 			dt, ok := byID[dep]
 			if !ok {
@@ -208,7 +211,11 @@ func lintPlanOpts(d *planDoc, skeleton bool) []planFinding {
 			for _, f := range frags {
 				for _, piece := range regexp.MustCompile(`\.\.\.|…`).Split(f, -1) {
 					if p := normSpace(piece); len(p) >= 8 && !strings.Contains(spec, p) {
-						errf("%s: spec excerpt not found in the spec: %q", t.ID, p)
+						hint := ""
+						if near, ok := closestSpecPhrase(d.SpecText, p); ok {
+							hint = fmt.Sprintf(" (did you mean %q? `plan lint --fix` restores markup-only differences)", near)
+						}
+						errf("%s: spec excerpt not found in the spec: %q%s", t.ID, p, hint)
 					}
 				}
 			}
@@ -307,16 +314,32 @@ func cmdPlanLint(args []string) int {
 	fs := newFlags("plan lint")
 	asJSON := fs.Bool("json", false, "Print findings as JSON")
 	skeleton := fs.Bool("skeleton", false, "Skip per-packet checks (the graph exists but the packets are not written yet)")
+	fix := fs.Bool("fix", false, "First repair mechanical mistakes in place: gofmt whole-file Go blocks, restore excerpts that differ from the spec only in markup")
 	pos, code, ok := parse(fs, args)
 	if !ok {
 		return code
 	}
 	if len(pos) != 1 {
-		return fail("usage: ai-mode plan lint <plan.md> [--json] [--skeleton]")
+		return fail("usage: ai-mode plan lint <plan.md> [--json] [--skeleton] [--fix]")
 	}
 	data, err := os.ReadFile(pos[0])
 	if err != nil {
 		return fail("%v", err)
+	}
+	var fixed []string
+	if *fix {
+		specPath := ""
+		if m := reSpec.FindStringSubmatch(string(data)); m != nil {
+			specPath = m[1]
+		}
+		out, notes := fixPlan(string(data), readSpec(specPath, pos[0]))
+		if out != string(data) {
+			if err := os.WriteFile(pos[0], []byte(out), 0o644); err != nil {
+				return fail("%v", err)
+			}
+			data = []byte(out)
+		}
+		fixed = notes
 	}
 	var findings []planFinding
 	if d, err := parsePlan(string(data)); err != nil {
@@ -342,9 +365,12 @@ func cmdPlanLint(args []string) int {
 		}
 	}
 	if *asJSON {
-		b, _ := json.MarshalIndent(map[string]any{"ok": !bad, "findings": findings, "waves": waves}, "", "  ")
+		b, _ := json.MarshalIndent(map[string]any{"ok": !bad, "findings": findings, "waves": waves, "fixed": fixed}, "", "  ")
 		fmt.Println(string(b))
 	} else {
+		for _, n := range fixed {
+			fmt.Println("FIXED: " + n)
+		}
 		for _, f := range findings {
 			fmt.Printf("%s: %s\n", f.Level, f.Msg)
 		}
