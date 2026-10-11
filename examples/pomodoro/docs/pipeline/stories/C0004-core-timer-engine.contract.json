@@ -2,95 +2,103 @@
   "contract": {
     "story": "# Core Timer Engine\n\n- **Card:** C0004 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST1) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** none · **Size:** M · **Flag:** none\n\n## Story\n\nAs a macOS user, I want a lightweight terminal-based Pomodoro timer, so that I can manage focus sessions and breaks without distractions.\n\n## Scope\n\nImplement the basic timer loop, session transitions (Short/Long break logic), and terminal output using carriage returns.\n\n## Scenarios (from the spec)\n\n- **S1 — Standard Cycle.** Given default durations, when 25m focus and 5m short break pass, then the terminal shows \"Session 1: 25:00\" → \"Session 1: 00:00\" → \"Break: 05:00\".\n- **S2 — Long Break Trigger.** Given default durations, when 4 focus sessions and 3 short breaks complete, then the 4th break must be 15 minutes long.\n- **S4 — Graceful Exit.** Given a running timer, when `SIGINT` is received, then the program prints the completed count and exits without a stack trace.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.\n\n## Answers from the requester\n\n- Every fourth focus session (the 4th, 8th, 12th, ...) is followed by the long break instead of a short one, so the four-session cycle starts over after each long break; the completed-focus total printed on Ctrl-C counts the whole run. The in-place line is written as a carriage return, the status text, then the ANSI erase-to-end-of-line sequence ESC[K so a shorter line leaves no leftovers. I have no preference on internal signatures: Run taking a context.Context that main cancels on Ctrl-C (signal.NotifyContext) is fine. (requester (answered by the operator, Claude, from the original request), 2026-10-11)\n- Status lines, updated in place each second: a focus session shows 'Session N: MM:SS' (N counts focus sessions from 1), a short break shows 'Break: MM:SS', a long break shows 'Long break: MM:SS'. On Ctrl-C it prints exactly one line, 'Completed N focus sessions' (only fully finished focus sessions count; nothing about the interrupted one), and exits with status 0. The 24-hour maximum applies to each length on its own (focus, short break, long break), not to a whole cycle. (requester (answered by the operator, Claude, from the original request), 2026-10-11)",
     "rules": [
-      "The timer must transition between focus, short break, and long break states according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
-      "On SIGINT, the program must print exactly one line 'Completed N focus sessions' where N is the count of fully finished focus sessions and exit with status 0, regardless of whether the interrupt occurred during focus, short break, or long break.",
-      "The timer must transition between focus, short break, and long break states according to the four-session cycle logic.",
-      "Timer state must transition deterministically: after every 4th completed focus session, the break must be a LongBreak (15m) instead of a ShortBreak (5m), and the cycle counter must reset.",
-      "On SIGINT, the program must print exactly one line 'Completed N focus sessions\\n' where N is the count of fully finished focus sessions, exit with status 0, and emit no partial timer output, carriage returns, or ANSI codes.",
-      "Status lines must be updated in place using '\\r\\u001b[K' + text format: 'Session N: MM:SS' for focus, 'Break: MM:SS' for short, 'Long break: MM:SS' for long, with MM:SS wrapping correctly up to 24:00.",
-      "No session duration may exceed 24 hours.",
-      "SIGINT must exit with status 0, printing only the count of fully completed focus sessions."
+      "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+      "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line, showing the correct session label and countdown for Focus, ShortBreak, and LongBreak states.",
+      "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n' where N counts only fully finished focus sessions, and exit with status 0 without a stack trace.",
+      "The program must validate that each configured duration (focus, short break, long break) does not exceed 24 hours at startup, printing a descriptive error to stderr and exiting with a non-zero code if violated.",
+      "The timer must transition between focus, short, and long breaks in a 4-session cycle.",
+      "On SIGINT, the program must clear the current in-place status line and print the completed count.",
+      "Each configured duration must not exceed 24 hours.",
+      "When a focus session is interrupted by SIGINT, the interrupted session must not be counted toward the 'Completed N focus sessions' output."
     ],
     "examples": [
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic",
-        "text": "After 4 focus sessions (each 25 minutes), the next session is a long break (15 minutes) instead of a short break (5 minutes)."
+        "rule": "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+        "text": "After 4 focus sessions (each 25 minutes), the next break is a long break of 15 minutes instead of a short break of 5 minutes."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
-        "text": "Given default durations, if the user interrupts the timer while it is in the middle of a 15-minute long break (the 4th break in the cycle), the terminal must output 'Completed 4 focus sessions\\n' and the process must exit with code 0, with no panic or stack trace."
+        "rule": "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+        "text": "Timer starts in Focus state, Session 1. At t=25m, it transitions to ShortBreak state for 5m. At t=30m, it transitions back to Focus state, Session 2. After 3 more focus sessions and 3 short breaks (t=25+5+25+5+25+5+25+5 = 115m), the 4th focus session ends. The timer must transition to LongBreak state (not ShortBreak) for 15 minutes. After the long break, the cycle restarts at Session 5."
       },
       {
-        "rule": "On SIGINT, the program must print exactly one line 'Completed N focus sessions' where N is the count of fully finished focus sessions and exit with status 0, regardless of whether the interrupt occurred during focus, short break, or long break.",
-        "text": "If the timer is interrupted during the 3rd focus session (which has not yet completed), the output must be 'Completed 2 focus sessions' because only the first two focus sessions are fully finished."
+        "rule": "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+        "text": "Timer is in LongBreak state (15:00). At t=10m of the long break, SIGINT is received. The program must print 'Completed 4 focus sessions' (counting only fully finished focus sessions) and exit with status 0. It must NOT print the interrupted long break status or a stack trace."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
-        "text": "For a long break (15 minutes), the terminal line must show 'Long break: 15:00' initially, counting down to 'Long break: 00:00', distinct from the short break format 'Break: 05:00'."
+        "rule": "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+        "text": "User configures focusDuration = 25h. The program must reject this configuration or fail fast at startup, because each session length (focus, short break, long break) individually must not exceed 24 hours. This constraint applies per-duration, not to the total cycle time."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
-        "text": "If a user configures a focus duration of 25 hours, the timer must reject the configuration or return an error immediately, without starting the countdown, because it exceeds the 24-hour maximum per duration constraint."
+        "rule": "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+        "text": "Terminal output for Focus Session 1 at t=0: the line shows 'Session 1: 25:00\\r\\x1b[K'. At t=24m59s: 'Session 1: 00:01\\r\\x1b[K'. At t=25m: transitions to ShortBreak, line shows 'Break: 05:00\\r\\x1b[K'. Each update overwrites the previous line in-place using carriage return and ANSI erase sequence."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
-        "text": "Given default durations, the terminal must display 'Session 1: 25:00\\r\\u001b[K' at the start of the first focus session, updating the same line in place every second until it reads 'Session 1: 00:00\\r\\u001b[K', then transition to 'Break: 05:00\\r\\u001b[K' for the short break."
+        "rule": "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
+        "text": "Timer is in Focus Session 3 (25:00). User presses Ctrl-C at t=20m. The program prints 'Completed 2 focus sessions' (Sessions 1 and 2 fully completed; Session 3 was interrupted) and exits with status 0. The interrupted Session 3 is NOT counted."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic",
-        "text": "After the 4th focus session completes, the terminal must display 'Long break: 15:00\\r\\u001b[K' instead of 'Break: 05:00\\r\\u001b[K', and after the long break ends, the next focus session must be labeled 'Session 5: 25:00\\r\\u001b[K', restarting the four-session cycle counter."
+        "rule": "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line, showing the correct session label and countdown for Focus, ShortBreak, and LongBreak states.",
+        "text": "At t=0 in Focus Session 1 with default 25m duration, the writer receives 'Session 1: 25:00\\r\\x1b[K'. At t=1439s, it receives 'Session 1: 00:01\\r\\x1b[K'. At t=1440s, the state transitions to ShortBreak and the writer receives 'Break: 05:00\\r\\x1b[K'."
       },
       {
-        "rule": "On SIGINT, the program must print exactly one line 'Completed N focus sessions' where N is the count of fully finished focus sessions and exit with status 0, regardless of whether the interrupt occurred during focus, short break, or long break.",
-        "text": "If SIGINT is received during the 2nd focus session at 25 minutes remaining, the output must be exactly 'Completed 1 focus sessions\\n' (with a trailing newline) and exit code 0, with no carriage returns, no ANSI escape codes, and no 'Session 2' partial output."
+        "rule": "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line, showing the correct session label and countdown for Focus, ShortBreak, and LongBreak states.",
+        "text": "At t=0 in LongBreak with default 15m duration, the writer receives 'Long break: 15:00\\r\\x1b[K'. Note the label is 'Long break' (two words) not 'Break' to distinguish it from the short break."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic, with each session's duration not exceeding 24 hours.",
-        "text": "Given a 24-hour focus duration, the countdown must display 'Session 1: 24:00\\r\\u001b[K' at start and proceed to 'Session 1: 23:59\\r\\u001b[K' after one second, using MM:SS format that wraps correctly at the 24-hour boundary without overflow or panic."
+        "rule": "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n' where N counts only fully finished focus sessions, and exit with status 0 without a stack trace.",
+        "text": "Timer is in Focus Session 3 at t=1200s (20m in, 5m remaining). SIGINT arrives. The writer first receives '\\r\\x1b[K' to clear the 'Session 3: 05:00' remnant, then 'Completed 2 focus sessions\\n'. Exit code is 0. Session 3 is not counted because it was interrupted."
       },
       {
-        "rule": "The timer must transition between focus, short break, and long break states according to the four-session cycle logic",
-        "text": "After 4 focus sessions (each 25 minutes), the next session is a long break (15 minutes) instead of a short one."
+        "rule": "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n' where N counts only fully finished focus sessions, and exit with status 0 without a stack trace.",
+        "text": "Timer is in ShortBreak after Session 4 (the long break trigger has not fired yet—wait, Session 4 just completed, so the next break is LongBreak). Correction: Timer is in LongBreak after 4 completed focus sessions, t=600s into the 15m break. SIGINT arrives. Output is '\\r\\x1b[KCompleted 4 focus sessions\\n'. Exit code 0."
       },
       {
-        "rule": "Timer state must transition deterministically: after every 4th completed focus session, the break must be a LongBreak (15m) instead of a ShortBreak (5m), and the cycle counter must reset.",
-        "text": "After focus session 4 completes, the timer must output 'Long break: 15:00\\r\\u001b[K'. After the 15-minute long break completes, the next focus session must be labeled 'Session 5: 25:00\\r\\u001b[K', not 'Session 1', and the long break trigger must reset so the next long break occurs after session 8."
+        "rule": "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n' where N counts only fully finished focus sessions, and exit with status 0 without a stack trace.",
+        "text": "SIGINT arrives immediately at t=0 before any focus session has started or completed. Output is '\\r\\x1b[KCompleted 0 focus sessions\\n'. Exit code 0. No stack trace."
       },
       {
-        "rule": "On SIGINT, the program must print exactly one line 'Completed N focus sessions\\n' where N is the count of fully finished focus sessions, exit with status 0, and emit no partial timer output, carriage returns, or ANSI codes.",
-        "text": "If SIGINT is received during focus session 2 at 12:34 remaining (meaning session 1 is complete but session 2 is not), the output must be exactly 'Completed 1 focus sessions\\n' with exit code 0. The buffer must not contain any 'Session 2: 12:34' fragment, no '\\r', no '\\u001b[K', and no 'Session 2' text at all."
+        "rule": "The program must validate that each configured duration (focus, short break, long break) does not exceed 24 hours at startup, printing a descriptive error to stderr and exiting with a non-zero code if violated.",
+        "text": "User passes --focus 25h. The program prints 'error: focus duration 25h exceeds 24h limit' to stderr and exits with code 1. No timer loop starts."
       },
       {
-        "rule": "Status lines must be updated in place using '\\r\\u001b[K' + text format: 'Session N: MM:SS' for focus, 'Break: MM:SS' for short, 'Long break: MM:SS' for long, with MM:SS wrapping correctly up to 24:00.",
-        "text": "When focus duration is 24h, the first written line must be '\\r\\u001b[KSession 1: 24:00', and after one second tick it must become '\\r\\u001b[KSession 1: 23:59'. The MM field must display '24' (not '1440' or overflow), and SS must count down correctly from 00 to 59 without panic."
+        "rule": "The program must validate that each configured duration (focus, short break, long break) does not exceed 24 hours at startup, printing a descriptive error to stderr and exiting with a non-zero code if violated.",
+        "text": "User passes --short 24h --focus 25h. Both exceed the limit. The program should report both violations or the first one encountered, print descriptive errors to stderr, and exit with a non-zero code. The exact order of error reporting for multiple violations is an implementation detail, but at least one must be reported."
       },
       {
-        "rule": "Timer state must transition deterministically: after every 4th completed focus session, the break must be a LongBreak (15m) instead of a ShortBreak (5m), and the cycle counter must reset.",
-        "text": "If SIGINT arrives during the 4th break (which is a long break following focus session 4), the output must be 'Completed 4 focus sessions\\n' because all 4 focus sessions are fully finished. The interrupted long break itself does not affect the count."
+        "rule": "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line, showing the correct session label and countdown for Focus, ShortBreak, and LongBreak states.",
+        "text": "Boundary: duration is exactly 1 minute. At t=0, output is 'Session 1: 01:00\\r\\x1b[K'. At t=59s, output is 'Session 1: 00:01\\r\\x1b[K'. At t=60s, transition to break. The countdown does not show negative values or skip 00:00."
       },
       {
-        "rule": "On SIGINT, the program must print exactly one line 'Completed N focus sessions\\n' where N is the count of fully finished focus sessions, exit with status 0, and emit no partial timer output, carriage returns, or ANSI codes.",
-        "text": "If SIGINT arrives during the first focus session (0 completed), the output must be 'Completed 0 focus sessions\\n' and exit code 0. The word 'sessions' is used even for 0 (grammatical inconsistency is acceptable per spec wording)."
+        "rule": "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line, showing the correct session label and countdown for Focus, ShortBreak, and LongBreak states.",
+        "text": "Negative or zero duration passed to constructor. The 24-hour validation only checks the upper bound. Behavior for 0 or negative durations is unspecified by the contract. This is a potential edge case that should be addressed."
       },
       {
-        "rule": "After 4 focus sessions, a long break must occur.",
-        "text": "After 4 focus sessions (each 25 minutes), the next session is a 15-minute long break."
+        "rule": "The timer must transition between focus, short, and long breaks in a 4-session cycle.",
+        "text": "After 4 focus sessions (each 25 minutes), the next break is a long break of 15 minutes instead of a short one."
       },
       {
-        "rule": "Timer state must transition deterministically: after every 4th completed focus session, the break must be a LongBreak (15m) instead of a ShortBreak (5m), and the cycle counter must reset.",
-        "text": "Using a FakeClock that advances exactly 25m after each `After` call, running the timer for 4 focus sessions (Session 1 through Session 4) and verifying the subsequent break state: the writer buffer must contain 'Long break: 15:00' and the internal state must be LongBreak. If the timer continues for another 4 focus sessions (Session 5-8), it must again output 'Long break: 15:00'. The counter resets so that Session 1 and 5 are equivalent, but Session 2 and 3 (and 6, 7) are followed by 'Break: 05:00'."
+        "rule": "On SIGINT, the program must clear the current in-place status line and print the completed count.",
+        "text": "Timer is in Focus Session 3 at t=1200s. SIGINT arrives. Output is '\\r\\x1b[KCompleted 2 focus sessions\\n'. Exit code is 0."
       },
       {
-        "rule": "Status lines must be updated in place using '\\r\\u001b[K' + text format: 'Session N: MM:SS' for focus, 'Break: MM:SS' for short, 'Long break: MM:SS' for long, with MM:SS wrapping correctly up to 24:00.",
-        "text": "Initialize the timer with focusDuration=25*time.Minute. Call Run with a context that is canceled after 1 second (simulated via FakeClock or context.WithTimeout). The output buffer must contain the sequence: first write is \"\\r\\u001b[KSession 1: 25:00\", subsequent writes update the same line. After the 1-second tick, the buffer must contain \"\\r\\u001b[KSession 1: 24:59\". Verify that no newline character '\\n' appears in the buffer until the final completion message."
+        "rule": "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line, showing the correct session label and countdown for Focus, ShortBreak, and LongBreak states.",
+        "text": "At t=0 in Focus Session 1 with 25m duration, the writer receives 'Session 1: 25:00\\r\\x1b[K'."
       },
       {
-        "rule": "On SIGINT, the program must print exactly one line 'Completed N focus sessions\\n' where N is the count of fully finished focus sessions, exit with status 0, and emit no partial timer output, carriage returns, or ANSI codes.",
-        "text": "Simulate a run where Session 1 completes (25m passed) and Session 2 has run for 12 minutes. Cancel the context (simulating SIGINT). The final output to the writer must be exactly \"Completed 1 focus sessions\\n\". Crucially, the buffer must NOT contain \"\\r\\u001b[KSession 2: 13:00\" or any fragment of the interrupted session. The exit code must be 0."
+        "rule": "Each configured duration must not exceed 24 hours.",
+        "text": "User passes --focus 25h. The program prints 'error: focus duration 25h exceeds 24h limit' to stderr and exits with code 1."
       },
       {
-        "rule": "No session duration may exceed 24 hours.",
-        "text": "Construct a Timer with focusDuration=25*time.Hour. Call Run. It must return an error immediately without writing any timer status lines to the output writer. The error message must contain the string \"focus\" and \"25h\" (or equivalent representation of the offending value) to identify the specific violation."
+        "rule": "When a focus session is interrupted by SIGINT, the interrupted session must not be counted toward the 'Completed N focus sessions' output.",
+        "text": "Timer is in Focus Session 5 (the first session of the second 4-session cycle) at t=100s (1:40 elapsed, 23:20 remaining). SIGINT arrives. Output is '\\r\\x1b[KCompleted 4 focus sessions\\n'. The 4 completed focus sessions from the first cycle are counted; Session 5 is interrupted and NOT counted. Exit code 0."
+      },
+      {
+        "rule": "When a focus session is interrupted by SIGINT, the interrupted session must not be counted toward the 'Completed N focus sessions' output.",
+        "text": "Timer is in Focus Session 1 at t=1s. SIGINT arrives. Output is '\\r\\x1b[KCompleted 0 focus sessions\\n'. Session 1 is interrupted and NOT counted. Exit code 0. This confirms that 'completed' means the full 25:00 elapsed, not merely 'started'."
+      },
+      {
+        "rule": "When a focus session is interrupted by SIGINT, the interrupted session must not be counted toward the 'Completed N focus sessions' output.",
+        "text": "Timer is in Focus Session 4 (the 4th of the cycle) at t=1439s (24:59 elapsed, 00:01 remaining). SIGINT arrives. Output is '\\r\\x1b[KCompleted 3 focus sessions\\n'. Session 4 is interrupted 1 second before completion and NOT counted. Exit code 0."
       }
     ],
     "questions": [
@@ -99,107 +107,97 @@
         "state": "resolved",
         "score": 0,
         "answers": [
-          "The program should print the completed count of focus sessions and exit without a stack trace, as per S4 — Graceful Exit."
+          "The completed focus sessions from the current cycle are counted and printed, but the interrupted long break is not counted as a completed session."
         ]
       },
       {
-        "text": "Handling of timer interruption during a long break",
-        "state": "resolved",
-        "score": 1,
-        "answers": [
-          "The program must print the completed count of focus sessions and exit without a stack trace, as per the rules for SIGINT handling, regardless of whether the interruption occurred during a focus, short, or long break.",
-          "The `completedFocus` counter is incremented at the moment the `Focus` state completes and transitions to a `Break` state. If the timer is interrupted during a long break, the output will include the count of all completed focus sessions, including the session that triggered the break (e.g., 'Completed 4 focus sessions' if interrupted during the break following session 4).",
-          "The `Timer.Run` implementation will use a `select` statement to monitor both the `clock.After` channel and the `ctx.Done()` channel. Because the `completedFocus` counter is only incremented specifically when a `Focus` session successfully completes, an interruption during the `LongBreak` state will terminate the loop and print the existing count without triggering any further increments, adhering to the requirement that only fully finished focus sessions count."
-        ]
-      },
-      {
-        "text": "What is the exact exit behavior if Run() returns an error other than context.Canceled (e.g., invalid duration passed at construction) — does the program print an error to stderr and exit non-zero, or is this scenario out of scope for this story?",
-        "state": "resolved",
-        "score": 1,
-        "answers": [
-          "If Run() returns an error (e.g., due to a duration exceeding the 24-hour limit), the main function will print the error message to stderr and exit with a non-zero status code. This is within scope as it defines the program's failure mode for invalid configuration.",
-          "If Run() returns an error, the main function will print the error to stderr and exit with a non-zero status code. This is feasible and necessary to handle the 24-hour constraint violation mentioned in the global constraints.",
-          "If Run() returns an error (e.g., due to an invalid duration), main should print the error to stderr and exit with a non-zero status code."
-        ]
-      },
-      {
-        "text": "When the terminal is not a TTY (e.g., piped to a file), should the timer still emit carriage returns and ANSI ESC[K sequences, or should it suppress in-place updates and emit one line per session?",
-        "state": "resolved",
-        "score": 1,
-        "answers": [
-          "To maintain the principle of separation of concerns, the `Timer` engine should remain agnostic of the output medium. Instead, the implementation in `main.go` should provide a decorated `io.Writer` (or a formatter) that detects if `os.Stdout` is a TTY. If it is a TTY, it applies the carriage returns and ANSI escape sequences; if it is not (e.g., a pipe or file), it suppresses them and instead emits a newline-delimited log of significant state transitions. This ensures clean, human-readable logs in non-interactive environments.",
-          "The implementation should detect if the writer is a terminal. If it is a TTY, use in-place updates with carriage returns and ANSI ESC[K. If it is not a TTY, it should suppress in-place updates and emit a new line only upon state transitions (e.g., session start/end) to maintain clean logs.",
-          "The `Timer` logic will remain agnostic of the writer type to ensure testability. In `main.go`, we will implement a TTY-aware `io.Writer` wrapper. This wrapper will detect if `os.Stdout` is a terminal: if it is, it will use `\\r\\u001b[K` for in-place updates; if it is not (e.g., piped to a file), it will emit a standard newline `\\n`. This ensures clean, one-line-per-event logs in non-interactive environments while providing the requested in-place updates for macOS Terminal users."
-        ]
-      },
-      {
-        "text": "What is the exact exit behavior if Run() returns an error other than context.Canceled?",
+        "text": "What is the behavior when SIGINT is received during a focus session that has already been completed (i.e., the timer just transitioned to a break)? Does the completed focus session count in the 'Completed N focus sessions' message?",
         "state": "resolved",
         "score": 0,
         "answers": [
-          "If Run() returns an error (e.g., invalid duration), main should print the error to stderr and exit with a non-zero status code."
+          "Yes, the completed focus session is counted because it was fully finished before the transition."
         ]
       },
       {
-        "text": "When the terminal is not a TTY, should the timer still emit carriage returns and ANSI ESC[K sequences?",
+        "text": "What happens if SIGINT is received before the timer has started its first focus session (e.g., during initialization or if durations are zero)?",
         "state": "resolved",
         "score": 0,
         "answers": [
-          "The Timer will write to the provided io.Writer; for the scope of this story, we will assume TTY-like behavior, but the Timer implementation remains agnostic of the writer type."
+          "The program will print 'Completed 0 focus sessions' and exit."
         ]
       },
       {
-        "text": "When Run() returns an error for an invalid duration (e.g., 25 hours), does the error message include which duration was invalid (focus/short/long) and the offending value, or is a generic error sufficient for this story?",
+        "text": "What is the exact error behavior when a duration exceeds 24 hours: does the program exit at startup with an error message, or does it panic/crash?",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "The error message should be specific, including the type of duration (focus, short, or long) and the offending value. This provides much better usability for the user to fix their configuration and is a low-complexity implementation.",
-          "The error message should include the specific duration type and the offending value (e.g., 'invalid focus duration: 25h0m0s') to provide actionable feedback; this is a low-cost, high-value improvement for usability.",
-          "The error message should include the specific duration type and the offending value (e.g., 'focus duration 25h exceeds 24h limit') to ensure the user can identify and correct the configuration error without ambiguity."
+          "The program must validate durations at startup and exit with a clear error message and a non-zero exit code, rather than panicking.",
+          "The program must validate durations during initialization; if any duration exceeds 24 hours, it must print a descriptive error message to stderr and exit with a non-zero exit code.",
+          "The program should exit at startup with a clear error message printed to stderr. We should avoid panics or stack traces to ensure a clean, predictable failure for invalid configurations."
         ]
       },
       {
-        "text": "The contract shows `func (t *Timer) Run() error` but the requester said Run should take a `context.Context`. Is the final signature `Run(ctx context.Context) error` or does the Timer hold the context as a field? This affects test stub design.",
+        "text": "Should the 'Completed N focus sessions' line include a trailing newline, and is it the ONLY output on Ctrl-C (no partial timer line)?",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "The signature should be `Run(ctx context.Context) error`. Storing `context.Context` in a struct is a Go anti-pattern; context should flow through the call stack. This approach allows `main` to manage the lifecycle via `signal.NotifyContext` and enables the `Timer` to handle graceful shutdown by selecting on `ctx.Done()`.",
-          "The signature will be `Run(ctx context.Context) error`. This follows the Go idiom of passing context as the first argument to long-running functions. It avoids the anti-pattern of holding context in a struct, keeps the `Timer` struct focused on configuration and state, and simplifies test stub design by allowing us to simulate a `SIGINT` simply by passing a canceled context.",
-          "The signature should be `Run(ctx context.Context) error`. In Go, passing `context.Context` as the first argument to a blocking or long-running function is the standard idiom. This makes the lifecycle dependency explicit and allows the caller (`main`) to control termination via `signal.NotifyContext`. This is also significantly better for test stub design, as it allows us to use `context.WithCancel` to deterministically end the timer loop in our unit tests without needing to manipulate the internal state of the `Timer` struct."
+          "The message must include a trailing newline to ensure the shell prompt starts on a new line and does not append to the message. To ensure it is the only visible output, the implementation should use a carriage return or overwrite the existing in-place timer line to clear any leftover partial timer text.",
+          "Yes, it should include a trailing newline to ensure the shell prompt returns to a clean line. On Ctrl-C, the program should first clear the current in-place status line (using \\r\\x1b[K) and then print the 'Completed N focus sessions' message, ensuring that the message is the only output visible from the application's run.",
+          "The line should include a trailing newline to prevent the shell prompt from appearing on the same line. To ensure it is the only output, the program should use a carriage return (\\r) to overwrite the current in-place timer line with the final message, then append the newline."
         ]
       },
       {
-        "text": "When Run() returns an error for an invalid duration (e.g., 25 hours), does the error message include which duration was invalid and the offending value, or is a generic error sufficient?",
+        "text": "Should the program exit with a specific error message or error code if the 24-hour duration constraint is violated at startup?",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "The error message should be specific, including the type of duration (focus, short, or long) and the offending value (e.g., 'focus duration 25h exceeds 24h limit') to provide actionable feedback and ensure the user can identify and correct the configuration error without ambiguity.",
-          "The error message must be specific, identifying the type of duration (focus, short, or long) and the offending value (e.g., 'invalid focus duration: 25h') to provide actionable feedback and avoid ambiguity.",
-          "The error message should be specific, including the type of duration (focus, short, or long) and the offending value (e.g., 'focus duration 25h exceeds 24h limit'). This provides actionable feedback for the user and is a low-complexity implementation."
+          "The program should exit with a descriptive error message to stderr (e.g., 'error: focus duration 25h exceeds 24h limit') and a standard non-zero exit code (e.g., 1) to ensure failure is detectable by calling processes or scripts.",
+          "The program should exit with exit code 1 and print a descriptive error message to stderr, specifically identifying which duration (focus, short, or long) exceeded the 24-hour limit (e.g., 'error: focus duration 25h exceeds 24h limit').",
+          "The program should print a descriptive error message to stderr and exit with a non-zero exit code (e.g., 1). This follows the fail-fast principle, providing clear feedback to the user and allowing the failure to be detectable by shell scripts or automation."
         ]
       },
       {
-        "text": "Should the Run signature be func (t *Timer) Run(ctx context.Context) error or should the Timer struct hold the context?",
+        "text": "Should the 'Completed N focus sessions' message include a trailing newline, or should it strictly be the only thing printed on that line?",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "The signature should be `func (t *Timer) Run(ctx context.Context) error`. In Go, storing `context.Context` within a struct is a well-known anti-pattern. Passing the context as the first argument to the `Run` method follows the standard idiom for long-running or blocking functions. This makes the lifecycle dependency explicit, allows the caller (e.g., `main`) to manage termination via `signal.NotifyContext`, and significantly simplifies unit testing by allowing the injection of canceled or timed-out contexts to verify graceful shutdown logic.",
-          "The signature should be `func (t *Timer) Run(ctx context.Context) error`. In Go, passing `context.Context` as the first argument to a long-running or blocking function is the standard idiom. It avoids the anti-pattern of storing context in a struct, keeps the `Timer` struct focused on configuration and state, and allows the caller (e.g., `main`) to control the lifecycle via `signal.NotifyContext`. This also simplifies unit testing by allowing us to use `context.WithCancel` to deterministically simulate a `SIGINT` signal.",
-          "The signature should be `Run(ctx context.Context) error`. In Go, passing `context.Context` as an argument to long-running functions is the standard idiom. It avoids the anti-pattern of holding context in a struct, keeps the `Timer` struct focused on configuration and state, and simplifies test design by allowing us to use `context.WithCancel` to end the timer loop deterministically."
+          "It should include a trailing newline to ensure the shell prompt starts on a new line. To ensure it is the only content on that line and no remnants of the previous timer status remain, the implementation should use a carriage return (\\r) and the ANSI erase-to-end-of-line sequence (\\x1b[K) before printing the message and the newline.",
+          "The message should include a trailing newline to ensure the shell prompt starts on a new line. To ensure it is the only thing visible on that line, the implementation should use a carriage return (\\r) to overwrite the current in-place timer line, print the message, and then print the newline (\\n).",
+          "It must include a trailing newline to ensure the shell prompt starts on a new line. To ensure the message is the only thing on its line, we will use a carriage return (\\r) and the ANSI escape sequence \\x1b[K to clear any leftover timer text from the previous in-place updates."
         ]
       },
       {
-        "text": "SIGINT output requirements",
+        "text": "How should durations be provided to the engine (e.g., via command-line flags or hardcoded defaults for this first iteration)?",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "On SIGINT, the program must print exactly one line: 'Completed N focus sessions\\n' (where N is the count of fully finished focus sessions) and exit with status 0. Crucially, the output must be 'clean'—it must not contain any carriage returns (\\r), ANSI escape sequences (\\u001b[K), or any fragments of the interrupted timer line (e.g., 'Session 2: 12:34').",
-          "The program must print exactly one line: 'Completed N focus sessions\\n', where N is the count of fully completed focus sessions. The program must exit with status 0, without a stack trace, and must not emit any partial timer output, carriage returns, or ANSI escape sequences (such as \\r or \\u001b[K) from the interrupted session or break.",
-          "The program must print exactly one line: 'Completed N focus sessions\\n', where N is the count of fully finished focus sessions, and exit with status 0. This output must be clean: no carriage returns, no ANSI escape sequences, and no partial timer text from the interrupted session."
+          "The `Timer` struct will be decoupled from input methods, accepting `time.Duration` parameters via its constructor. `main.go` will use the standard `flag` package to provide command-line overrides for hardcoded defaults (25m focus, 5m short, 15m long), ensuring a 'zero-config' experience while allowing customization without a config file.",
+          "We will use the standard library `flag` package in `main.go` to allow customization via command-line flags. The `Timer` struct itself will remain decoupled, receiving these durations as configuration during initialization to ensure the engine logic is easily testable with any duration.",
+          "We should use the Go standard library `flag` package to provide durations via command-line flags, using hardcoded defaults (25m focus, 5m short, 15m long). This adheres to the 'no external dependencies' constraint while providing the necessary flexibility for the user."
+        ]
+      },
+      {
+        "text": "What happens if a duration is zero or negative? The 24-hour constraint is an upper bound, but is there a lower bound (e.g., minimum 1 second)? Should the program reject non-positive durations at startup, or allow them and immediately transition?",
+        "state": "resolved",
+        "score": 1,
+        "answers": [
+          "The program should enforce a minimum duration of 1 second and reject non-positive durations at startup with a descriptive error to stderr. This follows the fail-fast principle established for the 24-hour upper bound and prevents the state machine from entering an unstable 'rapid-fire' transition loop.",
+          "We should enforce a minimum duration of 1 second. Any duration \u003c= 0 should be rejected at startup with a descriptive error message, consistent with how we handle the 24-hour upper bound. This prevents edge cases in the timer loop and follows the fail-fast principle.",
+          "The program should reject non-positive durations (zero or negative) at startup with a descriptive error message to stderr, matching the 24-hour upper bound validation logic. We will enforce a minimum duration of 1 second to ensure the timer loop and state transitions remain predictable and meaningful."
+        ]
+      },
+      {
+        "text": "When SIGINT arrives, is the '\\r\\x1b[K' prefix before 'Completed N focus sessions\\n' guaranteed, or is it acceptable to simply print 'Completed N focus sessions\\n' and let the ANSI erase sequence from the last timer update leave a remnant? The contract says 'clear the current in-place status line' but the exact byte sequence for the final line should be pinned.",
+        "state": "resolved",
+        "score": 1,
+        "answers": [
+          "The '\\r\\x1b[K' prefix is required. The contract and existing examples (specifically Examples 9, 10, and 11) explicitly mandate clearing the current in-place line to prevent remnants of a longer previous status line from remaining. The sequence should be pinned to '\\r\\x1b[K' followed by the completion message.",
+          "The '\\r\\x1b[K' prefix is required. To satisfy the requirement to 'clear the current in-place status line' and prevent remnants from longer previous lines (e.g., 'Session 1: 25:00') being visible, the carriage return and ANSI erase sequence must be used. The contract examples already explicitly pin this sequence for the SIGINT scenario.",
+          "The '\\r\\x1b[K' prefix is required. The contract explicitly mandates that the program must 'clear the current in-place status line'. Relying on the terminal state left by the previous update is too fragile; we must explicitly emit the carriage return and ANSI erase sequence to guarantee a clean line and to enable deterministic verification in our `bytes.Buffer` test suite."
         ]
       }
     ],
-    "size": 3,
+    "size": 2,
     "split_into": null,
     "layer_plan": [
       {
@@ -225,7 +223,9 @@
           17,
           18,
           19,
-          20
+          20,
+          21,
+          22
         ],
         "test_level": "functional"
       }
@@ -252,53 +252,8 @@
         "state": "not-applicable"
       }
     ],
-    "verdict": "not-ready",
-    "disagreements": [
-      {
-        "item": "Handling of timer interruption during a long break",
-        "roles": [
-          "product",
-          "qa"
-        ],
-        "positions": [
-          "The program should print the completed count of focus sessions and exit without a stack trace.",
-          "The program should print the completed count of focus sessions and exit without a stack trace."
-        ]
-      },
-      {
-        "item": "Handling of timer interruption during a long break",
-        "roles": [
-          "product",
-          "qa"
-        ],
-        "positions": [
-          "The program should print the completed count of focus sessions and exit without a stack trace.",
-          "The program should print the completed count of focus sessions and exit without a stack trace."
-        ]
-      },
-      {
-        "item": "Handling of timer interruption during a long break",
-        "roles": [
-          "product",
-          "qa"
-        ],
-        "positions": [
-          "The program should print the completed count of focus sessions and exit without a stack trace.",
-          "The program should print 'Completed 4 focus sessions\\n' (or the correct count) with exit code 0, no partial output, no carriage returns, no ANSI codes — this is a hard test assertion, not just 'no stack trace'."
-        ]
-      },
-      {
-        "item": "SIGINT output requirements",
-        "roles": [
-          "product",
-          "qa"
-        ],
-        "positions": [
-          "The program must print the completed count of focus sessions.",
-          "The program must print the exact string 'Completed N focus sessions\\n' with no carriage returns or ANSI codes."
-        ]
-      }
-    ],
+    "verdict": "ready",
+    "disagreements": null,
     "deliverable": true,
     "ready_roles": [
       "product",
@@ -306,7 +261,7 @@
       "architect"
     ]
   },
-  "meeting_id": "20261011-172215-6ab33e",
+  "meeting_id": "20261011-175234-ca2b46",
   "story_file": "C0004-core-timer-engine.md",
-  "verdict": "not-ready"
+  "verdict": "ready"
 }

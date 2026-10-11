@@ -2,7 +2,7 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "amigos",
+  "stage": "ready",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
@@ -13,7 +13,7 @@
     "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T17:52:34Z",
+  "updated": "2026-10-11T18:06:36Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -104,6 +104,17 @@
       "done": "Retry requested.",
       "why": "A human cleared the block.",
       "next": "The next tick re-runs amigos."
+    },
+    {
+      "ts": "2026-10-11T18:06:36Z",
+      "by": "bot-amigos",
+      "stage": "amigos → ready",
+      "done": "Amigos: ready. Product, qa and architect agree on the Story Contract.",
+      "artifacts": [
+        "docs/pipeline/stories/C0004-core-timer-engine.contract.json"
+      ],
+      "why": "Verdict ready from meeting 20261011-175234-ca2b46; ready: product, qa, architect; 8 rules, 22 examples; layers: 1 Core Timer Engine [functional] examples [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22]; no flag.",
+      "next": "Stage 8: architect writes the story plan, qa writes failing tests, coder makes them pass, one stack layer at a time."
     }
   ]
 }
