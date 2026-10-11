@@ -1,0 +1,242 @@
+{
+ "goal": "Implement a lightweight terminal-based Pomodoro timer with a 4-session cycle, ANSI in-pass updates, and SIGINT handling.",
+ "architecture": "A core 'Timer' engine manages the state machine and countdown logic, decoupled from time (Clock interface) and output (io.Writer). A main entry point wires flags, signals, and the engine.",
+ "review_focus": [
+  "SIGINT handling during different states (S3, S6, S9)",
+  "The 4-session cycle transition logic (S1, S2, S16)",
+  "ANSI terminal output formatting (S5, S7, S8)",
+  "Input validation for durations > 24h (S4, S12, S13)",
+  "The 'Completed N' count accuracy (S2, S21, S22)"
+ ],
+ "boundaries": [
+  {
+   "boundary": "time",
+   "artifact": "clock.go (Clock interface)",
+   "fixtures": "none",
+   "fake": "fakeClock in clock_test.go",
+   "provider_check": "timer_test.go",
+   "owner": "T01"
+  },
+   {
+   "boundary": "terminal output",
+   "artifact": "io.Writer",
+   "fixtures": "none",
+   "fake": "bytes.Buffer in timer_test.go",
+   "provider_check": "timer_test.go",
+   "owner": "T02"
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T01",
+   "title": "Contract: shared types and clock seam",
+   "kind": "contract",
+   "packet": "code",
+   "depends_on": [],
+   "owns": [
+    "timer_types.go",
+    "clock_test.go"
+   ],
+   "produces": [
+    "type Clock interface",
+    "type Timer struct",
+    "var runTimerFn"
+   ],
+   "consumes": [],
+   "stack_layer": 1,
+   "test_level": "contract",
+   "files": [
+    {
+     "path": "timer_types.go",
+     "phase": "A",
+     "code": "package main\n\nimport (\n\t\"context\"\n\t\"io\"\n\t\"time\"\n)\n\n// main is provided for contract verification.\nfunc main() {}\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) <-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n}\n\n// runTimerFn is the seam for the main execution logic.\nvar runTimerFn = func(ctx context.Context, focus, short, long time.Duration) error {\n\treturn nil // stub\n}\n"
+    },
+    {
+     "path": "clock_test.go",
+     "phase": "A",
+     "code": "package main\n\nimport (\n\t\"time\"\n)\n\ntype FakeClock struct {\n\tnow time.Time\n}\n\nfunc (f *FakeClock) Now() time.Time { return f.now }\nfunc (f *FakeClock) After(d time.Duration) <-chan time.Time {\n\t// In a real fake, this would trigger after d\n\treturn make(<-chan time.Time)\n}\n"
+    }
+   ]
+  },
+  {
+   "id": "T02",
+   "title": "Implementation: Timer engine logic",
+   "kind": "impl",
+   "packet": "spec",
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "timer.go",
+    "timer_test.go"
+   ],
+   "produces": [
+    "func NewTimer(...)",
+    "func (t *Timer) Run(...)"
+   ],
+   "consumes": [
+    "Clock",
+    "TimerState"
+   ],
+   "stack_layer": 1,
+   "test_level": "unit",
+   "scenarios": [
+    {
+     "id": "S1",
+     "test": "TestTimer_S1_ShortBreakAfterFocus",
+     "check": "After 4 focus sessions, next transition is LongBreak"
+    },
+    {
+     "id": "S2",
+     "test": "TestTimer_S2_FullCycle",
+     "check": "Transition sequence: Focus -> ShortBreak -> Focus -> LongBreak"
+    },
+    {
+     "id": "S5",
+     "test": "TestTimer_S5_ANSIUpdates",
+     "check": "Timer writes 'Session 1: 25:00\\r\\x1b[K' to writer"
+    },
+    {
+     "id": "S7",
+     "test": "TestTimer_S7_StatusUpdate",
+     "check": "Writer receives correct countdown strings"
+    },
+    {
+     "id": "S8",
+     "test": "TestTimer_S8_LongBreakLabel",
+     "check": "Long break uses 'Long break: MM:SS' label"
+    },
+    {
+     "id": "S14",
+     "test": "TestTimer_S14_BoundaryOneMin",
+     "check": "Transitions correctly at exactly 1 minute"
+   },
+    {
+     "id": "S16",
+     "test": "TestTimer_S16_CycleRestart",
+     "check": "After long break, cycle resets to focus session 5"
+    },
+    {
+     "id": "S18",
+     "test": "TestTimer_S18_InitialOutput",
+     "check": "Starts with 'Session 1: 25:00\\r\\x1b[K'"
+    }
+   ],
+   "spec_excerpt": [
+    "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic"
+   ],
+   "notes": "Implement NewTimer and Run. Run must loop, check clock.After, and update state. Use the provided Clock and io.Writer. Use the ANSI sequence \\r\\x1b[K for updates."
+  },
+  {
+   "id": "T03",
+   "title": "Integration: CLI and Signal handling",
+   "kind": "integration",
+   "packet": "code",
+   "depends_on": [
+    "T01",
+    "T02"
+   ],
+   "owns": [
+    "main.go",
+    "main_test.go"
+   ],
+   "produces": [
+    "func main()"
+   ],
+   "consumes": [
+    "runTimerFn"
+   ],
+   "stack_layer": 1,
+   "scenarios": [
+    {
+     "id": "S3",
+     "test": "TestMain_S3_SIGINTDuringLongBreak",
+     "check": "SIGINT during long break prints 'Completed 4 focus sessions'"
+    },
+    {
+     "id": "S4",
+     "test": "TestMain_S4_DurationTooLong",
+     "check": "Fails if duration > 24h"
+    },
+    {
+     "id": "S6",
+     "test": "TestMain_S6_SIGINTDuringFocus",
+     "check": "SIGINT during focus session does not count that session"
+    },
+    {
+     "id": "S9",
+     "test": "TestMain_S9_SIGINTClearsLine",
+     "check": "SIGINT clears existing line with \\r\\x1b[K"
+    },
+    {
+     "id": "S10",
+     "test": "TestMain_S10_SIGINTDuringLongBreak",
+     "check": "SIGINT during long break counts completed sessions"
+    },
+    {
+     "id": "S11",
+     "test": "TestMain_S11_SIGINTImmediately",
+     "check": "SIGINT at start prints 'Completed 0 focus sessions'"
+    },
+    {
+     "id": "S12",
+     "test": "TestMain_S12_FlagValidation",
+     "check": "Flag --focus 25h prints error and exits 1"
+    },
+    {
+     "id": "S13",
+     "test": "TestMain_S13_MultipleViolations",
+     "check": "Reports error if multiple durations exceed 24h"
+    },
+    {
+     "id": "S15",
+     "test": "TestMain_S15_ZeroDuration",
+     "check": "Handles zero duration as configured"
+    },
+    {
+     "id": "S17",
+     "test": "TestMain_S17_SIGINTDuringFocus",
+     "check": "SIGINT during focus session counts completed sessions"
+    },
+    {
+     "id": "S19",
+     "test": "TestMain_S19_FlagValidation",
+     "check": "Flag --focus 25h prints error and exits 1"
+    },
+    {
+     "id": "S20",
+     "test": "TestMain_S20_SIGINTInSecondCycle",
+     "check": "SIGINT in focus session of second cycle counts all previous completions"
+    },
+    {
+     "id": "S21",
+     "test": "TestMain_S21_InterruptedFirstSession",
+     "check": "Interrupted first session results in 0 completed"
+    },
+    {
+     "id": "S22",
+     "test": "TestMain_S22_InterruptedBeforeEnd",
+     "check": "Interrupted session 4 one second before end does not count it"
+    }
+   ],
+   "spec_excerpt": [
+    "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n' ... and exit with status 0"
+   ],
+   "files": [
+    {
+     "path": "main.go",
+     "phase": "A",
+     "code": "package main\n\nimport (\n\t\"context\"\n\t\"flag\"\n\t\"fmt\"\n\t\"os\"\n\t\"os/signal\"\n\t\"syscall\"\n\t\"time\"\n)\n\nfunc main() {\n\tfocus := flag.Duration(\"focus\", 25*time.Minute, \"focus session duration\")\n\tshort := flag.Duration(\"short\", 5*time.Minute, \"short break duration\")\n\tlong := flag.Duration(\"long\", 15*time.Minute, \"long break duration\")\n\tflag.Parse()\n\n\tif *focus > 24*time.Hour || *short > 24*time.Hour || *long > 24*time.Hour {\n\t\tfmt.Fprintf(os.Stderr, \"error: duration exceeds 24h limit\\n\")\n\t\tos.Exit(1)\n\t}\n\n\tctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)\n\tdefer stop()\n\n\terr := runTimerFn(ctx, *focus, *short, *long)\n\tif err != nil && err != context.Canceled {\n\t\tfmt.Fprintf(os.Stderr, \"error: %v\\n\", err)\n\t\tos.Exit(1)\n\t}\n}\n"
+    }
+   ],
+   "notes": "Implement the main function: parse flags, validate (must be <= 24h and > 0), setup signal.NotifyContext, and call runTimerFn. The integration test should use a sub-process or a controlled environment to send SIGINT."
+  }
+ ],
+ "review_focus": [
+  "SIGINT handling during different states (S3, S6, S9)",
+  "The 4-session cycle transition logic (S1, S2, S16)",
+  "ANSI terminal output formatting (S5, S7, S8)",
+  "Input validation for durations > 24h (S4, S12, S13)",
+  "The 'Completed N' count accuracy (S2, S21, S22)"
+ ]
+}

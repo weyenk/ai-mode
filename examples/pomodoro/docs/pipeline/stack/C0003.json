@@ -1,0 +1,9 @@
+{
+  "plan": "C0003",
+  "base": "claude/pomodoro-timer-app-d722dd",
+  "base_sha": "b48fd306ad0aa7baaa6cdbc015a31012e40cde8f",
+  "slug": "simple-pomodoro-timer",
+  "worktree": "/Users/noahkruswicki/.local/state/ai-mode/pipeline/worktrees/C0003-ad3108da6276",
+  "module": "examples/pomodoro",
+  "layers": null
+}
