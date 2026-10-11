@@ -88,7 +88,7 @@ _ai-mode() {
       ;;
     pipeline)
       if (( CURRENT == 3 )); then
-        _values 'subcommand' 'new' 'status' 'board' 'show' 'tick' 'run' 'stage' 'retry' 'answer' 'launchd'
+        _values 'subcommand' 'new' 'status' 'board' 'show' 'tick' 'run' 'stage' 'retry' 'answer' 'note' 'launchd'
       elif [[ $words[CURRENT] == -* ]]; then
         _values 'option' '--repo' '--push' '--no-commit' '--max-ticks' '--type' '--context' '--body' '--interval' '--by'
       fi

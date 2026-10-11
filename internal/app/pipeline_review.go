@@ -285,6 +285,9 @@ func stageHandoff(pl *pipeline, c *card) (string, cardNote, error) {
 			stat, _ := gitIn(mod, "diff", "--stat", st.belowRef(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
 			body := pl.prBody(c, l, len(layers), &st, string(contract), stat)
 			title := fmt.Sprintf("%s: %s (%d/%d)", c.Title, l.Name, l.Layer, len(layers))
+			if l.Name == c.Title {
+				title = fmt.Sprintf("%s (%d/%d)", c.Title, l.Layer, len(layers))
+			}
 			url, err := gitHub(st.Worktree, "pr", "create", "--draft", "--base", st.below(l.N), "--head", l.Branch, "--title", title, "--body", body)
 			if err != nil {
 				return "", cardNote{}, fmt.Errorf("gh pr create for %s: %s", l.Branch, url)
@@ -297,7 +300,7 @@ func stageHandoff(pl *pipeline, c *card) (string, cardNote, error) {
 		}
 	}
 	c.setArtifact("prs", strings.Join(prs, " "))
-	noteText := pl.reviewNote(c, &st, prs)
+	noteText := pl.reviewNote(c, &st, prs, mod)
 	return "review", cardNote{By: "bot-chief", Done: fmt.Sprintf("Opened %d draft PR(s), one per layer: %s.", len(prs), strings.Join(prs, ", ")), Artifacts: prs,
 		Why: noteText, Next: "A human reviews bottom-up and merges bottom-up. Only a human merges."}, nil
 }
@@ -337,14 +340,35 @@ func (pl *pipeline) prBody(c *card, l *stackLayer, total int, st *stackState, co
 	return strings.TrimSpace(body) + fmt.Sprintf(prFooter, c.ID, l.N, len(st.Layers), st.below(l.N))
 }
 
-// reviewNote has chief write the hand-off note for the human; a failed call falls back to a fixed sentence.
-func (pl *pipeline) reviewNote(c *card, st *stackState, prs []string) string {
-	prompt := fmt.Sprintf(`Write a three-sentence note for the human who will review story %s ("%s"): what the PRs deliver,
-the order to review and merge them (bottom-up: %s), and anything they should check by hand (for example running the
-program). Plain text, no headings. Only a human merges.`, c.ID, c.Title, strings.Join(prs, ", "))
+// reviewNote has chief write the hand-off note for the human from facts only; a failed call falls back to the facts.
+// (Given only the PR links, chief invented time-zone support and PRs that did not exist.)
+func (pl *pipeline) reviewNote(c *card, st *stackState, prs []string, mod string) string {
+	var facts []string
+	for _, l := range pl.storyLayers(st, c.ID) {
+		facts = append(facts, fmt.Sprintf("layer %d %q on branch %s, PR %s, tasks %s", l.N, l.Name, l.Branch, firstNonEmpty(l.PR, "-"), strings.Join(l.Tasks, ", ")))
+	}
+	if b, err := os.ReadFile(pl.abs(c.Artifacts["contract-md"])); err == nil {
+		k := string(b)
+		ids, _ := contractScenarios(k)
+		facts = append(facts, fmt.Sprintf("%d contract scenarios, each with a test written first", len(ids)))
+		if i := strings.Index(k, "## Amendments"); i >= 0 {
+			facts = append(facts, fmt.Sprintf("%d contract amendment(s) by architect (see the contract)", strings.Count(k[i:], "\n- ")))
+		}
+	}
+	if rel, empty := mainFile(mod); rel != "" && empty {
+		facts = append(facts, "the program's main is not wired yet ("+rel+"); running the binary does nothing until a later story wires it")
+	}
+	if len(prs) > 1 {
+		facts = append(facts, "review and merge bottom-up, in this order: "+strings.Join(prs, ", "))
+	}
+	prompt := fmt.Sprintf(`Write a note of at most three sentences for the human who will review story %s ("%s"). Use ONLY these facts;
+do not mention any feature, file, PR, command or number that is not in them:
+- %s
+Say what to review and in what order, and anything they should know before merging. Plain text. Only a human merges.`,
+		c.ID, c.Title, strings.Join(facts, "\n- "))
 	text, err := pl.ask("chief", prompt, 600)
 	if err != nil || strings.TrimSpace(text) == "" {
-		return "Review and merge the PRs bottom-up: " + strings.Join(prs, ", ") + "."
+		return strings.Join(facts, "; ") + "."
 	}
 	return strings.Join(strings.Fields(text), " ")
 }

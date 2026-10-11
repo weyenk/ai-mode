@@ -592,6 +592,7 @@ const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
   stage <card> [--push]  run one card's current stage now (what the per-stage skills call)
   run [--push] [--max-ticks N]   tick until nothing can advance
   retry <card>           move a needs-human card back to the stage it stopped at
+  note <card> <text> [--by WHO]     add a note to a card (a correction or a comment; the stage does not change)
   answer <card> <text> [--by WHO]   add the requester's answer to a story amigos paused on, and re-run amigos
   launchd [--interval S] print a LaunchAgent plist that runs tick (not installed)`
 
@@ -647,6 +648,20 @@ func cmdPipeline(args []string) int {
 		if err := pl.answer(pos[0], strings.Join(pos[1:], " "), *by); err != nil {
 			return fail("%v", err)
 		}
+		return 0
+	case "note":
+		if len(pos) < 2 {
+			return fail("usage: ai-mode pipeline note <card> <text> [--by WHO]")
+		}
+		c, err := pl.board.load(pos[0])
+		if err != nil {
+			return fail("%v", err)
+		}
+		pl.addNote(&c, cardNote{By: *by, Stage: c.Stage, Done: strings.Join(pos[1:], " "), Why: "Added by hand.", Next: "No change to the card's stage."})
+		if err := pl.board.save(c); err != nil {
+			return fail("%v", err)
+		}
+		pl.sync(fmt.Sprintf("pipeline: %s note", c.ID))
 		return 0
 	case "retry":
 		if len(pos) != 1 {
