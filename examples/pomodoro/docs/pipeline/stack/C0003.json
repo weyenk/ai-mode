@@ -13,7 +13,8 @@
       "layer": 1,
       "name": "Core Timer Engine",
       "tasks": [
-        "T01"
+        "T01",
+        "T02"
       ]
     }
   ]

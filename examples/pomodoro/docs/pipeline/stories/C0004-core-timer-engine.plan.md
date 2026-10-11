@@ -2,8 +2,8 @@
 
 > **For agentic workers:** execute wave by wave; qa writes tests, coder implements.
 
-**Goal:** Implement a lightweight terminal-based Pomodoro timer with session management and signal handling.
-**Architecture:** The engine (Timer.Run) manages state transitions and countdowns via a Clock interface; the CLI (main.go) handles configuration, validation, and SIGINT cleanup.
+**Goal:** Implement a lightweight, terminal-based Pomodoro timer with a 4-session cycle and SIGINT handling.
+**Architecture:** A modular approach using package-level function variables for the core loop, output formatting, signal handling, and flag validation, allowing for incremental implementation and testing of each component. The core types are defined in `timer_types.go`.
 **Tech Stack:** Go, standard library only
 **Spec:** docs/pipeline/stories/C0004-core-timer-engine.contract.md    **Story Contract:** docs/pipeline/stories/C0004-core-timer-engine.contract.json
 **Context:** tools
@@ -18,17 +18,16 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
 - Maximum session length must not exceed 24 hours to prevent resource exhaustion.
 
 ## Review Focus
-1. The 4-session cycle logic and long break trigger (S1, S2, S16)
-2. SIGINT signal handling and the 'Completed N' count (S3, S6, S9, S22)
-3. Duration validation for the 25h/24h upper bound and 1s lower bound (S4, S12, S13, S15)
-4. ANSI escape sequence formatting for in-place updates (S5, S7, S8)
-5. The requirement that interrupted sessions are not counted (S6, S21, S22)
+1. The transition logic for the 4-session cycle (S1, S2, S16)
+2. The ANSI escape sequence accuracy for in-place updates (S5, S7, S8, S14, S18)
+3. The SIGINT exit behavior and correct completion count (S3, S6, S9, S10, S11, S17, S20, S21, S22)
+4. Command-line argument validation for the 24-hour limit (S4, S12, S13, S15, S19)
 
 ## Boundaries
 | Boundary | Contract artifact | Fixtures | Fake | Provider check | Owner task |
 | --- | --- | --- | --- | --- | --- |
-| time | Clock interface | none | fakeClock with manual Advance() | timer_test.go | T01 |
-| terminal output | io.Writer | none | bytes.Buffer | timer_test.go | T02 |
+| time | Clock interface | none | fakeClock in timer_test.go | loop_test.go | T01 |
+| terminal output | io.Writer | none | bytes.Buffer in tests | output_test.go | T01 |
 
 ## Task graph
 
@@ -41,7 +40,7 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
  "tasks": [
   {
    "id": "T01",
-   "title": "Contract: shared types",
+   "title": "Contract: main.go entry point and seams",
    "kind": "contract",
    "packet": "code",
    "depends_on": [],
@@ -49,9 +48,7 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
     "main.go"
    ],
    "produces": [
-    "type Clock interface",
-    "type TimerState",
-    "type Timer"
+    "main function and function variable seams"
    ],
    "consumes": [],
    "covers": [],
@@ -61,34 +58,27 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
   },
   {
    "id": "T02",
-   "title": "Engine: Timer logic and transitions",
+   "title": "Impl: Timer Loop Logic",
    "kind": "impl",
    "packet": "spec",
    "depends_on": [
     "T01"
    ],
    "owns": [
-    "timer.go",
-    "timer_test.go"
+    "loop.go",
+    "loop_test.go"
    ],
    "produces": [
-    "Timer.Run implementation"
+    "func runLoopFn"
    ],
    "consumes": [
-    "Clock",
-    "TimerState",
     "Timer"
    ],
    "covers": [
     "S1",
     "S2",
-    "S5",
-    "S7",
-    "S8",
-    "S14",
-    "S15",
     "S16",
-    "S18"
+    "S14"
    ],
    "test_level": "unit",
    "stack_layer": 1,
@@ -96,41 +86,111 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
   },
   {
    "id": "T03",
-   "title": "Integration: CLI and Signal Handling",
-   "kind": "integration",
+   "title": "Impl: Terminal Output Formatting",
+   "kind": "impl",
    "packet": "spec",
    "depends_on": [
-    "T01",
-    "T02"
+    "T01"
    ],
    "owns": [
-    "main.go",
-    "main_test.go"
+    "output.go",
+    "output_test.go"
    ],
    "produces": [
-    "main() function",
-    "flag parsing and validation"
+    "func updateOutputFn"
+   ],
+   "consumes": [],
+   "covers": [
+    "S5",
+    "S7",
+    "S8",
+    "S18"
+   ],
+   "test_level": "unit",
+   "stack_layer": 1,
+   "branch": ""
+  },
+  {
+   "id": "T04",
+   "title": "Impl: SIGINT - Interrupted Session",
+   "kind": "impl",
+   "packet": "spec",
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "interrupt.go",
+    "interrupt_test.go"
+   ],
+   "produces": [
+    "func handleSIGINTFn"
    ],
    "consumes": [
-    "Timer",
-    "Clock"
+    "Timer"
    ],
    "covers": [
-    "S3",
-    "S4",
     "S6",
-    "S9",
-    "S10",
-    "S11",
-    "S12",
-    "S13",
-    "S17",
-    "S19",
-    "S20",
     "S21",
     "S22"
    ],
-   "test_level": "functional",
+   "test_level": "unit",
+   "stack_layer": 1,
+   "branch": ""
+  },
+  {
+   "id": "T05",
+   "title": "Impl: SIGINT - Completion Message",
+   "kind": "impl",
+   "packet": "spec",
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "completion.go",
+    "completion_test.go"
+   ],
+   "produces": [
+    "func handleSIGINTFn"
+   ],
+   "consumes": [
+    "Timer"
+   ],
+   "covers": [
+    "S3",
+    "S9",
+    "S10",
+    "S11",
+    "S17",
+    "S20"
+   ],
+   "test_level": "unit",
+   "stack_layer": 1,
+   "branch": ""
+  },
+  {
+   "id": "T06",
+   "title": "Impl: CLI and Flags",
+   "kind": "impl",
+   "packet": "spec",
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "flags.go",
+    "flags_test.go"
+   ],
+   "produces": [
+    "func validateFlagsFn"
+   ],
+   "consumes": [],
+   "covers": [
+    "S4",
+    "S12",
+    "S13",
+    "S15",
+    "S19"
+   ],
+   "test_level": "unit",
    "stack_layer": 1,
    "branch": ""
   }
@@ -142,32 +202,32 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
 
 | Scenario | Rule | Task | Test |
 | --- | --- | --- | --- |
-| S1 | R1 | T02 | `TestTimer_S1_ShortBreakAfterFourth` |
-| S2 | R1 | T02 | `TestTimer_S2_FullCycle` |
-| S3 | R1 | T03 | `TestMain_S3_SIGINTInLongBreak` |
-| S4 | R1 | T03 | `TestMain_S4_DurationLimitExceeded` |
-| S5 | R1 | T02 | `TestTimer_S5_OutputFormat` |
-| S6 | R1 | T03 | `TestMain_S6_SIGINTInFocus` |
-| S7 | R2 | T02 | `TestTimer_S7_BreakTransitionOutput` |
-| S8 | R2 | T02 | `TestTimer_S8_LongBreakLabel` |
-| S9 | R3 | T03 | `TestMain_S9_SIGINTClearLine` |
-| S10 | R3 | T03 | `TestMain_S10_SIGINTInLongBreakAfterFour` |
-| S11 | R3 | T03 | `TestMain_S11_SIGINTImmediately` |
-| S12 | R4 | T03 | `TestMain_S12_FlagError` |
-| S13 | R4 | T03 | `TestMain_S13_MultipleFlagErrors` |
-| S14 | R2 | T02 | `TestTimer_S14_BoundaryOneMinute` |
-| S15 | R2 | T02 | `TestTimer_S15_ZeroDuration` |
-| S16 | R5 | T02 | `TestTimer_S16_CycleRestart` |
-| S17 | R6 | T03 | `TestMain_S17_SIGINTFocusInterrupted` |
-| S18 | R2 | T02 | `TestTimer_S18_InitialOutput` |
-| S19 | R7 | T03 | `TestMain_S19_FlagLimit` |
-| S20 | R8 | T03 | `TestMain_S20_SIGINTCycleRestart` |
-| S21 | R8 | T03 | `TestMain_S21_SIGINTStart` |
-| S22 | R8 | T03 | `TestMain_S22_SIGINTEndBoundary` |
+| S1 | R1 | T02 | `TestLoop_S1_ShortBreakAfterFocus` |
+| S2 | R1 | T02 | `TestLoop_S2_FullCycle` |
+| S3 | R1 | T05 | `TestCompletion_S3_LongBreak` |
+| S4 | R1 | T06 | `TestFlags_S4_TooLong` |
+| S5 | R1 | T03 | `TestOutput_S5_Formatting` |
+| S6 | R1 | T04 | `TestInterrupt_S6_FocusInterrupted` |
+| S7 | R2 | T03 | `TestOutput_S7_ShortBreak` |
+| S8 | R2 | T03 | `TestOutput_S8_LongBreak` |
+| S9 | R3 | T05 | `TestCompletion_S9_ClearLine` |
+| S10 | R3 | T05 | `TestCompletion_S10_AfterSession4` |
+| S11 | R3 | T05 | `TestCompletion_S11_Start` |
+| S12 | R4 | T06 | `TestFlags_S12_ErrorMsg` |
+| S13 | R4 | T06 | `TestFlags_S13_MultipleErrors` |
+| S14 | R2 | T02 | `TestLoop_S14_Boundary` |
+| S15 | R2 | T06 | `TestFlags_S15_NonPositive` |
+| S16 | R5 | T02 | `TestLoop_S16_CycleRestart` |
+| S17 | R6 | T05 | `TestCompletion_S17_FocusInterrupted` |
+| S18 | R2 | T03 | `TestOutput_S18_Initial` |
+| S19 | R7 | T06 | `TestFlags_S19_DuplicateCheck` |
+| S20 | R8 | T05 | `TestCompletion_S20_Session5Start` |
+| S21 | R8 | T04 | `TestInterrupt_S21_StartInterrupted` |
+| S22 | R8 | T04 | `TestInterrupt_S22_EndOfSessionInterrupted` |
 
 ## Task packets
 
-### T01: Contract: shared types
+### T01: Contract: main.go entry point and seams
 
 **Kind / packet / stack layer / test level / depends on:** contract / code / 1 / contract / none
 **Owns (exclusive):** `main.go`
@@ -176,7 +236,7 @@ _Rendered by `ai-mode plan render` from the plan JSON next to this file; change 
 
 **Interfaces**
 - Consumes: nothing
-- Produces: type Clock interface; type TimerState; type Timer
+- Produces: main function and function variable seams
 
 **Phase A: the contract code.**
 
@@ -185,99 +245,124 @@ package main
 
 import (
 	"context"
-	"io"
 	"time"
 )
 
-// main is provided for contract verification.
-func main() {}
+// Seams for modular testing
+var runLoopFn = func(ctx context.Context, t *Timer) error { return nil }
+var updateOutputFn = func(t *Timer, out interface{}) error { return nil }
+var handleSIGINTFn = func(ctx context.Context, t *Timer) error { return nil }
+var validateFlagsFn = func(durations map[string]time.Duration) error { return nil }
 
-// Clock defines the interface for time-related operations to allow for testing.
-type Clock interface {
-	Now() time.Time
-	After(d time.Duration) <-chan time.Time
-}
-
-// TimerState represents the current phase of the Pomodoro timer.
-type TimerState int
-
-const (
-	Focus TimerState = iota
-	ShortBreak
-	LongBreak
-)
-
-// Timer manages the Pomodoro countdown and session transitions.
-type Timer struct {
-	focusDuration  time.Duration
-	shortDuration  time.Duration
-	longDuration   time.Duration
-	clock          Clock
-	out            io.Writer
-	completedFocus int
-	currentSession int // Session number within the 4-session cycle (1-4)
-}
-
-// Run starts the timer loop and handles transitions.
-func (t *Timer) Run(ctx context.Context) error {
-	return nil
-}
+// main is provided for contract verification in timer_types.go.
+// We leave it empty here to avoid redeclaration errors if timer_types.go also defines it.
 ```
 
 Run: `go vet ./...`
 
-### T02: Engine: Timer logic and transitions
+### T02: Impl: Timer Loop Logic
 
 **Kind / packet / stack layer / test level / depends on:** impl / spec / 1 / unit / T01
-**Owns (exclusive):** `timer.go`, `timer_test.go`
-**Covers:** S1, S2, S5, S7, S8, S14, S15, S16, S18
-**Spec excerpt:** "R1 The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic"
+**Owns (exclusive):** `loop.go`, `loop_test.go`
+**Covers:** S1, S2, S16, S14
+**Spec excerpt:** "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic"
 
 **Interfaces**
-- Consumes: Clock; TimerState; Timer
-- Produces: Timer.Run implementation
+- Consumes: Timer
+- Produces: func runLoopFn
 
-Implementation of Run() must use a Ticker or Clock.After. It must track elapsed time and update the Writer every second. It must increment completedFocus only when a focus session finishes.
+Implement the loop that calls updateOutputFn and handles duration ticks.
 
 **Scenarios (write these tests first):**
-- S1 `TestTimer_S1_ShortBreakAfterFourth`: Given 4 completed focus sessions, the next transition from Focus to Break is a LongBreak
-- S2 `TestTimer_S2_FullCycle`: Verifies the complete sequence of Focus -> ShortBreak -> Focus -> LongBreak
-- S5 `TestTimer_S5_OutputFormat`: Ensures output uses \r\x1b[K and correct labels like 'Session 1: 25:00'
-- S7 `TestTimer_S7_BreakTransitionOutput`: Verifies output switches from 'Session X' to 'Break: MM:SS'
-- S8 `TestTimer_S8_LongBreakLabel`: Verifies LongBreak uses 'Long break: MM:SS' label
-- S14 `TestTimer_S14_BoundaryOneMinute`: Timer works correctly with 1-minute durations without skipping 00:00
-- S15 `TestTimer_S15_ZeroDuration`: Ensure 0 or negative durations are handled (per R15/R15 ambiguity)
-- S16 `TestTimer_S16_CycleRestart`: After a long break, the next session is Focus Session 5 (resetting cycle count)
-- S18 `TestTimer_S18_InitialOutput`: Immediately displays correct session and duration
+- S1 `TestLoop_S1_ShortBreakAfterFocus`: Transition to ShortBreak after 1 focus session
+- S2 `TestLoop_S2_FullCycle`: Transition to LongBreak after 4 focus sessions
+- S16 `TestLoop_S16_CycleRestart`: Cycle restarts after LongBreak
+- S14 `TestLoop_S14_Boundary`: Transitions exactly at duration limit
 
-Run: `go test ./... -count=1 -run '^(TestTimer_S1_ShortBreakAfterFourth|TestTimer_S2_FullCycle|TestTimer_S5_OutputFormat|TestTimer_S7_BreakTransitionOutput|TestTimer_S8_LongBreakLabel|TestTimer_S14_BoundaryOneMinute|TestTimer_S15_ZeroDuration|TestTimer_S16_CycleRestart|TestTimer_S18_InitialOutput)$'`
+Run: `go test ./... -count=1 -run '^(TestLoop_S1_ShortBreakAfterFocus|TestLoop_S2_FullCycle|TestLoop_S16_CycleRestart|TestLoop_S14_Boundary)$'`
 
-### T03: Integration: CLI and Signal Handling
+### T03: Impl: Terminal Output Formatting
 
-**Kind / packet / stack layer / test level / depends on:** integration / spec / 1 / functional / T01, T02
-**Owns (exclusive):** `main.go`, `main_test.go`
-**Covers:** S3, S4, S6, S9, S10, S11, S12, S13, S17, S19, S20, S21, S22
-**Spec excerpt:** "R3 On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\n'..."
+**Kind / packet / stack layer / test level / depends on:** impl / spec / 1 / unit / T01
+**Owns (exclusive):** `output.go`, `output_test.go`
+**Covers:** S5, S7, S8, S18
+**Spec excerpt:** "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line"
 
 **Interfaces**
-- Consumes: Timer; Clock
-- Produces: main() function; flag parsing and validation
+- Consumes: nothing
+- Produces: func updateOutputFn
 
-Main must use signal.NotifyContext to catch SIGINT. It must parse flags, validate durations (1s <= d <= 24h), instantiate Timer, and call Run. On context cancellation, it must print the final message using \r\x1b[K.
+Implement the logic that uses io.Writer to print the current state.
 
 **Scenarios (write these tests first):**
-- S3 `TestMain_S3_SIGINTInLongBreak`: SIGINT during long break prints 'Completed 4 focus sessions' and exits 0
-- S4 `TestMain_S4_DurationLimitExceeded`: Configuring 25h duration fails startup with error
-- S6 `TestMain_S6_SIGINTInFocus`: SIGINT during focus session does NOT count the interrupted session
-- S9 `TestMain_S9_SIGINTClearLine`: SIGINT prints \r\x1b[K to clear remnants before printing completion message
-- S10 `TestMain_S10_SIGINTInLongBreakAfterFour`: SIGINT during long break after 4 sessions shows 'Completed 4 focus sessions'
-- S11 `TestMain_S11_SIGINTImmediately`: SIGINT at startup shows 'Completed 0 focus sessions'
-- S12 `TestMain_S12_FlagError`: Passing --focus 25h prints error to stderr and exits 1
-- S13 `TestMain_S13_MultipleFlagErrors`: Reporting multiple duration violations
-- S17 `TestMain_S17_SIGINTFocusInterrupted`: SIGINT during focus session 3 shows 'Completed 2 sessions'
-- S19 `TestMain_S19_FlagLimit`: Direct check of flag parsing for 25h error
-- S20 `TestMain_S20_SIGINTCycleRestart`: SIGINT during session 5 counts previous cycle's 4 sessions
-- S21 `TestMain_S21_SIGINTStart`: SIGINT at t=1s counts 0 completed sessions
-- S22 `TestMain_S22_SIGINTEndBoundary`: SIGINT 1s before end of session does not count it
+- S5 `TestOutput_S5_Formatting`: Prints 'Session 1: 25:00\r\x1b[K'
+- S7 `TestOutput_S7_ShortBreak`: Transition to ShortBreak shows 'Break: 05:00\r\x1b[K'
+- S8 `TestOutput_S8_LongBreak`: Long break shows 'Long break: 15:00\r\x1b[K'
+- S18 `TestOutput_S18_Initial`: Initial output at t=0 is correct
 
-Run: `go test ./... -count=1 -run '^(TestMain_S3_SIGINTInLongBreak|TestMain_S4_DurationLimitExceeded|TestMain_S6_SIGINTInFocus|TestMain_S9_SIGINTClearLine|TestMain_S10_SIGINTInLongBreakAfterFour|TestMain_S11_SIGINTImmediately|TestMain_S12_FlagError|TestMain_S13_MultipleFlagErrors|TestMain_S17_SIGINTFocusInterrupted|TestMain_S19_FlagLimit|TestMain_S20_SIGINTCycleRestart|TestMain_S21_SIGINTStart|TestMain_S22_SIGINTEndBoundary)$'`
+Run: `go test ./... -count=1 -run '^(TestOutput_S5_Formatting|TestOutput_S7_ShortBreak|TestOutput_S8_LongBreak|TestOutput_S18_Initial)$'`
+
+### T04: Impl: SIGINT - Interrupted Session
+
+**Kind / packet / stack layer / test level / depends on:** impl / spec / 1 / unit / T01
+**Owns (exclusive):** `interrupt.go`, `interrupt_test.go`
+**Covers:** S6, S21, S22
+**Spec excerpt:** "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\n'"
+
+**Interfaces**
+- Consumes: Timer
+- Produces: func handleSIGINTFn
+
+Implement the logic for handling interruption during a session.
+
+**Scenarios (write these tests first):**
+- S6 `TestInterrupt_S6_FocusInterrupted`: Focus session interrupted doesn'int count
+- S21 `TestInterrupt_S21_StartInterrupted`: Session 1 interrupted at t=1s doesn't count
+- S22 `TestInterrupt_S22_EndOfSessionInterrupted`: Session 4 interrupted 1s before end doesn't count
+
+Run: `go test ./... -count=1 -run '^(TestInterrupt_S6_FocusInterrupted|TestInterrupt_S21_StartInterrupted|TestInterrupt_S22_EndOfSessionInterrupted)$'`
+
+### T05: Impl: SIGINT - Completion Message
+
+**Kind / packet / stack layer / test level / depends on:** impl / spec / 1 / unit / T01
+**Owns (exclusive):** `completion.go`, `completion_test.go`
+**Covers:** S3, S9, S10, S11, S17, S20
+**Spec excerpt:** "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\n'"
+
+**Interfaces**
+- Consumes: Timer
+- Produces: func handleSIGINTFn
+
+Implement the logic for printing the final message.
+
+**Scenarios (write these tests first):**
+- S3 `TestCompletion_S3_LongBreak`: Prints correct count when LongBreak interrupted
+- S9 `TestCompletion_S9_ClearLine`: Clears line before printing message
+- S10 `TestCompletion_S10_AfterSession4`: Prints correct count after session 4 completed
+- S11 `TestCompletion_S11_Start`: Prints correct count at start
+- S17 `TestCompletion_S17_FocusInterrupted`: Prints correct count after focus interrupted
+- S20 `TestCompletion_S20_Session5Start`: Prints correct count at session 5 start
+
+Run: `go test ./... -count=1 -run '^(TestCompletion_S3_LongBreak|TestCompletion_S9_ClearLine|TestCompletion_S10_AfterSession4|TestCompletion_S11_Start|TestCompletion_S17_FocusInterrupted|TestCompletion_S20_Session5Start)$'`
+
+### T06: Impl: CLI and Flags
+
+**Kind / packet / stack layer / test level / depends on:** impl / spec / 1 / unit / T01
+**Owns (exclusive):** `flags.go`, `flags_test.go`
+**Covers:** S4, S12, S13, S15, S19
+**Spec excerpt:** "The program must validate that each configured duration... does not exceed 24 hours at startup"
+
+**Interfaces**
+- Consumes: nothing
+- Produces: func validateFlagsFn
+
+Implement the flag validation logic.
+
+**Scenarios (write these tests first):**
+- S4 `TestFlags_S4_TooLong`: Reject 25h duration
+- S12 `TestFlags_S12_ErrorMsg`: Prints error to stderr
+- S13 `TestFlags_S13_MultipleErrors`: Prints multiple errors
+- S15 `TestFlags_S15_NonPositive`: Handles non-positive durations
+- S19 `TestFlags_S19_DuplicateCheck`: Prints error for 2rad 25h duration
+
+Run: `go test ./... -count=1 -run '^(TestFlags_S4_TooLong|TestFlags_S12_ErrorMsg|TestFlags_S13_MultipleErrors|TestFlags_S15_NonPositive|TestFlags_S19_DuplicateCheck)$'`
