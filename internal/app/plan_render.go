@@ -258,6 +258,9 @@ func scenarioNum(id string) int {
 
 var reTestName = regexp.MustCompile(`^Test[A-Za-z0-9_]+$`)
 
+// maxScenariosPerTask keeps a task small enough for one qa or coder turn to hold in mind.
+const maxScenariosPerTask = 6
+
 // storyPlanChecks are the pipeline's rules on top of plan lint: qa's tests and coder's code for a scenario live in one
 // task, every Story Contract scenario is covered, and names and paths are usable.
 func storyPlanChecks(pj *storyPlanJSON, contractMD string) []string {
@@ -297,6 +300,9 @@ func storyPlanChecks(pj *storyPlanJSON, contractMD string) []string {
 			if len(goCode) == 0 {
 				out = append(out, fmt.Sprintf("%s covers scenarios but owns no non-test .go file (qa writes the stubs and coder the code in the same task)", t.ID))
 			}
+		}
+		if n := len(t.Scenarios); n > maxScenariosPerTask {
+			out = append(out, fmt.Sprintf("%s covers %d scenarios; at most %d per task (split it: qa and coder slow down sharply on big tasks)", t.ID, n, maxScenariosPerTask))
 		}
 		for _, s := range t.Scenarios {
 			covered[s.ID] = true

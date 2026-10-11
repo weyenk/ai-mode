@@ -342,6 +342,8 @@ const storyPlanAdaptations = `How the pipeline uses your plan:
   Everything else is packet "spec": no files; notes say exactly what to build and scenarios say exactly what to assert.
 - stack_layer is the Story Contract's layer number ("## Layer plan"); test_level comes from that layer.
 - Keep it small: at most one contract task (only if two tasks share types), then one task per new source file.
+- At most 6 scenarios per task: qa and coder think for a long time over a big task (one 14-scenario task cost a
+  19-minute qa turn), so split a large behaviour into tasks of a few scenarios each, each with its own test file.
 - spec_excerpt: exact phrases copied from the contract file (rules or scenarios), or [] when none fits.
 
 JSON shape (an example; fields not listed here are rejected):
@@ -399,9 +401,16 @@ func storyPlanCheck(mod, jsonRel, specRel string, done map[string]string) []stri
 	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err != nil {
 		return []string{"the plan file " + jsonRel + " does not exist yet; write it with write_file"}
 	}
-	mdPath, findings, err := renderStoryPlanFile(filepath.Join(mod, jsonRel), specRel, mod)
+	mdPath, all, err := renderStoryPlanFile(filepath.Join(mod, jsonRel), specRel, mod)
 	if err != nil {
 		return []string{err.Error()}
+	}
+	var findings []string
+	for _, f := range all {
+		if id := strings.Fields(f + " ")[0]; done[id] != "" && strings.Contains(f, "scenarios; at most") {
+			continue // the task is already committed: its size is history, not a planning error
+		}
+		findings = append(findings, f)
 	}
 	if len(findings) > 0 {
 		return findings
