@@ -17,12 +17,13 @@ _empty_
 | C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
 | C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
 | C0003 | plan | tracking | C0002 | Pomodoro CLI — feature plan | planning → tracking (bot-architect): Cut 2 stories (C0004, C0005), in stack order. |
-| C0004 | story | handoff | C0003 | Core Timer Engine | architect-review → handoff (bot-architect): Architect approved all 1 layer(s); 0 fix round(s). |
 | C0005 | story | ready | C0003 | CLI Configuration & Validation | amigos → ready (bot-amigos): Amigos: ready. Product, qa and architect agree on the Story Contract. |
 
 ## review
 
-_empty_
+| Card | Type | Stage | Parent | Title | Latest note |
+| --- | --- | --- | --- | --- | --- |
+| C0004 | story | review | C0003 | Core Timer Engine | handoff → review (bot-chief): Opened 1 draft PR(s), one per layer: https://github.com/weyenk/ai-mode/pull/19. |
 
 ## done
 
