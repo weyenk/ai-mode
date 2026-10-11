@@ -231,6 +231,7 @@ type pipeline struct {
 	ask      func(role, user string, maxTokens int) (string, error)   // one consult; tests replace it
 	newAgent func(spec agentSpec) (*agentSession, error)              // an agent-mode role; tests replace it
 	amigos   func(dir, story string, rounds int) (int, string, error) // `ai-mode amigos --story`; tests replace it
+	effort   map[string]string                                        // per-role reasoning_effort for agent turns
 	log      io.Writer
 	git      bool // commit artifacts after each tick
 	push     bool // push the pipeline branch after each commit
@@ -503,6 +504,14 @@ func newPipeline(repo string, git, push bool) (*pipeline, error) {
 		return text, nil
 	}
 	pl.newAgent = func(s agentSpec) (*agentSession, error) { return newRoleAgent(pl.profile, s, pl.trace, "pipeline") }
+	// qa and coder (Qwen3.8) think at ~24 tok/s; on the first run a few 16-20k-token deliberations took most of the
+	// build time. In the tool loop the compiler and tests give the feedback, so their agent turns think at low effort.
+	pl.effort = map[string]string{"qa": "low", "coder": "low"}
+	if e := os.Getenv("AI_MODE_AGENT_EFFORT"); e != "" {
+		for _, r := range []string{"qa", "coder"} {
+			pl.effort[r] = e
+		}
+	}
 	pl.amigos = amigosExec
 	return pl, nil
 }
@@ -530,7 +539,8 @@ func (pl *pipeline) runAgentIn(root, role, system, task string, owns, readOnly [
 
 // startAgent makes a session without running it, so a caller can drive it more than once (e.g. after a review).
 func (pl *pipeline) startAgent(root, role, system string, owns, readOnly []string, cmds [][]string, maxTurns int) (*agentSession, error) {
-	spec := agentSpec{Role: role, Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds, MaxTurns: maxTurns, MaxWall: 45 * time.Minute, Log: pl.log}
+	spec := agentSpec{Role: role, Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds, MaxTurns: maxTurns, MaxWall: 45 * time.Minute, Log: pl.log,
+		ReasoningEffort: pl.effort[role]}
 	if system != "" {
 		spec.System = system + agentRulesFor(owns, cmds)
 	}

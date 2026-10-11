@@ -39,10 +39,11 @@ type agentMsg struct {
 }
 
 type agentRequest struct {
-	Model     string
-	Messages  []agentMsg
-	Tools     []map[string]any
-	MaxTokens int
+	Model           string
+	Messages        []agentMsg
+	Tools           []map[string]any
+	MaxTokens       int
+	ReasoningEffort string // chat_template_kwargs.reasoning_effort for this request; "" keeps the preset's
 }
 
 type agentReply struct {
@@ -58,17 +59,20 @@ type chatClient interface {
 }
 
 type agentSpec struct {
-	Role       string
-	System     string     // full system prompt; "" uses the role's agent guide plus agentRules
-	Root       string     // every path is relative to it and must stay inside it
-	Owns       []string   // writable path patterns (file, dir/**, or a path.Match glob)
-	ReadOnly   []string   // patterns that stay read-only even when Owns matches (e.g. tests during green)
-	Commands   [][]string // allowlisted argv prefixes for the run tool
-	MaxTurns   int
-	MaxWall    time.Duration
-	MaxTokens  int
-	Transcript string    // JSONL file of every message; "" for none
-	Log        io.Writer // one progress line per tool call; nil for none
+	Role      string
+	System    string     // full system prompt; "" uses the role's agent guide plus agentRules
+	Root      string     // every path is relative to it and must stay inside it
+	Owns      []string   // writable path patterns (file, dir/**, or a path.Match glob)
+	ReadOnly  []string   // patterns that stay read-only even when Owns matches (e.g. tests during green)
+	Commands  [][]string // allowlisted argv prefixes for the run tool
+	MaxTurns  int
+	MaxWall   time.Duration
+	MaxTokens int
+	// ReasoningEffort is sent per request (low | medium | high); "" keeps the preset's. A per-request token budget is
+	// ignored by llama-server, but the effort level is honoured and is what keeps a thinking model's turns short.
+	ReasoningEffort string
+	Transcript      string    // JSONL file of every message; "" for none
+	Log             io.Writer // one progress line per tool call; nil for none
 }
 
 type agentResult struct {
@@ -190,7 +194,7 @@ func (a *agentSession) loop() (agentResult, error) {
 		if a.spec.MaxWall > 0 && time.Since(a.start) > a.spec.MaxWall {
 			return a.result("timeout", ""), nil
 		}
-		rep, err := a.chat.Complete(agentRequest{Model: a.spec.Role, Messages: a.msgs, Tools: agentToolDefs(), MaxTokens: maxTokens})
+		rep, err := a.chat.Complete(agentRequest{Model: a.spec.Role, Messages: a.msgs, Tools: agentToolDefs(), MaxTokens: maxTokens, ReasoningEffort: a.spec.ReasoningEffort})
 		a.turns++
 		turnsThisRun++
 		if err != nil {
@@ -683,6 +687,9 @@ type llamaChat struct {
 
 func (c llamaChat) Complete(req agentRequest) (agentReply, error) {
 	body := map[string]any{"model": req.Model, "messages": req.Messages, "tools": req.Tools, "max_tokens": req.MaxTokens}
+	if req.ReasoningEffort != "" {
+		body["chat_template_kwargs"] = map[string]any{"reasoning_effort": req.ReasoningEffort}
+	}
 	ev := Event{Kind: "agent", Trace: c.trace, Span: newSpanID(), Caller: c.caller, Profile: c.profile, Role: req.Model, MaxTokens: req.MaxTokens}
 	start := time.Now()
 	ev.TS = start.UTC()
@@ -745,6 +752,7 @@ func cmdAgent(args []string) int {
 	maxTurns := fs.Int("max-turns", 40, "Maximum model turns")
 	maxWall := fs.Duration("max-wall", 30*time.Minute, "Wall-clock budget")
 	maxTokens := fs.Int("max-tokens", 32768, "max_tokens per model turn (thinking roles need room)")
+	effort := fs.String("effort", "", "reasoning_effort per request: low | medium | high (default: the preset's)")
 	transcript := fs.String("transcript", "", "Write the conversation as JSONL here (default: <state>/agent/...)")
 	asJSON := fs.Bool("json", false, "Print the result as JSON")
 	profile := fs.String("profile", "", "Profile (default: active)")
@@ -782,7 +790,7 @@ func cmdAgent(args []string) int {
 	}
 	root, _ := filepath.Abs(*repo)
 	a, err := newRoleAgent(p, agentSpec{Role: pos[0], Root: root, Owns: owns, ReadOnly: readOnly, Commands: cmds,
-		MaxTurns: *maxTurns, MaxWall: *maxWall, MaxTokens: *maxTokens, Transcript: *transcript, Log: os.Stderr},
+		MaxTurns: *maxTurns, MaxWall: *maxWall, MaxTokens: *maxTokens, ReasoningEffort: *effort, Transcript: *transcript, Log: os.Stderr},
 		os.Getenv("AI_MODE_TRACE_ID"), firstNonEmpty(*callerF, os.Getenv("AI_MODE_CALLER"), "cli"))
 	if err != nil {
 		return fail("%v", err)

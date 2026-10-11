@@ -173,7 +173,7 @@ request, so it only looks like a toggle. Thinking is set per role in the preset 
   Don't pair a ~60 GiB architect (e.g. Laguna-S-2.1) with the other four: wired memory hit ~110 GiB and swap started.
 - Thinking models (architect's Gemma 4, coder's Qwen3.8) keep thinking **on** — do **not** set
   `enable_thinking=false` for them.
-  Cap runaway thinking with `reasoning-budget` (a valid preset key; architect 8192, coder 16384) instead.
+  Cap runaway thinking with `reasoning-budget` (a valid preset key; architect, coder and qa 8192) instead. The pipeline also sends `reasoning_effort: low` for qa and coder agent turns (`AI_MODE_AGENT_EFFORT` overrides; a per-request token budget is ignored by llama-server, the effort level is honoured).
 
 ## Model selection
 
