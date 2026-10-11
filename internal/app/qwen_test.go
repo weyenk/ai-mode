@@ -1,6 +1,10 @@
 package app
 
 import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -56,7 +60,7 @@ func TestSpliceQwenHook(t *testing.T) {
 	s := string(out)
 	if !strings.Contains(s, `"ai-mode hook session-start"`) || !strings.Contains(s, `"ai-mode hook prompt-expansion"`) ||
 		!strings.Contains(s, `"UserPromptExpansion"`) || !strings.Contains(s, `"echo hi"`) ||
-		!strings.Contains(s, `"PreToolUse"`) || !strings.Contains(s, `"chief"`) {
+		!strings.Contains(s, `"PreToolUse"`) || !strings.Contains(s, `"chief"`) || !strings.Contains(s, `"ai-mode hook pre-tool-use"`) {
 		t.Fatalf("install lost settings or missed the hook:\n%s", s)
 	}
 
@@ -82,5 +86,42 @@ func TestSpliceQwenHook(t *testing.T) {
 
 	if _, _, err := spliceQwenHook([]byte("{not json"), true); err == nil {
 		t.Fatal("invalid JSON should error")
+	}
+}
+
+func TestDenyChiefSkill(t *testing.T) {
+	dir := t.TempDir()
+	transcript := func(models ...string) string {
+		var b strings.Builder
+		b.WriteString(`{"type":"user","message":{}}` + "\n")
+		for _, m := range models {
+			fmt.Fprintf(&b, `{"type":"assistant","model":%q}`+"\n", m)
+		}
+		p := filepath.Join(dir, strings.Join(models, "-")+".jsonl")
+		if err := os.WriteFile(p, []byte(b.String()), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	call := func(tool, skill, path string) []byte {
+		b, _ := json.Marshal(map[string]any{"tool_name": tool, "tool_input": map[string]any{"skill": skill}, "transcript_path": path})
+		return b
+	}
+	for _, tc := range []struct {
+		name  string
+		input []byte
+		deny  bool
+	}{
+		{"chief calls drafting-plans", call("skill", "drafting-plans", transcript("chief")), true},
+		{"switched to architect", call("skill", "drafting-plans", transcript("chief", "architect")), false},
+		{"switched back to chief", call("skill", "drafting-plans", transcript("architect", "chief")), true},
+		{"no transcript counts as chief", call("skill", "drafting-plans", ""), true},
+		{"other skill", call("skill", "ai-mode-routing", transcript("chief")), false},
+		{"other tool", call("run_shell_command", "drafting-plans", transcript("chief")), false},
+		{"bad JSON", []byte("{"), false},
+	} {
+		if got := denyChiefSkill(tc.input); got != tc.deny {
+			t.Errorf("%s: deny = %v, want %v", tc.name, got, tc.deny)
+		}
 	}
 }
