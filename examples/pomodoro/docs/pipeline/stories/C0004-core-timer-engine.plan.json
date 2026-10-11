@@ -1,151 +1,313 @@
 {
- "goal": "Implement a lightweight, terminal-based Pomodoro timer with a 4-session cycle and SIGINT handling.",
- "architecture": "A modular approach using package-level function variables for the core loop, output formatting, signal handling, and flag validation, allowing for incremental implementation and testing of each component. The core types are defined in `timer_types.go`.",
+ "goal": "Implement the core Pomodoro timer engine with state transitions, in-place terminal updates, and SIGINT handling.",
+ "architecture": "The engine is centered around the `Timer` struct in `timer.go`, using `Clock` and `io.Writer` interfaces for testability. Transitions and updates are driven by a loop in `Timer.Run` that reacts to clock ticks and context cancellation.",
  "review_focus": [
-  "The transition logic for the 4-session cycle (S1, S2, S16)",
-  "The ANSI escape sequence accuracy for in-place updates (S5, S7, S8, S14, S18)",
-  "The SIGINT exit behavior and correct completion count (S3, S6, S9, S10, S11, S17, S20, S21, S22)",
-  "Command-line argument validation for the 24-hour limit (S4, S12, S13, S15, S19)"
+  "SIGINT handling precisely clearing the line (S9, S10, S11)",
+  "Correct session counting (interrupted sessions not counted) (S6, S22)",
+  "Correct transition logic for the 4-session cycle (S1, S2, S16)",
+  "ANSI escape sequence accuracy for in-place updates (S5, S7, S14)",
+  "Validation of durations at startup (S4, S12, S13, S19)"
  ],
  "boundaries": [
   {
    "boundary": "time",
-   "artifact": "Clock interface",
+   "artifact": "clock_test.go (testClock)",
    "fixtures": "none",
-   "fake": "fakeClock in timer_test.go",
-   "provider_check": "loop_test.go",
+   "fake": "testClock provides manual advancement of time",
+   "provider_check": "timer_test.go",
    "owner": "T01"
   },
   {
    "boundary": "terminal output",
-   "artifact": "io.Writer",
+   "artifact": "output.go (updateOutputFn)",
    "fixtures": "none",
-   "fake": "bytes.Buffer in tests",
+   "fake": "notifyWriter records all writes to a slice for assertion",
    "provider_check": "output_test.go",
-   "owner": "T01"
+   "owner": "T03"
+  },
+  {
+   "boundary": "process signals",
+   "artifact": "interrupt.go (handleSIGINTFn)",
+   "fixtures": "none",
+   "fake": "bytes.Buffer used to capture output in unit tests",
+   "provider_check": "interrupt_test.go",
+   "owner": "T04"
   }
  ],
  "tasks": [
   {
    "id": "T01",
-   "title": "Contract: main.go entry point and seams",
+   "title": "Contract: shared types",
    "kind": "contract",
    "packet": "code",
    "depends_on": [],
-   "owns": ["main.go"],
-   "produces": ["main function and function variable seams"],
+   "owns": [
+    "clock_test.go",
+    "timer_types.go"
+   ],
+   "produces": [
+    "type Clock interface",
+    "type TimerState int",
+    "type Timer struct"
+   ],
    "consumes": [],
    "stack_layer": 1,
    "test_level": "contract",
    "files": [
     {
-     "path": "main.go",
+     "path": "timer_types.go",
      "phase": "A",
-     "code": "package main\n\nimport (\n\t\"context\"\n\t\"time\"\n)\n\n// Seams for modular testing\nvar runLoopFn = func(ctx context.Context, t *Timer) error { return nil }\nvar updateOutputFn = func(t *Timer, out interface{}) error { return nil }\nvar handleSIGINTFn = func(ctx context.Context, t *Timer) error { return nil }\nvar validateFlagsFn = func(durations map[string]time.Duration) error { return nil }\n\n// main is provided for contract verification in timer_types.go.\n// We leave it empty here to avoid redeclaration errors if timer_types.go also defines it.\n"
+     "code": "package main\n\nimport (\n\t\"context\"\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) <-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n}\n"
     }
    ]
   },
   {
    "id": "T02",
-   "title": "Impl: Timer Loop Logic",
+   "title": "Timer Loop and Transitions",
    "kind": "impl",
    "packet": "spec",
-   "depends_on": ["T01"],
-   "owns": ["loop.go", "loop_test.go"],
-   "produces": ["func runLoopFn"],
-   "consumes": ["Timer"],
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "timer.go",
+    "timer_test.go"
+   ],
+   "produces": [
+    "func (t *Timer) Run(ctx context.Context) error",
+    "func (t *Timer) transition(state *TimerState)",
+    "func (t *Timer) durationFor(state TimerState) time.Duration"
+   ],
+   "consumes": [
+    "Clock"
+   ],
    "stack_layer": 1,
    "test_level": "unit",
    "scenarios": [
-    {"id": "S1", "test": "TestLoop_S1_ShortBreakAfterFocus", "check": "Transition to ShortBreak after 1 focus session"},
-    {"id": "S2", "test": "TestLoop_S2_FullCycle", "check": "Transition to LongBreak after 4 focus sessions"},
-    {"id": "S16", "test": "TestLoop_S16_CycleRestart", "check": "Cycle restarts after LongBreak"},
-    {"id": "S14", "test": "TestLoop_S14_Boundary", "check": "Transitions exactly at duration limit"}
+    {
+     "id": "S1",
+     "test": "TestTimer_S1_ShortBreakAfterFourth",
+     "check": "After 4 focus sessions, the next break is a long break."
+    },
+    {
+     "id": "S2",
+     "test": "TestTimer_S2_FullCycle",
+     "check": "Timer transitions correctly through Focus, ShortBreak, and LongBreak in the 4-session cycle."
+    },
+    {
+     "id": "S14",
+     "test": "TestTimer_S14_BoundaryOneMinute",
+     "check": "Timer handles 1-minute durations correctly without negative countdowns."
+    },
+    {
+     "id": "S16",
+     "test": "TestTimer_S16_CycleRestart",
+     "check": "After a long break, the cycle restarts at session 5."
+    }
    ],
-   "spec_excerpt": ["The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic"],
-   "notes": "Implement the loop that calls updateOutputFn and handles duration ticks."
+   "spec_excerpt": [
+    "The timer must transition between focus sessions, short breaks, and long breaks according to the four-session cycle logic",
+    "The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line"
+   ],
+   "notes": "Implement the Run loop using a select on Clock.After and context.Done. Ensure transition logic increments completedFocus and handles the 4-session logic (modulo 4)."
   },
   {
    "id": "T03",
-   "title": "Impl: Terminal Output Formatting",
+   "title": "Output Formatting",
    "kind": "impl",
    "packet": "spec",
-   "depends_on": ["T01"],
-   "owns": ["output.go", "output_test.go"],
-   "produces": ["func updateOutputFn"],
-   "consumes": [],
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "output.go",
+    "output_test.go"
+   ],
+   "produces": [
+    "var updateOutputFn"
+   ],
+   "consumes": [
+    "TimerState"
+   ],
    "stack_layer": 1,
    "test_level": "unit",
    "scenarios": [
-    {"id": "S5", "test": "TestOutput_S5_Formatting", "check": "Prints 'Session 1: 25:00\\r\\x1b[K'"},
-    {"id": "S7", "test": "TestOutput_S7_ShortBreak", "check": "Transition to ShortBreak shows 'Break: 05:00\\r\\x1b[K'"},
-    {"id": "S8", "test": "TestOutput_S8_LongBreak", "check": "Long break shows 'Long break: 15:00\\r\\x1b[K'"},
-    {"id": "S18", "test": "TestOutput_S18_Initial", "check": "Initial output at t=0 is correct"}
+    {
+     "id": "S5",
+     "test": "TestOutput_S5_Formatting",
+     "check": "Output format matches 'Session N: MM:SS\\r\\x1b[K'."
+    },
+    {
+     "id": "S7",
+     "test": "TestOutput_S7_ShortBreak",
+     "check": "Transitions between countdowns correctly."
+    },
+    {
+     "id": "S8",
+     "test": "TestOutput_S8_LongBreak",
+     "check": "Long break label is 'Long break'."
+    },
+    {
+     "id": "S18",
+     "test": "TestOutput_S18_Initial",
+     "check": "Initial output is formatted correctly."
+    }
    ],
-   "spec_excerpt": ["The timer must update the in-place status line every second using carriage return and ANSI erase-to-end-of-line"],
-   "notes": "Implement the logic that uses io.Writer to print the current state."
+   "spec_excerpt": [
+    "the writer receives 'Session 1: 25:00\\r\\x1b[K'",
+    "the writer receives 'Break: 05:00\\r\\x1b[K'",
+    "the writer receives 'Long break: 15:00\\r\\x1b[K'"
+   ],
+   "notes": "Implement updateOutputFn to format the duration as MM:SS and include the ANSI escape sequence."
   },
   {
    "id": "T04",
-   "title": "Impl: SIGINT - Interrupted Session",
+   "title": "Interrupt Handling",
    "kind": "impl",
    "packet": "spec",
-   "depends_on": ["T01"],
-   "owns": ["interrupt.go", "interrupt_test.go"],
-   "produces": ["func handleSIGINTFn"],
-   "consumes": ["Timer"],
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "interrupt.go",
+    "interrupt_test.go"
+   ],
+   "produces": [
+    "func handleSIGINTFn"
+   ],
+   "consumes": [
+    "Timer"
+   ],
    "stack_layer": 1,
    "test_level": "unit",
    "scenarios": [
-    {"id": "S6", "test": "TestInterrupt_S6_FocusInterrupted", "check": "Focus session interrupted doesn'int count"},
-    {"id": "S21", "test": "TestInterrupt_S21_StartInterrupted", "check": "Session 1 interrupted at t=1s doesn't count"},
-    {"id": "S22", "test": "TestInterrupt_S22_EndOfSessionInterrupted", "check": "Session 4 interrupted 1s before end doesn't count"}
+    {
+     "id": "S6",
+     "test": "TestInterrupt_S6_FocusInterrupted",
+     "check": "Interrupted session is NOT counted."
+    },
+    {
+     "id": "S21",
+     "test": "TestInterrupt_S21_StartInterrupted",
+     "check": "Immediate interrupt counts 0 sessions."
+    },
+    {
+     "id": "S22",
+     "test": "TestInterrupt_S22_EndOfSessionInterrupted",
+     "check": "Interrupting 1s before completion does not count the session."
+    }
    ],
-   "spec_excerpt": ["On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n'"],
-   "notes": "Implement the logic for handling interruption during a session."
+   "spec_excerpt": [
+    "On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n' where N counts only fully finished focus sessions, and exit with status 0"
+   ],
+   "notes": "Implement handleSIGINTFn to clear the line using \\r\\x1b[K and print the completed count."
   },
   {
    "id": "T05",
-   "title": "Impl: SIGINT - Completion Message",
+   "title": "Completion Message Logic",
    "kind": "impl",
    "packet": "spec",
-   "depends_on": ["T01"],
-   "owns": ["completion.go", "completion_test.go"],
-   "produces": ["func handleSIGINTFn"],
-   "consumes": ["Timer"],
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "completion.go",
+    "completion_test.go"
+   ],
+   "produces": [
+    "var runCompletion"
+   ],
+   "consumes": [
+    "Timer"
+   ],
    "stack_layer": 1,
    "test_level": "unit",
    "scenarios": [
-    {"id": "S3", "test": "TestCompletion_S3_LongBreak", "check": "Prints correct count when LongBreak interrupted"},
-    {"id": "S9", "test": "TestCompletion_S9_ClearLine", "check": "Clears line before printing message"},
-    {"id": "S10", "test": "TestCompletion_S10_AfterSession4", "check": "Prints correct count after session 4 completed"},
-    {"id": "S11", "test": "TestCompletion_S11_Start", "check": "Prints correct count at start"},
-    {"id": "S17", "test": "TestCompletion_S17_FocusInterrupted", "check": "Prints correct count after focus interrupted"},
-    {"id": "S20", "test": "TestCompletion_S20_Session5Start", "check": "Prints correct count at session 5 start"}
+    {
+     "id": "S3",
+     "test": "TestCompletion_S3_LongBreak",
+     "check": "Long break interrupted prints correct count."
+    },
+    {
+     "id": "S9",
+     "test": "TestCompletion_S9_ClearLine",
+     "check": "SIGINT clears the current line before printing completion."
+    },
+    {
+     "id": "S10",
+     "test": "TestCompletion_S10_AfterSession4",
+     "check": "Completes 4 sessions correctly."
+    },
+    {
+     "id": "S11",
+     "test": "TestCompletion_S11_Start",
+     "check": "Initial interrupt counts 0."
+    },
+    {
+     "id": "S17",
+     "test": "TestCompletion_S17_FocusInterrupted",
+     "check": "Interrupted session not counted."
+    },
+    {
+     "id": "S20",
+     "test": "TestCompletion_S20_Session5Start",
+     "check": "Counts previous cycle's completed sessions."
+    }
    ],
-   "spec_excerpt": ["On SIGINT, the program must clear the current in-place status line, print exactly 'Completed N focus sessions\\n'"],
-   "notes": "Implement the logic for printing the final message."
+   "spec_excerpt": [
+    "The writer first receives '\\r\\x1b[K' to clear the 'Session 3: 05:00' remnant, then 'Completed 2 focus sessions\\n'."
+   ],
+   "notes": "Implement runCompletion to use the ANSI clear sequence and format the message with the completed count."
   },
   {
    "id": "T06",
-   "title": "Impl: CLI and Flags",
+   "title": "Flag Validation",
    "kind": "impl",
    "packet": "spec",
-   "depends_on": ["T01"],
-   "owns": ["flags.go", "flags_test.go"],
-   "produces": ["func validateFlagsFn"],
+   "depends_on": [
+    "T01"
+   ],
+   "owns": [
+    "flags.go",
+    "flags_test.go"
+   ],
+   "produces": [
+    "var validateFlagsFn"
+   ],
    "consumes": [],
    "stack_layer": 1,
    "test_level": "unit",
    "scenarios": [
-    {"id": "S4", "test": "TestFlags_S4_TooLong", "check": "Reject 25h duration"},
-    {"id": "S12", "test": "TestFlags_S12_ErrorMsg", "check": "Prints error to stderr"},
-    {"id": "S13", "test": "TestFlags_S13_MultipleErrors", "check": "Prints multiple errors"},
-    {"id": "S15", "test": "TestFlags_S15_NonPositive", "check": "Handles non-positive durations"},
-    {"id": "S19", "test": "TestFlags_S19_DuplicateCheck", "check": "Prints error for 2rad 25h duration"}
+    {
+     "id": "S4",
+     "test": "TestFlags_S4_TooLong",
+     "check": "Rejects duration > 24h."
+    },
+    {
+     "id": "S12",
+     "test": "TestFlags_S12_ErrorMsg",
+     "check": "Prints descriptive error message."
+    },
+    {
+     "id": "S13",
+     "test": "TestFlags_S13_MultipleErrors",
+     "check": "Reports multiple errors."
+    },
+    {
+     "id": "S15",
+     "test": "TestFlags_S15_NonPositive",
+     "check": "Rejects zero or negative durations."
+    },
+    {
+     "id": "S19",
+     "test": "TestFlags_S19_DuplicateCheck",
+     "check": "Identical error for same violation."
+    }
    ],
-   "spec_excerpt": ["The program must validate that each configured duration... does not exceed 24 hours at startup"],
-   "notes": "Implement the flag validation logic."
+   "spec_excerpt": [
+    "The program must validate that each configured duration... does not exceed 24 hours at startup"
+   ],
+   "notes": "Implement validateFlagsFn to check durations against the 24h limit and the 1s minimum, returning exit code 1 on failure."
   }
  ]
 }
