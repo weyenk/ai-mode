@@ -68,9 +68,10 @@ report and saves it under `~/.local/state/ai-mode/team/`. `--roles a,b,c` change
 A role that fails is marked `FAILED` in the report; all calls share one trace (`ai-mode trace`).
 
 To make Qwen Code's chief reach for `team`/`ask`/`classify` in any workflow (not only inside a skill), run `ai-mode setup-qwen` once;
-it adds a marked routing block to `~/.qwen/QWEN.md` and two hooks to `~/.qwen/settings.json` (`--print` shows all of it,
+it adds a marked routing block to `~/.qwen/QWEN.md` and three hooks to `~/.qwen/settings.json` (`--print` shows all of it,
 `--remove` undoes it). A `UserPromptExpansion` hook (`ai-mode hook prompt-expansion`) also appends a chief stop to
-`/drafting-plans`, whose planning text otherwise outweighs the session-start rule. The hook runs `ai-mode hook session-start`, which injects a short rule (the way Superpowers
+`/drafting-plans`, whose planning text otherwise outweighs the session-start rule, and a `PreToolUse` hook
+(`ai-mode hook pre-tool-use`) denies chief's `skill` tool call to `drafting-plans`, pointing it at `ai-mode ask architect`. The hook runs `ai-mode hook session-start`, which injects a short rule (the way Superpowers
 injects `using-superpowers`) while an ai-mode server is running: chief's first output must be a real tool call, and
 open-ended asks go through the `ai-mode-routing` skill to `ai-mode team`. Without it, chief copies the text-form example
 calls in Qwen Code's built-in prompt (`[tool_call: read_file for ...]`) and nothing runs.
