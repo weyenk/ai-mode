@@ -362,10 +362,20 @@ func (pl *pipeline) tick() (*card, error) {
 	if c == nil {
 		return nil, nil
 	}
+	return c, pl.runStage(c)
+}
+
+// runStage runs c's current stage, moves the card, notes it and syncs; the stage's error is returned after the
+// card has been moved to needs-human.
+func (pl *pipeline) runStage(c *card) error {
 	from := c.Stage
+	fn, ok := pl.stages[c.Type+":"+from]
+	if !ok {
+		return fmt.Errorf("no stage runs %s cards at %s", c.Type, from)
+	}
 	pl.logf("▶ %s %s [%s] %s", c.ID, c.Type, from, c.Title)
 	start := time.Now()
-	next, note, serr := pl.stages[c.Type+":"+from](pl, c)
+	next, note, serr := fn(pl, c)
 	if serr != nil {
 		next = "needs-human"
 		note = cardNote{By: "bot-chief", Done: "Stage " + from + " stopped before finishing.", Why: serr.Error(),
@@ -378,11 +388,11 @@ func (pl *pipeline) tick() (*card, error) {
 	c.Stage = next
 	pl.addNote(c, note)
 	if err := pl.board.save(*c); err != nil {
-		return c, err
+		return err
 	}
 	pl.logf("  %s %s in %s: %s", c.ID, note.Stage, time.Since(start).Round(time.Second), firstLine(note.Done))
 	pl.sync(fmt.Sprintf("pipeline: %s %s (%s)", c.ID, note.Stage, truncateRunes(c.Title, 50)))
-	return c, serr
+	return serr
 }
 
 // sync re-renders BOARD.md, then commits docs/pipeline (and pushes when asked). Git failures are reported, not fatal.
