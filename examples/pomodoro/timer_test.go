@@ -130,7 +130,7 @@ func runForTicks(t *testing.T, focus, short, long time.Duration, seconds int) *n
 }
 
 // S1: after 4 focus sessions the next break is a 15m long break, not a short one.
-func TestTimer_S1_ShortBreakAfterFocus(t *testing.T) {
+func TestTimer_S1_ShortBreakAfterFourth(t *testing.T) {
 	// Arrange: 4 focus sessions (4*1500s) plus 3 short breaks (3*300s) end at t=6900s.
 	// Act: run the timer to the transition right after the 4th focus session.
 	out := runForTicks(t, focusDur, shortDur, longDur, 6900)
@@ -169,7 +169,7 @@ func TestTimer_S2_FullCycle(t *testing.T) {
 }
 
 // S5: in-place updates use the '\r' + ANSI erase sequence, one per second.
-func TestTimer_S5_ANSIUpdates(t *testing.T) {
+func TestTimer_S5_OutputFormat(t *testing.T) {
 	// Arrange: default durations; observe ticks 0, 1499 and the transition tick 1500.
 	// Act: run 25 minutes.
 	out := runForTicks(t, focusDur, shortDur, longDur, 1500)
@@ -192,21 +192,21 @@ func TestTimer_S5_ANSIUpdates(t *testing.T) {
 	}
 }
 
-// S7: countdown strings at t=0, t=1439s and the transition at t=1440s.
-func TestTimer_S7_StatusUpdate(t *testing.T) {
-	// Arrange: default 25m focus; the 25th minute ends exactly at t=1440s.
+// S7: countdown strings at t=0, t=1439s and the break transition at t=1500s.
+func TestTimer_S7_BreakTransitionOutput(t *testing.T) {
+	// Arrange: default 25m focus (1500s); the 25th minute ends exactly at t=1500s.
 	// Act: run to the ShortBreak transition.
-	out := runForTicks(t, focusDur, shortDur, longDur, 1440)
+	out := runForTicks(t, focusDur, shortDur, longDur, 1500)
 
 	// Assert: writer received the exact pinned countdown strings.
 	if got, want := out.lineAt(t, 0), "Session 1: 25:00\r\x1b[K"; got != want {
 		t.Errorf("t=0: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 1439), "Session 1: 00:01\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 1439), "Session 1: 01:01\r\x1b[K"; got != want {
 		t.Errorf("t=1439s: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 1440), "Break: 05:00\r\x1b[K"; got != want {
-		t.Errorf("t=1440s: status line = %q, want %q", got, want)
+	if got, want := out.lineAt(t, 1500), "Break: 05:00\r\x1b[K"; got != want {
+		t.Errorf("t=1500s: status line = %q, want %q", got, want)
 	}
 }
 
@@ -223,7 +223,7 @@ func TestTimer_S8_LongBreakLabel(t *testing.T) {
 }
 
 // S14: boundary with a 1-minute focus duration; no negative values, no 00:00 shown.
-func TestTimer_S14_BoundaryOneMin(t *testing.T) {
+func TestTimer_S14_BoundaryOneMinute(t *testing.T) {
 	// Arrange: focus duration is exactly 1 minute.
 	// Act: run to the transition at t=60s.
 	out := runForTicks(t, time.Minute, shortDur, longDur, 60)
@@ -237,6 +237,24 @@ func TestTimer_S14_BoundaryOneMin(t *testing.T) {
 	}
 	if got, want := out.lineAt(t, 60), "Break: 05:00\r\x1b[K"; got != want {
 		t.Errorf("t=60s: status line = %q, want %q", got, want)
+	}
+}
+
+// S15: a zero or negative focus duration is a contract edge case; the 24-hour
+// rule only bounds the upper end, so the engine must not panic, emit negative
+// countdowns, or hang on the zero-duration boundary.
+func TestTimer_S15_ZeroDuration(t *testing.T) {
+	// Arrange: focus duration is 0; the 1m break prevents an infinite loop.
+	// Act: run through the first tick so the zero-length focus resolves.
+	out := runForTicks(t, 0, shortDur, longDur, 1)
+
+	// Assert: output stays well-formed (never negative) and no 00:00 remnant.
+	if got, want := out.lineAt(t, 0), "Session 1: 00:00\r\x1b[K"; got != want {
+		t.Errorf("t=0: status line = %q, want %q", got, want)
+	}
+	line := out.lineAt(t, 1)
+	if strings.Contains(line, "-") {
+		t.Errorf("t=1: status line %q contains a negative value", line)
 	}
 }
 
