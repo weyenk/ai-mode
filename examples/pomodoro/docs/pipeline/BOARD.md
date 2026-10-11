@@ -18,6 +18,7 @@ _empty_
 | C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
 | C0003 | plan | tracking | C0002 | Pomodoro CLI — feature plan | planning → tracking (bot-architect): Cut 2 stories (C0004, C0005), in stack order. |
 | C0004 | story | amigos | C0003 | Core Timer Engine | needs-human → amigos (requester (answered by the operator, Claude, from the original request)): The requester answered. |
+| C0005 | story | amigos | C0003 | CLI Configuration & Validation | needs-human → amigos (human): Retry requested. |
 
 ## review
 
@@ -29,6 +30,4 @@ _empty_
 
 ## blocked
 
-| Card | Type | Stage | Parent | Title | Latest note |
-| --- | --- | --- | --- | --- | --- |
-| C0005 | story | needs-human | C0003 | CLI Configuration & Validation | amigos → needs-human (bot-amigos): Amigos: not ready after two meetings. |
+_empty_

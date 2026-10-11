@@ -2,14 +2,13 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "needs-human",
+  "stage": "amigos",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
-  "prev_stage": "amigos",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
@@ -17,7 +16,7 @@
     "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-11T17:03:28Z",
+  "updated": "2026-10-11T17:06:05Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -78,6 +77,14 @@
       ],
       "why": "Verdict not-ready from meeting 20261011-164833-d12461; ready: product, architect; 4 rules, 22 examples; layers: 1 CLI Argument Parsing \u0026 Validation [] examples [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]; no flag. Open: ",
       "next": "A human clarifies the story (`ai-mode pipeline answer C0005 \"\u003cclarification\u003e\"`) or splits it."
+    },
+    {
+      "ts": "2026-10-11T17:06:05Z",
+      "by": "human",
+      "stage": "needs-human → amigos",
+      "done": "Retry requested.",
+      "why": "A human cleared the block.",
+      "next": "The next tick re-runs amigos."
     }
   ]
 }
