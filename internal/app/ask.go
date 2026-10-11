@@ -61,22 +61,24 @@ func cmdAsk(args []string) int {
 	var ctxPaths stringList
 	fs.Var(&ctxPaths, "context", "File (full contents) or directory (file listing) to put in the prompt as reference material; repeatable")
 	ctxMax := fs.Int("context-max-chars", defaultContextMaxChars, "Fail if the --context block is larger than this many characters")
+	noAuto := fs.Bool("no-auto-context", false, "Don't attach repo files the question names (they are attached as --context by default)")
 	pos, code, ok := parse(fs, args)
 	if !ok {
 		return code
 	}
 	if len(pos) < 1 {
-		return fail("usage: ai-mode ask <role> [message...] [--context PATH]... [--context-max-chars N] [--profile P] [--max-tokens N] [--timeout S] [--json] [--raw] [--trace ID] [--parent SPAN] [--caller NAME] [-v]")
+		return fail("usage: ai-mode ask <role> [message...] [--context PATH]... [--context-max-chars N] [--no-auto-context] [--profile P] [--max-tokens N] [--timeout S] [--json] [--raw] [--trace ID] [--parent SPAN] [--caller NAME] [-v]")
 	}
 	role := pos[0]
 	user := readUserMessage(pos[1:])
 	if user == "" {
 		return fail("Empty question: pass a message argument or pipe stdin.")
 	}
-	user, err := askUser(user, ctxPaths, *ctxMax)
+	block, err := callerContext("ask", user, ctxPaths, *ctxMax, *noAuto)
 	if err != nil {
 		return fail("%v", err)
 	}
+	user = withContext(user, block)
 	p, code := activeProfile(*profile, "Use: ai-mode use <name> or ai-mode ask --profile <name>")
 	if code != 0 {
 		return code

@@ -90,15 +90,16 @@ func cmdTeam(args []string) int {
 	var ctxPaths stringList
 	fs.Var(&ctxPaths, "context", "File (full contents) or directory (file listing) given to architect (or the first role) as reference material; repeatable")
 	ctxMax := fs.Int("context-max-chars", defaultContextMaxChars, "Fail if the --context block is larger than this many characters")
+	noAuto := fs.Bool("no-auto-context", false, "Don't attach repo files the topic names (they are attached as --context by default)")
 	pos, code, ok := parse(fs, args)
 	if !ok {
 		return code
 	}
 	topic := readUserMessage(pos)
 	if topic == "" {
-		return fail("usage: ai-mode team <topic...> [--context PATH]... [--roles a,b,c] [--max-tokens N] [--timeout S] [--out FILE] [--profile P] [--caller NAME] [-v]\n(or pipe the topic on stdin)")
+		return fail("usage: ai-mode team <topic...> [--context PATH]... [--no-auto-context] [--roles a,b,c] [--max-tokens N] [--timeout S] [--out FILE] [--profile P] [--caller NAME] [-v]\n(or pipe the topic on stdin)")
 	}
-	ctxBlock, err := buildContext(ctxPaths, *ctxMax)
+	ctxBlock, err := callerContext("team", topic, ctxPaths, *ctxMax, *noAuto)
 	if err != nil {
 		return fail("%v", err)
 	}
