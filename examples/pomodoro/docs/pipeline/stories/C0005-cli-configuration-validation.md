@@ -72,3 +72,7 @@ func (t *Timer) Run() error {
 ```
 
 - The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.
+
+## Answers from the requester
+
+- All three lengths (-focus, -short, -long) follow the same rules: whole minutes, at least 1 and at most 1440 (24 hours); anything else prints an error naming the flag and exits with status 2 before any session starts. Defaults when a flag is not given: -focus 25, -short 5, -long 15. (requester (answered by the operator, Claude, from the original request), 2026-10-11)
