@@ -130,7 +130,13 @@ func lastJSONObject(text string) (string, bool) {
 	if i := strings.LastIndex(text, "```json"); i >= 0 {
 		rest := text[i+len("```json"):]
 		if j := strings.Index(rest, "```"); j >= 0 {
-			return strings.TrimSpace(rest[:j]), true
+			block := strings.TrimSpace(rest[:j])
+			if !json.Valid([]byte(block)) {
+				if fixed := closeJSON(block); json.Valid([]byte(fixed)) {
+					return fixed, true // a model dropped the final brace(s)
+				}
+			}
+			return block, true
 		}
 	}
 	best := ""
@@ -148,6 +154,42 @@ func lastJSONObject(text string) (string, bool) {
 		i = end - 1 // skip what this object covered, so a nested object never wins over its parent
 	}
 	return best, best != ""
+}
+
+// closeJSON appends the closing brackets a truncated JSON value is missing (outside strings).
+func closeJSON(s string) string {
+	var stack []byte
+	inStr, esc := false, false
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case inStr:
+			if esc {
+				esc = false
+			} else if c == '\\' {
+				esc = true
+			} else if c == '"' {
+				inStr = false
+			}
+		case c == '"':
+			inStr = true
+		case c == '{':
+			stack = append(stack, '}')
+		case c == '[':
+			stack = append(stack, ']')
+		case c == '}' || c == ']':
+			if len(stack) > 0 {
+				stack = stack[:len(stack)-1]
+			}
+		}
+	}
+	if inStr {
+		return s
+	}
+	for i := len(stack) - 1; i >= 0; i-- {
+		s += string(stack[i])
+	}
+	return s
 }
 
 // withoutJSON drops the trailing estimate block so the report shows the prose once.
