@@ -334,3 +334,28 @@ func TestReplan_CommittedTasksMustStayAsCommitted(t *testing.T) {
 		t.Fatalf("note %q", note)
 	}
 }
+
+func TestWiring_LastStoryMustWireAnEmptyMain(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module p\n\ngo 1.22\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "types.go"), []byte("package main\n\nfunc main() {}\n"), 0o644)
+	rel, empty := mainFile(dir)
+	if rel != "types.go" || !empty {
+		t.Fatalf("mainFile = %q %v", rel, empty)
+	}
+	os.MkdirAll(filepath.Join(dir, "docs"), 0o755)
+	plan := `{"goal":"g","architecture":"a","tasks":[{"id":"T01","title":"Flags","owns":["flags.go","flags_test.go"],"stack_layer":1,
+		"scenarios":[{"id":"S1","test":"TestFlags_S1_X","check":"x"}]}]}`
+	os.WriteFile(filepath.Join(dir, "docs", "p.plan.json"), []byte(plan), 0o644)
+	if f := wiringPlanCheck(dir, "docs/p.plan.json", "types.go"); len(f) != 1 || !strings.Contains(f[0], "own types.go") {
+		t.Fatalf("findings %v", f)
+	}
+	os.WriteFile(filepath.Join(dir, "docs", "p.plan.json"), []byte(strings.Replace(plan, `"flags.go"`, `"types.go", "flags.go"`, 1)), 0o644)
+	if f := wiringPlanCheck(dir, "docs/p.plan.json", "types.go"); len(f) != 0 {
+		t.Fatalf("a task owning main's file with a scenario passes: %v", f)
+	}
+	os.WriteFile(filepath.Join(dir, "types.go"), []byte("package main\n\nimport \"os\"\n\nfunc main() { os.Exit(run()) }\n\nfunc run() int { return 0 }\n"), 0o644)
+	if _, empty := mainFile(dir); empty {
+		t.Fatal("a wired main is not empty")
+	}
+}

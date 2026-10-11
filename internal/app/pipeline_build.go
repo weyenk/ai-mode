@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -275,7 +278,10 @@ func stageImplement(pl *pipeline, c *card) (string, cardNote, error) {
 		_ = pl.saveStack(st)
 		return "", cardNote{}, err
 	}
-	// 3. the TDD gate over everything this story committed
+	// 3. the TDD gate over everything this story committed, and for the feature's last story a program that does something
+	if rel, empty := mainFile(mod); rel != "" && empty && pl.isLastStory(c) {
+		return "", cardNote{}, fmt.Errorf("the feature's last story finished with an empty main in %s: the program cannot be run; re-plan with a wiring task", rel)
+	}
 	res := tddCheck(d, mod, c.ID)
 	if !res.ok() {
 		return "", cardNote{}, fmt.Errorf("tdd-check failed: %s", strings.Join(res.problems(), "; "))
@@ -369,8 +375,14 @@ func drafttingPlansRules() string {
 // drafting-plans markdown and must pass lint, the pipeline's checks and plan verify.
 func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string, done map[string]string, committed map[string]*committedTask) error {
 	jsonRel := strings.TrimSuffix(planRel, ".md") + ".json"
+	mainRel, mainEmpty := mainFile(mod)
+	wire := pl.isLastStory(c) && mainRel != "" && mainEmpty
 	check := func() []string {
-		return append(committedPlanCheck(mod, jsonRel, committed), storyPlanCheck(mod, jsonRel, contractMD, done)...)
+		f := append(committedPlanCheck(mod, jsonRel, committed), storyPlanCheck(mod, jsonRel, contractMD, done)...)
+		if wire {
+			f = append(f, wiringPlanCheck(mod, jsonRel, mainRel)...)
+		}
+		return f
 	}
 	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err == nil && len(check()) == 0 {
 		return nil // a retried stage keeps a plan that already passes
@@ -378,7 +390,7 @@ func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string, don
 	contract, _ := os.ReadFile(filepath.Join(mod, contractMD))
 	task := fmt.Sprintf(`Write the implementation plan for story %s ("%s"), following the drafting-plans rules below, as JSON in %s.
 It is the only file you may write. Read the module's code first (list_files, read_file): the plan builds on what exists.
-`+committedNote(committed)+`
+`+committedNote(committed)+wiringNote(wire, mainRel)+`
 %s
 
 <drafting_plans_rules>
@@ -394,6 +406,48 @@ The Story Contract (data from the amigos meeting; it is your spec):
 	_, err := pl.runAgentIn(mod, "architect", "", task, []string{jsonRel}, nil, cmds, 40, check)
 	return err
 }
+
+// mainFile returns the module-relative file that declares func main in package main, and whether its body is empty.
+func mainFile(mod string) (string, bool) {
+	ents, err := os.ReadDir(mod)
+	if err != nil {
+		return "", false
+	}
+	for _, e := range ents {
+		n := e.Name()
+		if e.IsDir() || !strings.HasSuffix(n, ".go") || strings.HasSuffix(n, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(mod, n), nil, 0)
+		if err != nil || f.Name.Name != "main" {
+			continue
+		}
+		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok && fd.Recv == nil && fd.Name.Name == "main" {
+				return n, fd.Body == nil || len(fd.Body.List) == 0
+			}
+		}
+	}
+	return "", false
+}
+
+// isLastStory: no later story of the same feature plan (the stack is linear, so the last story makes the feature whole).
+func (pl *pipeline) isLastStory(c *card) bool {
+	cards, _ := pl.board.all()
+	for _, o := range cards {
+		if o.Type == "story" && o.Parent == c.Parent && o.Order > c.Order {
+			return false
+		}
+	}
+	return true
+}
+
+const wiringRule = `
+This is the last story of its feature: after it a user must be able to run the program end to end. The plan must wire it:
+one task owns %s (where func main is) and makes main call a testable run function (taking args, stdout, stderr and the
+seams the program needs, returning an exit code), and that task covers at least one scenario with a journey test that calls
+the run function the way a user starts the program. An empty or stub main is not done.
+`
 
 // committedNote tells architect which tasks of a re-planned story are already committed and must stay as they are.
 func committedNote(committed map[string]*committedTask) string {
@@ -412,6 +466,31 @@ func committedNote(committed map[string]*committedTask) string {
 		fmt.Fprintf(&b, "- %s: files %s; tests %s\n", id, strings.Join(committed[id].Files, ", "), firstNonEmpty(strings.Join(committed[id].Tests, ", "), "none"))
 	}
 	return b.String()
+}
+
+func wiringNote(wire bool, mainRel string) string {
+	if !wire {
+		return ""
+	}
+	return fmt.Sprintf(wiringRule, mainRel)
+}
+
+// wiringPlanCheck: some task owns the file with func main and covers at least one scenario.
+func wiringPlanCheck(mod, jsonRel, mainRel string) []string {
+	data, err := os.ReadFile(filepath.Join(mod, jsonRel))
+	if err != nil {
+		return nil
+	}
+	pj, err := parseStoryPlanJSON(data)
+	if err != nil {
+		return nil
+	}
+	for _, t := range pj.Tasks {
+		if contains(t.Owns, mainRel) && len(t.Scenarios) > 0 {
+			return nil
+		}
+	}
+	return []string{fmt.Sprintf("this is the feature's last story and main in %s is still empty: one task must own %s, wire main to a testable run function and cover a scenario with a journey test", mainRel, mainRel)}
 }
 
 // committedPlanCheck: every committed task is in the plan, owns its committed files, and names only tests that exist.
