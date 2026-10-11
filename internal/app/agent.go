@@ -553,11 +553,31 @@ func (a *agentSession) toolEdit(args map[string]any) string {
 	return "edited " + rel
 }
 
-var shellOps = regexp.MustCompile("[;|&<>`\\n]|\\$\\(")
+// hasShellOps reports a shell operator outside quotes; inside quotes (a -run regexp like '^(A|B)$') it is just a character,
+// since the command runs as argv without a shell.
+func hasShellOps(cmd string) bool {
+	quote := rune(0)
+	rs := []rune(cmd)
+	for i, r := range rs {
+		switch {
+		case quote != 0:
+			if r == quote {
+				quote = 0
+			}
+		case r == '\'' || r == '"':
+			quote = r
+		case strings.ContainsRune(";|&<>`\n", r):
+			return true
+		case r == '$' && i+1 < len(rs) && rs[i+1] == '(':
+			return true
+		}
+	}
+	return false
+}
 
 func (a *agentSession) toolRun(args map[string]any) string {
 	cmd := strings.TrimSpace(argStr(args, "command"))
-	if shellOps.MatchString(cmd) {
+	if hasShellOps(cmd) {
 		return "refused: no shell here, so pipes, redirects, ;, && and $(...) are not supported. Run one command."
 	}
 	argv, err := splitArgv(cmd)

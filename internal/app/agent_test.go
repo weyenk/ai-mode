@@ -92,13 +92,15 @@ func TestAgent_ReadRefusesPathsOutsideRoot(t *testing.T) {
 func TestAgent_RunAllowsOnlyListedCommands(t *testing.T) {
 	a, _ := newTestAgent(t, nil)
 	for cmd, want := range map[string]string{
-		"rm -rf .":                  "not allowed",
-		"go test ./...; rm -rf /":   "shell",
-		"go test ./... && echo hi":  "shell",
-		"go test $(echo x)":         "shell",
-		"git push origin main":      "not allowed",
-		"gh pr merge 1":             "not allowed",
-		"go test ./... -run TestNo": "exit",
+		"rm -rf .":                                   "not allowed",
+		"go test ./...; rm -rf /":                    "shell",
+		"go test ./... && echo hi":                   "shell",
+		"go test $(echo x)":                          "shell",
+		"git push origin main":                       "not allowed",
+		"gh pr merge 1":                              "not allowed",
+		"go test ./... -run TestNo":                  "exit",
+		"go test ./... -run '^(TestA|TestB)$'":       "exit",
+		`go test ./... -run "^(TestA|TestB)$"; rm x`: "shell",
 	} {
 		got := a.toolRun(map[string]any{"command": cmd})
 		if !strings.Contains(got, want) {
