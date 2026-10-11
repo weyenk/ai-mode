@@ -2,13 +2,14 @@
   "id": "C0001",
   "title": "Simple pomodoro timer",
   "type": "feature",
-  "stage": "new",
+  "stage": "spec",
   "context": "hobby",
   "artifacts": {
-    "request": "docs/pipeline/requests/C0001-simple-pomodoro-timer.md"
+    "request": "docs/pipeline/requests/C0001-simple-pomodoro-timer.md",
+    "viability": "docs/pipeline/viability/C0001-simple-pomodoro-timer.md"
   },
   "created": "2026-10-11T16:11:27Z",
-  "updated": "2026-10-11T16:11:27Z",
+  "updated": "2026-10-11T16:12:17Z",
   "notes": [
     {
       "ts": "2026-10-11T16:11:27Z",
@@ -20,6 +21,17 @@
       ],
       "why": "Intake.",
       "next": "The next tick runs viability (research, product, architect)."
+    },
+    {
+      "ts": "2026-10-11T16:12:17Z",
+      "by": "bot-product",
+      "stage": "new → spec",
+      "done": "Viability: GO for a hobby request.",
+      "artifacts": [
+        "docs/pipeline/viability/C0001-simple-pomodoro-timer.md"
+      ],
+      "why": "ROI 4.00 value points per day; pass: feasible = true (research, confidence 0.9); pass: value 4.0 ≥ 2.0 (product); pass: 3 success metric(s) named (product); pass: effort 1.0 days ≤ 10 (architect); pass: ROI 4.00 = value 4.0 / effort 1.0 days ≥ 0.20",
+      "next": "architect decides how many specs the request needs and writes them; specialists review each."
     }
   ]
 }
