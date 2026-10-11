@@ -779,13 +779,14 @@ func (ex *executor) runTask(t planTask, redDone bool) error {
 	}
 	var redOut, hint string
 	if redDone {
-		// a resumed task stopped between red and green: triage first instead of repeating the attempt that failed
-		redOut, _ = runIn(ex.mod, "go", "test", "./...", "-count=1", "-run", testFilter(names))
-		h, err := ex.triage(t, names, impl, "a previous coder attempt did not make these tests pass:\n"+redOut)
-		if err != nil {
-			ex.pl.logf("  triage %s: %v", t.ID, err)
+		// a resumed task stopped between red and green (the module was reset to the red commit, so coder's failed code is
+		// gone): have architect review the committed tests against the contract before coder tries again
+		if probs := ex.reviewTests(t, names); len(probs) > 0 {
+			if err := ex.qaFixTests(t, names, probs); err != nil {
+				return err
+			}
+			hint = "qa changed the tests after architect's review; the tests are the specification."
 		}
-		hint = h
 		redOut, _ = runIn(ex.mod, "go", "test", "./...", "-count=1", "-run", testFilter(names))
 	} else {
 		out, err := ex.qaRed(t, names)
