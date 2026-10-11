@@ -64,6 +64,12 @@ func chiefDenial(input []byte) string {
 			reason = fmt.Sprintf("Blocked: `%s` %s.\n\n%s", seg, why, strings.TrimSpace(chiefShellDenied))
 		}
 	}
+	if p.ToolName == "run_shell_command" {
+		if seg := mergeDenial(p.ToolInput.Command); seg != "" {
+			// every model, not only chief: only a human merges (dev pipeline roadmap, P8c)
+			return fmt.Sprintf("Blocked: `%s` merges a pull request. Only a human merges; leave the PR open and tell the human it is ready.", seg)
+		}
+	}
 	if reason == "" {
 		return ""
 	}
@@ -71,6 +77,57 @@ func chiefDenial(input []byte) string {
 		return ""
 	}
 	return reason
+}
+
+// mergeDenial returns the simple command that merges a PR (gh pr merge, gh stack merge), or "".
+func mergeDenial(cmd string) string {
+	segs, _ := shellParse(cmd)
+	for _, words := range segs {
+		words = realCommand(words)
+		if len(words) == 0 {
+			continue
+		}
+		switch filepath.Base(words[0]) {
+		case "gh":
+			args := words[1:]
+			for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+				if (args[0] == "-R" || args[0] == "--repo") && len(args) > 1 {
+					args = args[1:]
+				}
+				args = args[1:]
+			}
+			if len(args) >= 2 && (args[0] == "pr" || args[0] == "stack") && args[1] == "merge" {
+				return strings.Join(words, " ")
+			}
+		case "bash", "sh", "zsh":
+			for i, a := range words[1:] {
+				if a == "-c" && i+2 < len(words) {
+					if seg := mergeDenial(words[i+2]); seg != "" {
+						return seg
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// realCommand skips variable assignments and wrappers (sudo, env, ...) to reach the command that runs.
+func realCommand(words []string) []string {
+	for len(words) > 0 {
+		w := words[0]
+		if strings.Contains(w, "=") && !strings.HasPrefix(w, "-") && !strings.HasPrefix(w, "=") {
+			words = words[1:]
+			continue
+		}
+		switch filepath.Base(w) {
+		case "sudo", "env", "command", "exec", "time", "nohup", "xargs":
+			words = words[1:]
+			continue
+		}
+		return words
+	}
+	return words
 }
 
 func hookCwd(cwd string) string {
@@ -136,21 +193,7 @@ func shellDenial(cmd, cwd string) (seg, why string) {
 }
 
 func commandDenial(words []string, cwd string) string {
-	// Skip assignments and wrappers to reach the real command.
-skip:
-	for len(words) > 0 {
-		w := words[0]
-		if strings.Contains(w, "=") && !strings.HasPrefix(w, "-") && !strings.HasPrefix(w, "=") {
-			words = words[1:]
-			continue
-		}
-		switch filepath.Base(w) {
-		case "sudo", "env", "command", "exec", "time", "nohup", "xargs":
-			words = words[1:]
-			continue
-		}
-		break skip
-	}
+	words = realCommand(words)
 	if len(words) == 0 {
 		return ""
 	}

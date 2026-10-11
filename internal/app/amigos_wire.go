@@ -65,8 +65,12 @@ func newMeetingRunner() meetingRunner {
 		return fail(err)
 	}
 	cwd, _ := os.Getwd()
+	var engine uncertaintyEngine = agreementEngine{}
+	if contains(iniSectionsFile(p.Ini), "fast") {
+		engine = judgedEngine{ask: newRoleAsker(p, "amigos", runAsk), role: "fast"}
+	}
 	return newMeetingRunnerWith(wireDeps{
-		Asker: newRoleAsker(p, "amigos", runAsk), Codec: jsonCodec{}, Engine: agreementEngine{},
+		Asker: newRoleAsker(p, "amigos", runAsk), Codec: jsonCodec{}, Engine: engine,
 		Classifier: newJevClassifier(p, classifyCall), Callers: callers, Roots: []string{cwd},
 		StateDir: stateDir(), MaxAuditBytes: 50 << 20,
 	})

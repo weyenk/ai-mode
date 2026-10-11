@@ -137,7 +137,10 @@ func TestImplementStage_RefusesStoryThatIsNotReady(t *testing.T) {
 	c := readyContract()
 	c.Verdict = VerdictNotReady
 	saveStoryVerdict(pl.abs(st.Artifacts["story"]), "m2", c)
-	pl.newAgent = func(agentSpec) (*agentSession, error) { t.Fatal("no agent may start on a story that is not ready"); return nil, nil }
+	pl.newAgent = func(agentSpec) (*agentSession, error) {
+		t.Fatal("no agent may start on a story that is not ready")
+		return nil, nil
+	}
 	if _, _, err := stageImplement(pl, &st); err == nil || !strings.Contains(err.Error(), "not ready") {
 		t.Fatalf("err = %v", err)
 	}
@@ -177,5 +180,50 @@ func TestRedCheck_RejectsBuildFailuresAndPassingTests(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "add.go"), []byte("package demo\n\nfunc Add(a, b int) int { return 0 }\n"), 0o644)
 	if f, _ := redCheck(dir, []string{"TestAdd_S1_SumsTwoNumbers"}); len(f) != 0 {
 		t.Fatalf("stub returning 0 is red: %v", f)
+	}
+}
+
+func TestReviewStage_BlockingCommentFixedInTheLayerThenApproved(t *testing.T) {
+	pl, st := buildFixture(t)
+	var calls []string
+	pl.newAgent = scriptedAgents(t, &calls)
+	if _, _, err := stageImplement(pl, &st); err != nil {
+		t.Fatal(err)
+	}
+	reviews := []string{
+		"Missing doc.\n```json\n{\"approve\": false, \"comments\": [{\"file\": \"add.go\", \"line\": 3, \"severity\": \"blocking\", \"comment\": \"say what Add does with overflow\"}]}\n```",
+		"Good.\n```json\n{\"approve\": true, \"comments\": [{\"file\": \"add.go\", \"line\": 1, \"severity\": \"nit\", \"comment\": \"fine\"}]}\n```",
+	}
+	pl.ask = func(role, user string, n int) (string, error) {
+		if role != "architect" || !strings.Contains(user, "func Add") {
+			return "", fmt.Errorf("review needs architect and the diff, got %s", role)
+		}
+		r := reviews[0]
+		reviews = reviews[1:]
+		return r, nil
+	}
+	pl.newAgent = func(s agentSpec) (*agentSession, error) {
+		if s.Role != "coder" || strings.Join(s.Owns, ",") != "add.go,contract.go" || strings.Join(s.ReadOnly, ",") != "add_test.go" {
+			return nil, fmt.Errorf("fix goes to coder owning the layer's code, got %s %v %v", s.Role, s.Owns, s.ReadOnly)
+		}
+		return &agentSession{spec: s, chat: &scriptedChat{replies: []agentMsg{
+			call("1", "write_file", map[string]any{"path": "add.go", "content": "package demo\n\n// Add returns a+b; it wraps on overflow like Go's int.\nfunc Add(a, b int) int { return a + b }\n"}),
+			call("2", "finish", map[string]any{"summary": "documented"}),
+		}}}, nil
+	}
+	next, note, err := stageReview(pl, &st)
+	if err != nil || next != "handoff" {
+		t.Fatalf("next=%s err=%v note=%+v", next, err, note)
+	}
+	stack, _ := pl.loadStack("C0003")
+	wtMod := filepath.Join(stack.Worktree, "examples", "demo")
+	if top := gitT(t, wtMod, "log", "-1", "--format=%s", stack.Layers[0].Branch); top != "fix(review): layer 1 round 1" {
+		t.Fatalf("top commit %q", top)
+	}
+	if _, err := os.Stat(pl.abs("docs/pipeline/reviews/C0004/layer-1-round-2.json")); err != nil {
+		t.Fatal("second review round not saved")
+	}
+	if !strings.Contains(note.Done, "1 fix round") {
+		t.Fatalf("note %+v", note)
 	}
 }

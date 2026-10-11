@@ -915,8 +915,16 @@ func tddCheck(d *planDoc, mod, story string) tddResult {
 			continue
 		}
 		tests, _ := splitTests(t.Owns)
-		if out, err := gitIn(mod, append([]string{"diff", "--quiet", red, "HEAD", "--"}, tests...)...); err != nil {
-			bad("test files changed after the red commit %s %s", red[:8], out)
+		// no commit after red may touch the tests, except an architect-requested review fix (Phase: review)
+		later, _ := gitIn(mod, append([]string{"log", "--format=%H%x01%B%x00", red + "..HEAD", "--"}, tests...)...)
+		for _, rec := range strings.Split(later, "\x00") {
+			parts := strings.SplitN(strings.TrimSpace(rec), "\x01", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			if ph := rePhaseTrailer.FindStringSubmatch(parts[1]); ph == nil || ph[1] != "review" {
+				bad("test files changed after the red commit %s by %s (%s)", red[:8], parts[0][:8], firstLine(parts[1]))
+			}
 		}
 		if o, code := runIn(mod, "go", "test", "./...", "-count=1", "-run", testFilter(names)); code != 0 {
 			bad("the tests fail at the tip: %s", tail(o))

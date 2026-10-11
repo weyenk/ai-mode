@@ -218,3 +218,15 @@ func TestLoop_P7_ReadyNeedsAllThreeAmigosAndADeliverableStory(t *testing.T) {
 		t.Fatalf("all three ready and deliverable: %q %+v", o.c.Verdict, o.c)
 	}
 }
+
+func TestLoop_SampleTakesTheOnlyAnswerEvenIfTheQuestionIsReworded(t *testing.T) {
+	reworded := Turn{Answers: []Answer{{Question: "q1 (reworded)", Text: "A"}}}
+	o := runLoop(1, 1.0, map[string][]Turn{
+		"product":   {{Rules: []string{"r1"}, Questions: []string{"Q1"}, Ready: true}},
+		"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true}, reworded, reworded, reworded},
+	}, nil, nil, nil)
+	if got := o.c.Questions[0].Answers; len(got) != 3 || got[0] != "A" || got[2] != "A" {
+		t.Fatalf("answers %v", got)
+	}
+}

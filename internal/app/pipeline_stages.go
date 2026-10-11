@@ -1,15 +1,8 @@
 package app
 
-import "errors"
-
-var errStageNotBuilt = errors.New("stage not built yet")
-
-func stageReview(pl *pipeline, c *card) (string, cardNote, error) {
-	return "", cardNote{}, errStageNotBuilt
+// laterStages are the stages from implementation on; defaultStages registers them with the rest.
+var laterStages = map[string]stageFunc{
+	"story:ready":            stageImplement,
+	"story:architect-review": stageReview,
+	"story:handoff":          stageHandoff,
 }
-func stageHandoff(pl *pipeline, c *card) (string, cardNote, error) {
-	return "", cardNote{}, errStageNotBuilt
-}
-
-// laterStages are registered as they are built; a card whose stage has no runner waits.
-var laterStages = map[string]stageFunc{"story:ready": stageImplement}

@@ -221,6 +221,9 @@ func (l *loopRun) sample(i int) error {
 				break
 			}
 		}
+		if text == "" && len(t.Answers) == 1 {
+			text = t.Answers[0].Text // the turn was asked this one question; a reworded echo of it is still its answer
+		}
 		texts = append(texts, text)
 	}
 	l.c.Questions[i].Answers = texts
