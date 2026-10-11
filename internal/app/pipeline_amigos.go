@@ -115,7 +115,7 @@ func stageAmigos(pl *pipeline, c *card) (string, cardNote, error) {
 }
 
 // answer appends the requester's answer to a story that amigos sent to a human, and moves it back to amigos.
-func (pl *pipeline) answer(id, text string) error {
+func (pl *pipeline) answer(id, text, by string) error {
 	c, err := pl.board.load(id)
 	if err != nil {
 		return err
@@ -132,12 +132,12 @@ func (pl *pipeline) answer(id, text string) error {
 	if !strings.Contains(s, "\n## Answers from the requester\n") {
 		s += "\n## Answers from the requester\n\n"
 	}
-	s += fmt.Sprintf("- %s (%s)\n", strings.TrimSpace(text), pl.now()[:10])
+	s += fmt.Sprintf("- %s (%s, %s)\n", strings.TrimSpace(text), by, pl.now()[:10])
 	if err := os.WriteFile(path, []byte(s), 0o644); err != nil {
 		return err
 	}
 	c.Stage, c.Prev = "amigos", ""
-	pl.addNote(&c, cardNote{By: "human", Stage: "needs-human → amigos", Done: "The requester answered.", Artifacts: []string{c.Artifacts["story"]},
+	pl.addNote(&c, cardNote{By: by, Stage: "needs-human → amigos", Done: "The requester answered.", Artifacts: []string{c.Artifacts["story"]},
 		Why: truncateRunes(strings.TrimSpace(text), 300), Next: "Amigos runs again with the answer in the story."})
 	if err := pl.board.save(c); err != nil {
 		return err

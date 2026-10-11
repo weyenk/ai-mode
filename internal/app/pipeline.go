@@ -545,7 +545,7 @@ const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
   tick [--push]          stage 2: run one stage on one card, commit the artifacts
   run [--push] [--max-ticks N]   tick until nothing can advance
   retry <card>           move a needs-human card back to the stage it stopped at
-  answer <card> <text>   add the requester's answer to a story amigos paused on, and re-run amigos
+  answer <card> <text> [--by WHO]   add the requester's answer to a story amigos paused on, and re-run amigos
   launchd [--interval S] print a LaunchAgent plist that runs tick (not installed)`
 
 func cmdPipeline(args []string) int {
@@ -563,6 +563,7 @@ func cmdPipeline(args []string) int {
 	ctxF := fs.String("context", "hobby", "new: the request's context (hobby, enterprise, health, ...)")
 	body := fs.String("body", "", "new: request text from a file, or - for stdin")
 	interval := fs.Int("interval", 900, "launchd: seconds between ticks")
+	by := fs.String("by", "human", "answer: who answers (recorded on the card and in the story)")
 	pos, code, ok := parse(fs, args[1:])
 	if !ok {
 		return code
@@ -596,7 +597,7 @@ func cmdPipeline(args []string) int {
 		if len(pos) < 2 {
 			return fail("usage: ai-mode pipeline answer <card> <answer...>")
 		}
-		if err := pl.answer(pos[0], strings.Join(pos[1:], " ")); err != nil {
+		if err := pl.answer(pos[0], strings.Join(pos[1:], " "), *by); err != nil {
 			return fail("%v", err)
 		}
 		return 0

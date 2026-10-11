@@ -72,12 +72,12 @@ func TestAmigosStage_PausedThenAnswered(t *testing.T) {
 	}
 	sc.Stage, sc.Prev = next, "amigos"
 	pl.board.save(sc)
-	if err := pl.answer(sc.ID, "Yes, ring at the end of every session, breaks included."); err != nil {
+	if err := pl.answer(sc.ID, "Yes, ring at the end of every session, breaks included.", "human"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := pl.board.load(sc.ID)
 	body, _ := os.ReadFile(pl.abs(got.Artifacts["story"]))
-	if got.Stage != "amigos" || !strings.Contains(string(body), "## Answers from the requester\n\n- Yes, ring at the end of every session") {
+	if got.Stage != "amigos" || !strings.Contains(string(body), "## Answers from the requester\n\n- Yes, ring at the end of every session, breaks included. (human") {
 		t.Fatalf("stage %s body:\n%s", got.Stage, body)
 	}
 	var v storyVerdict
