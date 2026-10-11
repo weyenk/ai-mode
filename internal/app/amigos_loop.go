@@ -22,6 +22,22 @@ type loopRun struct {
 	ue   uncertaintyEngine
 	au   auditSink
 	c    StoryContract
+	// round is the meeting round the next turn belongs to (0 while sampling outside a round)
+	round int
+}
+
+// roundNote tells a role where the meeting stands, so turns converge instead of adding polish every round:
+// in the last round a story is ready only if all three amigos set ready.
+func roundNote(round, rounds int) string {
+	if round <= 0 || rounds <= 0 {
+		return ""
+	}
+	if round < rounds {
+		return fmt.Sprintf("\nThis is round %d of %d. Raise what matters now; set ready when you have no open concern.\n", round, rounds)
+	}
+	return fmt.Sprintf("\nThis is round %d of %d, the last. The story is ready only if product, qa and architect all set ready in this round. "+
+		"Set ready to true unless something would make the story impossible to build or test as written; do not add questions, rules or "+
+		"examples for polish now (they become a follow-up story).\n", round, rounds)
 }
 
 func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue uncertaintyEngine, au auditSink, lc layerClassifier) (StoryContract, error) {
@@ -43,6 +59,7 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 			}
 		}
 		readyRoles := map[string]bool{}
+		l.round = round
 		for _, role := range meetingRoles {
 			turn, err := l.askTurn(role, "")
 			if err != nil {
@@ -59,6 +76,7 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 				l.c.ReadyRoles = append(l.c.ReadyRoles, role)
 			}
 		}
+		l.round = 0
 		for i := range l.c.Questions {
 			if l.c.Questions[i].State == QuestionOpen {
 				if err := l.sample(i); err != nil {
@@ -102,7 +120,7 @@ func (l *loopRun) ask(role, focus string) (string, string, error) {
 }
 
 func (l *loopRun) askTurn(role, focus string) (Turn, error) {
-	prompt := l.tc.Prompt(role, l.in, l.c, focus)
+	prompt := l.tc.Prompt(role, l.in, l.c, focus) + roundNote(l.round, l.opts.Rounds)
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		p := prompt

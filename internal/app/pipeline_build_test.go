@@ -9,22 +9,6 @@ import (
 	"testing"
 )
 
-const demoStoryPlan = "# Add story plan\n\n" +
-	"**Goal:** add two numbers\n**Architecture:** one file\n**Tech Stack:** Go\n" +
-	"**Spec:** docs/pipeline/stories/C0004-add.contract.md    **Story Contract:** docs/pipeline/stories/C0004-add.contract.json\n" +
-	"**Context:** tools\n**Lint:** ok · **Verify:** ok\n\n" +
-	"## Global Constraints\n- Go standard library only.\n\n" +
-	"## Review Focus\n1. negative numbers (S1)\n\n" +
-	"## Boundaries\n| Boundary | Contract artifact | Fixtures | Fake | Provider check | Owner task |\n| --- | --- | --- | --- | --- | --- |\n| adder | `contract.go` | none | none | add_test.go | T01 |\n\n" +
-	"## Task graph\n\n```json\n" +
-	`{"tasks":[` + "\n" +
-	` {"id":"T01","title":"Contract","kind":"contract","packet":"code","depends_on":[],"owns":["contract.go"],"produces":["type Adder"],"consumes":[],"covers":[],"test_level":"contract","stack_layer":1},` + "\n" +
-	` {"id":"T02","title":"Add","kind":"impl","packet":"spec","depends_on":["T01"],"owns":["add.go","add_test.go"],"produces":["func Add(a, b int) int"],"consumes":["Adder"],"covers":["S1"],"test_level":"unit","stack_layer":1}` + "\n" +
-	`],"hot_files":["go.mod","README.md"]}` + "\n```\n\n" +
-	"**Scenario coverage**\n\n| Scenario | Rule | Task | Test |\n| --- | --- | --- | --- |\n| S1 | sums | T02 | `TestAdd_S1_SumsTwoNumbers` |\n\n" +
-	"### T01: Contract\n\n**Spec excerpt:** none\n\n**Phase A: the types.**\n\n```go file=contract.go\npackage demo\n\n// Adder adds two numbers.\ntype Adder func(a, b int) int\n```\n\nRun: `go vet ./...`\n\n" +
-	"### T02: Add\n\n**Spec excerpt:** none\n\n- S1 `TestAdd_S1_SumsTwoNumbers`: Given 2 and 3, when Add runs, then it returns 5.\n\nRun: `go test ./... -run TestAdd_S1`\n"
-
 const demoStoryPlanJSON = `{"goal": "add two numbers", "architecture": "one file", "review_focus": ["negative numbers (S1)"],
  "boundaries": [{"boundary": "adder", "artifact": "contract.go", "fixtures": "none", "fake": "none", "provider_check": "add_test.go", "owner": "T01"}],
  "tasks": [

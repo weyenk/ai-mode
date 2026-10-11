@@ -241,3 +241,28 @@ func TestLoop_SameExampleUnderAnotherRuleIsNotAdded(t *testing.T) {
 		t.Fatalf("want 1 example, got %+v", o.c.Examples)
 	}
 }
+
+func TestLoop_TurnsKnowTheRoundAndTheLastOneAsksToConverge(t *testing.T) {
+	fa := &fakeAsker{Answers: map[string]string{"product": "x", "qa": "x", "architect": "x"}}
+	var prompts []string
+	codec := &promptSpy{fakeCodec: fakeCodec{Turns: map[string][]Turn{"product": {{}, {}}, "qa": {{}, {}}, "architect": {{}, {}}}}, seen: &prompts}
+	runMeeting(Intake{Story: "s"}, meetingOptions{Rounds: 2, MeetingID: "m"}, &recordingAsker{fa, &prompts}, codec, &fakeEngine{ScoreVal: 1}, &memAudit{LevelStr: "off"}, &fakeClassifier{})
+	if len(prompts) < 6 || !strings.Contains(prompts[0], "round 1 of 2") || !strings.Contains(prompts[5], "round 2 of 2, the last") {
+		t.Fatalf("prompts: %q", prompts)
+	}
+}
+
+type promptSpy struct {
+	fakeCodec
+	seen *[]string
+}
+
+type recordingAsker struct {
+	*fakeAsker
+	prompts *[]string
+}
+
+func (r *recordingAsker) Ask(role, user string, n int) (string, error) {
+	*r.prompts = append(*r.prompts, user)
+	return r.fakeAsker.Ask(role, user, n)
+}
