@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/format"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -217,7 +218,13 @@ func renderStoryPlan(pj *storyPlanJSON, title, specRel, contractJSONRel, contrac
 				b.WriteString("**Phase B: implementation (role: coder).**\n\n")
 			}
 			for _, f := range blocks {
-				code := strings.TrimRight(f.Code, "\n")
+				code := f.Code
+				if strings.HasSuffix(f.Path, ".go") {
+					if formatted, err := format.Source([]byte(code)); err == nil {
+						code = string(formatted) // the mechanical repair plan lint --fix makes on markdown plans
+					}
+				}
+				code = strings.TrimRight(code, "\n")
 				fmt.Fprintf(&b, "```go file=%s\n%s\n```\n\n", f.Path, code)
 			}
 		}

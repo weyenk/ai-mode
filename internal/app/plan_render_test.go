@@ -71,7 +71,7 @@ func TestPlanRender_ProducesALintCleanDraftingPlan(t *testing.T) {
 
 func TestPlanRender_CodePacketPhasesBecomeFileBlocks(t *testing.T) {
 	pj, err := parseStoryPlanJSON([]byte(`{"goal":"g","architecture":"a","tasks":[{"id":"T01","title":"Contract","kind":"contract","packet":"code",
-		"owns":["clock.go"],"produces":["type Clock"],"stack_layer":1,"files":[{"path":"clock.go","phase":"A","code":"package kata\n\ntype Clock interface{}\n"}]}]}`))
+		"owns":["clock.go"],"produces":["type Clock"],"stack_layer":1,"files":[{"path":"clock.go","phase":"A","code":"package kata\n\ntype Clock interface{\nNow() int\n}\n"}]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestPlanRender_CodePacketPhasesBecomeFileBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	b := d.Packets["T01"].Blocks
-	if len(b) != 1 || b[0].File != "clock.go" || b[0].Phase != "A" || !strings.Contains(b[0].Code, "type Clock interface{}") {
+	if len(b) != 1 || b[0].File != "clock.go" || b[0].Phase != "A" || !strings.Contains(b[0].Code, "type Clock interface {\n\tNow() int\n}") {
 		t.Fatalf("blocks %+v", b)
 	}
 }
