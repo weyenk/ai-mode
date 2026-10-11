@@ -1,78 +1,166 @@
 {
   "contract": {
-    "story": "# CLI Configuration \u0026 Validation\n\n- **Card:** C0005 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST2) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** C0004 · **Size:** S · **Flag:** none\n\n## Story\n\nAs a macOS user, I want to configure custom focus and break durations via command-line flags, so that I can tailor my Pomodoro sessions to my workflow without distractions.\n\n## Scope\n\nAdd flag parsing for custom durations and implement input validation (negative/large values).\n\n## Scenarios (from the spec)\n\n- **S3 — Custom Configuration.** Given flags `-focus 50 -short 10`, when the timer starts, then the first session lasts 50 minutes.\n- **S5 — Invalid Input.** Given `-focus -1`, when the program starts, then it prints an error and exits.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.",
+    "story": "# CLI Configuration \u0026 Validation\n\n- **Card:** C0005 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST2) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** C0004 · **Size:** S · **Flag:** none\n\n## Story\n\nAs a macOS user, I want to configure custom focus and break durations via command-line flags, so that I can tailor my Pomodoro sessions to my workflow without distractions.\n\n## Scope\n\nAdd flag parsing for custom durations and implement input validation (negative/large values).\n\n## Scenarios (from the spec)\n\n- **S3 — Custom Configuration.** Given flags `-focus 50 -short 10`, when the timer starts, then the first session lasts 50 minutes.\n- **S5 — Invalid Input.** Given `-focus -1`, when the program starts, then it prints an error and exits.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.\n\n## Answers from the requester\n\n- All three lengths (-focus, -short, -long) follow the same rules: whole minutes, at least 1 and at most 1440 (24 hours); anything else prints an error naming the flag and exits with status 2 before any session starts. Defaults when a flag is not given: -focus 25, -short 5, -long 15. (requester (answered by the operator, Claude, from the original request), 2026-10-11)",
     "rules": [
-      "The program must validate custom focus and break durations to ensure they are positive and do not exceed 24 hours.",
-      "Duration flags must be validated to be strictly greater than zero.",
-      "Duration flags must be validated to be no greater than 24 hours (1440 minutes).",
-      "Invalid duration input must cause the program to exit with a non-zero status code and a clear error message to stderr."
+      "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+      "The program must validate that all duration flags (-focus, -short, -long) are between 1 and 1440 minutes and exit with status 2 on error.",
+      "Validation must reject non-integer durations (e.g., -focus 2.5) with a flag-named error and exit status 2.",
+      "When multiple flags are invalid, only the first invalid flag (in argument order) is reported and the program exits immediately."
     ],
     "examples": [
       {
-        "rule": "The program must validate custom focus and break durations to ensure they are positive and do not exceed 24 hours.",
-        "text": "Given flags `-focus 1500 -short 60`, when the program starts, then it prints an error and exits because 1500 minutes exceeds 24 hours."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus 50 -short 10`, when the timer starts, then the first session lasts 50 minutes."
       },
       {
-        "rule": "Duration flags must be validated to be strictly greater than zero.",
-        "text": "Given flags `-focus 0 -short 5`, when the program starts, then it prints an error message 'focus duration must be positive' and exits with code 1."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus -1`, when the program starts, then it prints an error and exits."
       },
       {
-        "rule": "Duration flags must be validated to be strictly greater than zero.",
-        "text": "Given flags `-focus -10 -short 5`, when the program starts, then it prints an error message 'focus duration must be positive' and exits with code 1."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus 0`, when the program starts, then it prints 'Error: -focus must be at least 1 minute' and exits with status 2."
       },
       {
-        "rule": "Duration flags must be validated to be no greater than 24 hours (1440 minutes).",
-        "text": "Given flags `-focus 1441 -short 10`, when the program starts, then it prints an error message 'focus duration exceeds maximum of 24 hours' and exits with code 1."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus 1441`, when the program starts, then it prints 'Error: -focus must not exceed 1440 minutes' and exits with status 2."
       },
       {
-        "rule": "Duration flags must be validated to be no greater than 24 hours (1440 minutes).",
-        "text": "Given flags `-focus 1440 -short 10`, when the program starts, then the validation passes and the timer initializes with a 24-hour focus duration."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-short 1440`, when the program starts, then the timer uses a 1440-minute short break duration."
       },
       {
-        "rule": "The program must validate custom focus and break durations to ensure they are positive and do not exceed 24 hours.",
-        "text": "Given flags `-focus 50 -short 10`, when the program starts, then the validation passes and the first session lasts 50 minutes."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus 25` (valid) and `-short 0` (invalid), when the program starts, then it prints 'Error: -short must be at least 1 minute' and exits with status 2, ignoring the valid -focus value."
       },
       {
-        "rule": "Invalid duration input must cause the program to exit with a non-zero status code and a clear error message to stderr.",
-        "text": "Given flags `-focus abc -short 10`, when the program starts, then it prints a parsing error and exits with a non-zero status."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given no duration flags, when the program starts, then it uses defaults: focus 25, short 5, long 15."
+      },
+      {
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus 1`, when the program starts, then the timer uses a 1-minute focus duration."
+      },
+      {
+        "rule": "Validation must reject non-integer durations (e.g., -focus 2.5) with a flag-named error and exit status 2.",
+        "text": "Given -focus 2.5, when the program starts, then it prints an error naming -focus (e.g., 'Error: -focus must be a whole number of minutes') and exits with status 2 without starting a session."
+      },
+      {
+        "rule": "When multiple flags are invalid (e.g., -focus 0 and -long 2000), only the first invalid flag (in argument order) is reported and the program exits immediately.",
+        "text": "Given -focus 0 -long 2000, when the program starts, then it prints 'Error: -focus must be at least 1 minute' and exits with status 2; it does not report the invalid -long value."
+      },
+      {
+        "rule": "Validation must reject non-integer durations (e.g., -focus 2.5) with a flag-named error and exit status 2.",
+        "text": "Given `-focus 2.5`, when the program starts, then it prints 'Error: -focus must be a whole number of minutes' and exits with status 2. The Timer.Run() method is never called."
+      },
+      {
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-long 0`, when the program starts, then it prints 'Error: -long must be at least 1 minute' and exits with status 2. The error message specifically names the -long flag, not -focus or -short."
+      },
+      {
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-short 1441`, when the program starts, then it prints 'Error: -short must not exceed 1440 minutes' and exits with status 2. The validation correctly applies the 24-hour upper bound to the break durations as well."
+      },
+      {
+        "rule": "When multiple flags are invalid (e.g., -focus 0 and -long 2000), only the first invalid flag (in argument order) is reported and the program exits immediately.",
+        "text": "Given `-short 999999 -focus 25`, when the program starts, then it prints 'Error: -short must not exceed 1440 minutes' and exits with status 2. It does NOT print an error for -focus because -focus is valid, but it stops at the first invalid flag (-short) encountered in parsing order."
+      },
+      {
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given `-focus 25 -short 5 -long 15` (all defaults, all valid), when the program starts, then no error is printed, exit status is 0, and the Timer begins with the default durations. This is the happy path confirming valid inputs don't trigger the error path."
+      },
+      {
+        "rule": "Validation must reject non-integer durations (e.g., -focus 2.5) with a flag-named error and exit status 2.",
+        "text": "Given `-long 3.0`, when the program starts, then it prints 'Error: -long must be a whole number of minutes' and exits with status 2. Note: 3.0 has a decimal point even though the value is mathematically an integer; it must be rejected as non-integer format."
+      },
+      {
+        "rule": "When multiple flags are invalid (e.g., -focus 0 and -long 2000), only the first invalid flag (in argument order) is reported and the program exits immediately.",
+        "text": "Given `-focus 0 -long 2000`, when the program starts, then it prints 'Error: -focus must be at least 1 minute' and exits with status 2; it does not report the invalid -long value."
+      },
+      {
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given -focus 25 -short 5 -long 15 (all valid defaults), when the program starts, then no error is printed, exit status is 0, and the Timer begins with default durations. This confirms valid inputs do not trigger the error path."
+      },
+      {
+        "rule": "Validation must reject non-integer durations (e.g., -focus 2.5) with a flag-named error and exit status 2.",
+        "text": "Given -focus abc, when the program starts, then it prints 'Error: -focus must be a whole number of minutes' and exits with status 2. This covers non-numeric strings, not just decimals."
+      },
+      {
+        "rule": "Validation must reject non-integer durations (e.g., -focus 2.5) with a flag-named error and exit status 2.",
+        "text": "Given -focus -5, when the program starts, then it prints 'Error: -focus must be at least 1 minute' and exits with status 2. Negative values are integers and fail the lower bound check, not the format check."
+      },
+      {
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag, exit with status 2, and not start any session.",
+        "text": "Given -short 0 -long 1441, when the program starts, then it prints 'Error: -short must be at least 1 minute' and exits with status 2. The first invalid flag in argument order is reported; -long is never validated because the program exits immediately."
+      },
+      {
+        "rule": "When multiple flags are invalid (e.g., -focus 0 and -long 2000), only the first invalid flag (in argument order) is reported and the program exits immediately.",
+        "text": "Given -long 2000 -focus 0, when the program starts, then it prints 'Error: -long must not exceed 1440 minutes' and exits with status 2. The order of flags on the command line determines which error is reported, not the internal flag order."
       }
     ],
     "questions": [
       {
-        "text": "What is the exact behavior for durations that are valid but very large (e.g., 12 hours)?",
+        "text": "What happens if a user provides non-integer values for the durations, such as `-focus 2.5`?",
         "state": "resolved",
         "score": 0,
         "answers": [
-          "Valid durations up to 24 hours are accepted. The timer will run for that duration. No special truncation or warning is needed, just standard validation bounds."
+          "The program should print an error message naming the flag, exit with status 2, and not start any session."
         ]
       },
       {
-        "text": "Does the `-long` flag also require validation, or is it only `-focus` and `-short`?",
-        "state": "escalated",
-        "score": 0.3333333333333333,
+        "text": "If multiple flags are invalid (e.g., -focus 0 and -long 2000), does the program report the first invalid flag in argument order, or all invalid flags?",
+        "state": "resolved",
+        "score": 0,
         "answers": [
-          "Yes, the `-long` flag must be validated using the same constraints (strictly greater than zero and no more than 24 hours) to ensure consistency and prevent resource exhaustion.",
-          "Yes, the `-long` flag must also be validated (strictly greater than zero and no more than 24 hours) to ensure consistency across all duration flags and to adhere to the global constraint regarding resource exhaustion.",
-          "The `-long` flag must also be validated to be positive and not exceed 24 hours to maintain consistency across all duration flags and to adhere to the global constraint regarding resource exhaustion."
+          "The program should report the first invalid flag encountered during parsing and exit immediately to minimize complexity."
         ]
       },
       {
-        "text": "What is the default duration for `-long` if it is not specified?",
-        "state": "parked",
-        "score": 0.3333333333333333,
+        "text": "What is the exact error message format for a non-integer duration (e.g., 'must be a whole number of minutes' vs 'invalid value'), since the spec only names the flag and exit code but not the full string for this case?",
+        "state": "resolved",
+        "score": 1,
         "answers": [
-          "The default duration for `-long` will be 15 minutes, adhering to the standard 25/5/15 Pomodoro pattern.",
-          "The `-long` duration will default to 15 minutes. To ensure a predictable baseline, the defaults for all flags will be: `-focus` 25 minutes, `-short` 5 minutes, and `-long` 15 minutes.",
-          "The default duration for `-long` will be 20 minutes, following the standard 25/5/20 Pomodoro pattern (25m focus, 5m short, 20m long). These defaults should be implemented as package-level constants in `main.go`."
+          "To maintain consistency with the existing error patterns for bounds checking (e.g., 'Error: -focus must be at least 1 minute'), we should use: 'Error: [flag] must be a whole number of minutes'.",
+          "To maintain consistency with the established error pattern (e.g., 'Error: -focus must be at least 1 minute'), we will use: 'Error: \u003cflag\u003e must be a whole number of minutes'.",
+          "To maintain consistency with the existing error message patterns (e.g., 'Error: -focus must be at least 1 minute'), the format will be: 'Error: -\u003cflag\u003e must be a whole number of minutes'."
+        ]
+      },
+      {
+        "text": "Go's flag package parses `-focus 2.5` as a type error for int flags, producing a different error message (e.g., 'flag: invalid value \"2.5\" for -focus'). Should the test assert the exact custom message 'Error: -focus must be a whole number of minutes', or is it acceptable to assert any error containing '-focus' with exit code 2? The implementation must decide whether to use flag.Int (which rejects 2.5 with its own message) or flag.String + manual parsing (which allows the custom message). This affects test assertions and must be decided before coding.",
+        "state": "resolved",
+        "score": 1,
+        "answers": [
+          "We should use `flag.String` and manual parsing to `int`. This allows us to maintain a consistent error format ('Error: -[flag] must be...') across both type-validation and bounds-validation failures. Consequently, the test must assert the exact custom error message.",
+          "We must use `flag.String` with manual parsing. This allows us to maintain the established error pattern: `Error: -\u003cflag\u003e must be a whole number of minutes`. Using `flag.Int` would introduce an inconsistent error format from the standard library. Tests must assert this exact custom message to ensure a uniform user experience across all validation types.",
+          "We will use `flag.String` with manual parsing. This ensures the error message follows our established pattern: `Error: -\u003cflag\u003e must be a whole number of minutes`. Therefore, tests must assert this exact custom message to maintain consistent UX and prevent regression to the default Go `flag` package error format."
+        ]
+      },
+      {
+        "text": "Does 'argument order' for the first-invalid-flag rule mean the order flags appear on the command line (e.g., -long 2000 -focus 0 reports -long), or the internal fixed order (focus, short, long)? The examples imply command-line order, but Go's flag package does not preserve argument order by default, so the implementation must either parse os.Args manually or document the actual behavior. This affects which test cases are correct.",
+        "state": "resolved",
+        "score": 1,
+        "answers": [
+          "It refers to the order flags appear on the command line. To implement this, the validation logic will check the flags in the order they are encountered in the command-line arguments (os.Args).",
+          "The rule refers to the order flags appear on the command line. To ensure compliance with the examples (such as Example 21), the validation logic must iterate through the flags in the order they are provided in the command-line arguments. We will implement this by verifying the flags based on their appearance order in the arguments to ensure the first invalid flag encountered in the user's input is the one reported.",
+          "It refers to the order flags appear on the command line. To implement this, the validation logic will iterate through the arguments as they appear in `os.Args` to identify and report the first flag that violates the duration constraints, ensuring the behavior matches the provided examples."
+        ]
+      },
+      {
+        "text": "For non-numeric values like -focus abc, should the error message be 'Error: -focus must be a whole number of minutes' (same as for 2.5), or should it distinguish between non-numeric and non-integer-numeric inputs? The contract only specifies the message for non-integer format, not for non-numeric strings.",
+        "state": "resolved",
+        "score": 1,
+        "answers": [
+          "We should use the same message: 'Error: -[flag] must be a whole number of minutes'. Since we have already decided to use manual string parsing to maintain a consistent error format, any input that fails to parse as a valid integer (be it a float like 2.5 or a string like 'abc') should trigger the same unified error. This minimizes complexity and adheres to the established pattern.",
+          "We should use the same error message: 'Error: [flag] must be a whole number of minutes'. This maintains consistency with the established pattern for all inputs that fail to represent a valid whole number of minutes, regardless of whether they are non-numeric strings or decimals. This simplifies the validation logic and provides a uniform user experience.",
+          "We should use the same error message: 'Error: [flag] must be a whole number of minutes'. This maintains consistency with the established error pattern and avoids unnecessary complexity in the validation logic. Both '2.5' and 'abc' fail the fundamental requirement of being a whole number of minutes."
         ]
       }
     ],
-    "size": 2,
+    "size": 1,
     "split_into": null,
     "layer_plan": [
       {
         "n": 1,
-        "name": "CLI entry point and flag parsing",
+        "name": "CLI Argument Parsing \u0026 Validation",
         "scenarios": [
           1,
           2,
@@ -80,9 +168,18 @@
           4,
           5,
           6,
-          7
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16
         ],
-        "test_level": "functional"
+        "test_level": ""
       }
     ],
     "gates": [
@@ -107,11 +204,15 @@
         "state": "not-applicable"
       }
     ],
-    "verdict": "paused",
+    "verdict": "not-ready",
     "disagreements": null,
-    "deliverable": true
+    "deliverable": true,
+    "ready_roles": [
+      "product",
+      "architect"
+    ]
   },
-  "meeting_id": "20261011-163050-9515d2",
+  "meeting_id": "20261011-164833-d12461",
   "story_file": "C0005-cli-configuration-validation.md",
-  "verdict": "paused"
+  "verdict": "not-ready"
 }
