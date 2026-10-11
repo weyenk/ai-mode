@@ -2,13 +2,14 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "amigos",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
+  "prev_stage": "amigos",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
@@ -16,7 +17,7 @@
     "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-11T17:06:05Z",
+  "updated": "2026-10-11T17:51:14Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -85,6 +86,17 @@
       "done": "Retry requested.",
       "why": "A human cleared the block.",
       "next": "The next tick re-runs amigos."
+    },
+    {
+      "ts": "2026-10-11T17:51:14Z",
+      "by": "bot-amigos",
+      "stage": "amigos → needs-human",
+      "done": "Amigos paused: a question needs the requester.",
+      "artifacts": [
+        "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json"
+      ],
+      "why": "Verdict paused from meeting 20261011-173937-6da5c8; ready: ; 1 rules, 10 examples; layers: 1 CLI Entrypoint \u0026 Validation [functional] examples [1 2 3 4 5 6 7 8 9 10]; no flag. Escalated: [escalated] Since Go's `flag` package produces its own error format for non-numeric input (e.g., `invalid value \"abc\" for flag -focus`), should we implement a custom `flag.FlagSet` to ensure the error message strictly follows the 'Invalid value for -flag: value' pattern for all failure modes? | [parked] To ensure the test suite can verify error messages, should we redirect the `flag` package's error output to the same `io.Writer` used by the `Timer`?",
+      "next": "The requester answers with `ai-mode pipeline answer C0005 \"\u003canswer\u003e\"`, which adds it to the story and re-runs amigos."
     }
   ]
 }
