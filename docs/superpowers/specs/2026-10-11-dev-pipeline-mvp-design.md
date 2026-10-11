@@ -81,3 +81,29 @@ at a time (roadmap invariant).
   what the human must decide, and stops.
 - Model output is data: stage inputs come from artifacts, never from notes; role replies are parsed into fixed shapes
   (JSON estimates, review comments) or written to files the next stage reads as context.
+
+## As built: what the first run changed (2026-10-11)
+
+Running the pomodoro request through the real dev-shop roles exposed failures that unit tests could not; each was fixed
+in the tool, not by hand-editing an artifact:
+
+- **Story plans are JSON, rendered to markdown.** In a stage 8 dry run architect spent fifteen `plan lint` rounds on the
+  drafting-plans markdown's format (backtick-quoted excerpts, a truncated packet, edits that no longer matched) and split
+  tests from implementation. It now writes `<story>.plan.json`; `ai-mode plan render` writes the drafting-plans document
+  (format right by construction) and enforces the pipeline's rules (a task covering scenarios owns both its test and its
+  code file; every contract scenario covered). The same dry run then planned in seven turns, first time clean.
+- **amigos agreement is judged by decision, not wording.** Self-consistency compared sampled answers by exact string, so
+  three answers that all said "exit code 0" scored 0.33 and settled questions were parked and escalated to the human. The
+  `fast` model now groups answers by decision (exact match is the fallback), and a sample whose answer rewords the
+  question still counts.
+- **amigos examples are de-duplicated by text and the layer plan's bookkeeping is repaired.** A meeting where all three
+  agreed ended not-ready because roles re-sent examples under reworded rules (27 examples) and architect's layer plan
+  listed only the first six. Leftover examples now join the layer holding their rule; each repair is logged.
+- **amigos turns know their round.** qa kept adding rules and questions every round while product and architect agreed;
+  the last round now says the story is ready only if all three set ready, and polish becomes a follow-up story.
+- **The stack is built on a recorded base commit.** The pipeline commits notes to its branch while stage 8 runs; building
+  layer 1 on the moving branch collided with files the worktree held untracked.
+- **Agent `run` treats quoted shell characters as argv** (`go test -run '^(A|B)$'` was refused).
+- **Branch builds need `AI_MODE_PRESETS`** pointed at the branch's `presets/` (the user config pins the main checkout).
+- **Requester answers in the acceptance run** were given by the operator from the original request and are logged on the
+  cards as such (design decision above).
