@@ -17,7 +17,6 @@ _empty_
 | C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
 | C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
 | C0003 | plan | tracking | C0002 | Pomodoro CLI — feature plan | planning → tracking (bot-architect): Cut 2 stories (C0004, C0005), in stack order. |
-| C0004 | story | amigos | C0003 | Core Timer Engine | → amigos (bot-architect): Story ST1 cut from the feature plan; product worded it. |
 | C0005 | story | amigos | C0003 | CLI Configuration & Validation | → amigos (bot-architect): Story ST2 cut from the feature plan; product worded it. |
 
 ## review
@@ -30,4 +29,6 @@ _empty_
 
 ## blocked
 
-_empty_
+| Card | Type | Stage | Parent | Title | Latest note |
+| --- | --- | --- | --- | --- | --- |
+| C0004 | story | needs-human | C0003 | Core Timer Engine | amigos → needs-human (bot-chief): Stage amigos stopped before finishing. |

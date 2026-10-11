@@ -2,17 +2,18 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "amigos",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
+  "prev_stage": "amigos",
   "artifacts": {
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
     "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
     "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T16:21:15Z",
+  "updated": "2026-10-11T16:24:38Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -24,6 +25,14 @@
       ],
       "why": "Covers S1, S2, S4; size M; stack position 1.",
       "next": "Three amigos (product, qa, architect) refine it into a Story Contract."
+    },
+    {
+      "ts": "2026-10-11T16:24:38Z",
+      "by": "bot-chief",
+      "stage": "amigos → needs-human",
+      "done": "Stage amigos stopped before finishing.",
+      "why": "amigos failed: {\"code\":\"unauthorized_caller\",\"detail\":\"caller pipeline is not allowlisted\"}",
+      "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0004`."
     }
   ]
 }
