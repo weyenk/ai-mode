@@ -310,6 +310,17 @@ func storyPlanChecks(pj *storyPlanJSON, contractMD string) []string {
 				out = append(out, fmt.Sprintf("%s: scenario %s needs a check (what the test asserts, with values)", t.ID, s.ID))
 			}
 		}
+		if t.Packet == "code" && len(t.Scenarios) > 0 {
+			hasTest := false
+			for _, f := range t.Files {
+				if strings.HasSuffix(f.Path, "_test.go") && strings.ToUpper(firstNonEmpty(f.Phase, "A")) == "A" {
+					hasTest = true
+				}
+			}
+			if !hasTest {
+				out = append(out, fmt.Sprintf("%s is a code packet that covers scenarios but has no phase A _test.go file; make it a spec packet (qa writes the tests, coder the code) or give the tests in phase A", t.ID))
+			}
+		}
 		if t.Packet == "code" && len(t.Files) == 0 {
 			out = append(out, fmt.Sprintf("%s is a code packet without files; give files or make it a spec packet", t.ID))
 		}

@@ -120,3 +120,12 @@ func TestPlanRenderCommand_WritesMarkdownNextToTheJSON(t *testing.T) {
 		t.Fatalf("plan:\n%s", b)
 	}
 }
+
+func TestStoryPlanChecks_CodePacketCoveringScenariosNeedsItsTests(t *testing.T) {
+	pj, _ := parseStoryPlanJSON([]byte(`{"goal":"g","architecture":"a","tasks":[
+		{"id":"T01","title":"Main","kind":"integration","packet":"code","owns":["main.go","main_test.go"],"stack_layer":1,
+		 "scenarios":[{"id":"S1","test":"TestMain_S1_X","check":"x"}],"files":[{"path":"main.go","phase":"A","code":"package main\n\nfunc main() {}\n"}]}]}`))
+	if f := strings.Join(storyPlanChecks(pj, "- **S1** (R1) x\n"), "\n"); !strings.Contains(f, "no phase A _test.go file") {
+		t.Fatalf("findings:\n%s", f)
+	}
+}

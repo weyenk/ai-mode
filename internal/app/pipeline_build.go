@@ -696,6 +696,17 @@ func splitTests(owns []string) (tests, impl []string) {
 	return
 }
 
+// hasPhaseATests reports whether a code packet brings its own tests; one that does not is run like a spec packet
+// (qa writes the tests, coder the code, with the packet's code as a hint).
+func hasPhaseATests(pk *planPacket) bool {
+	for _, b := range pk.Blocks {
+		if strings.HasSuffix(b.File, "_test.go") && (b.Phase == "A" || b.Phase == "") {
+			return true
+		}
+	}
+	return false
+}
+
 func applyPhase(mod string, pk *planPacket, phase string) error {
 	for _, b := range pk.Blocks {
 		if b.File == "" || (phase != "" && b.Phase != phase) {
@@ -725,7 +736,7 @@ func (ex *executor) runTask(t planTask, redDone bool) error {
 		}
 		ex.log = append(ex.log, t.ID+" contract applied.")
 		return ex.commit(t, "contract", fmt.Sprintf("contract(%s): %s", t.ID, t.Title))
-	case t.Packet == "code":
+	case t.Packet == "code" && hasPhaseATests(pk):
 		if err := applyPhase(ex.mod, pk, "A"); err != nil {
 			return err
 		}
