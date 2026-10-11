@@ -2,10 +2,11 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "amigos",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
+  "prev_stage": "amigos",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0004-core-timer-engine.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
@@ -13,7 +14,7 @@
     "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T16:47:22Z",
+  "updated": "2026-10-11T17:39:36Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -85,6 +86,17 @@
       ],
       "why": "Status lines, updated in place each second: a focus session shows 'Session N: MM:SS' (N counts focus sessions from 1), a short break shows 'Break: MM:SS', a long break shows 'Long break: MM:SS'. On Ctrl-C it prints exactly one line, 'Completed N focus sessions' (only fully finished focus sessions co…",
       "next": "Amigos runs again with the answer in the story."
+    },
+    {
+      "ts": "2026-10-11T17:39:36Z",
+      "by": "bot-amigos",
+      "stage": "amigos → needs-human",
+      "done": "Amigos: not ready after two meetings.",
+      "artifacts": [
+        "docs/pipeline/stories/C0004-core-timer-engine.contract.json"
+      ],
+      "why": "Verdict not-ready from meeting 20261011-172215-6ab33e; ready: product, qa, architect; 8 rules, 20 examples; layers: 1 Core Timer Engine [functional] examples [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20]; no flag. Open: ",
+      "next": "A human clarifies the story (`ai-mode pipeline answer C0004 \"\u003cclarification\u003e\"`) or splits it."
     }
   ]
 }
