@@ -146,3 +146,29 @@ func TestCmd_S33_IntakeSourcesAndPrecedence(t *testing.T) {
 		t.Fatalf("%q", o)
 	}
 }
+
+func TestCmd_P7_StoryFileGetsItsVerdictSavedNextToIt(t *testing.T) {
+	dir := t.TempDir()
+	story := filepath.Join(dir, "C0004-core.md")
+	os.WriteFile(story, []byte("# Core\nAs a user..."), 0o644)
+	run, s := fakeRun(readyContract(), nil)
+	if code, _, _ := amigos([]string{"--story", story, "--caller", "pipeline"}, "", run); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if s.in.Provenance.CallerID != "pipeline" || !strings.Contains(s.in.Story, "As a user") {
+		t.Fatalf("intake %+v", s.in)
+	}
+	var saved struct {
+		MeetingID string        `json:"meeting_id"`
+		Verdict   Verdict       `json:"verdict"`
+		Story     string        `json:"story_file"`
+		Contract  StoryContract `json:"contract"`
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "C0004-core.contract.json"))
+	if err != nil || json.Unmarshal(data, &saved) != nil {
+		t.Fatalf("contract not saved next to the story: %v", err)
+	}
+	if saved.Verdict != VerdictReady || saved.MeetingID == "" || saved.Contract.Rules[0] != "r1" || saved.Story != "C0004-core.md" {
+		t.Fatalf("saved %+v", saved)
+	}
+}

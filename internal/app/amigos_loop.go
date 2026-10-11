@@ -42,7 +42,7 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 				return l.c, l.snapshot(round)
 			}
 		}
-		architectReady := false
+		readyRoles := map[string]bool{}
 		for _, role := range meetingRoles {
 			turn, err := l.askTurn(role, "")
 			if err != nil {
@@ -51,8 +51,12 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 			if err := l.merge(round, role, turn); err != nil {
 				return l.c, err
 			}
-			if role == "architect" {
-				architectReady = turn.Ready
+			readyRoles[role] = turn.Ready
+		}
+		l.c.ReadyRoles = nil
+		for _, role := range meetingRoles {
+			if readyRoles[role] {
+				l.c.ReadyRoles = append(l.c.ReadyRoles, role)
 			}
 		}
 		for i := range l.c.Questions {
@@ -62,7 +66,7 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 				}
 			}
 		}
-		if l.ready(architectReady) {
+		if l.ready(len(l.c.ReadyRoles) == len(meetingRoles)) {
 			l.c.Verdict = VerdictReady
 			return l.c, l.snapshot(round)
 		}
@@ -170,6 +174,10 @@ func (l *loopRun) merge(round int, role string, t Turn) error {
 		}
 	}
 	if role == "architect" {
+		c.Deliverable = t.Deliverable
+		if t.Flag != "" && t.Flag != "none" {
+			c.Flag = t.Flag
+		}
 		if t.Size != 0 {
 			c.Size = t.Size
 		}
@@ -243,8 +251,10 @@ func (l *loopRun) reaskParked(round int) (bool, error) {
 	return false, nil
 }
 
-func (l *loopRun) ready(architectReady bool) bool {
-	if !architectReady {
+// ready: product, qa and architect all reported ready this round, architect confirmed the story is deliverable on
+// its own, every question is resolved and every rule has an example.
+func (l *loopRun) ready(allReady bool) bool {
+	if !allReady || !l.c.Deliverable {
 		return false
 	}
 	for _, q := range l.c.Questions {

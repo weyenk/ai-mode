@@ -228,8 +228,9 @@ type pipeline struct {
 	stages   map[string]stageFunc // "<type>:<stage>"
 	profile  Profile
 	trace    string
-	ask      func(role, user string, maxTokens int) (string, error) // one consult; tests replace it
-	newAgent func(spec agentSpec) (*agentSession, error)            // an agent-mode role; tests replace it
+	ask      func(role, user string, maxTokens int) (string, error)   // one consult; tests replace it
+	newAgent func(spec agentSpec) (*agentSession, error)              // an agent-mode role; tests replace it
+	amigos   func(dir, story string, rounds int) (int, string, error) // `ai-mode amigos --story`; tests replace it
 	log      io.Writer
 	git      bool // commit artifacts after each tick
 	push     bool // push the pipeline branch after each commit
@@ -492,6 +493,7 @@ func newPipeline(repo string, git, push bool) (*pipeline, error) {
 		return text, nil
 	}
 	pl.newAgent = func(s agentSpec) (*agentSession, error) { return newRoleAgent(pl.profile, s, pl.trace, "pipeline") }
+	pl.amigos = amigosExec
 	return pl, nil
 }
 
@@ -543,6 +545,7 @@ const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
   tick [--push]          stage 2: run one stage on one card, commit the artifacts
   run [--push] [--max-ticks N]   tick until nothing can advance
   retry <card>           move a needs-human card back to the stage it stopped at
+  answer <card> <text>   add the requester's answer to a story amigos paused on, and re-run amigos
   launchd [--interval S] print a LaunchAgent plist that runs tick (not installed)`
 
 func cmdPipeline(args []string) int {
@@ -588,6 +591,14 @@ func cmdPipeline(args []string) int {
 		}
 		b, _ := json.MarshalIndent(c, "", "  ")
 		fmt.Println(string(b))
+		return 0
+	case "answer":
+		if len(pos) < 2 {
+			return fail("usage: ai-mode pipeline answer <card> <answer...>")
+		}
+		if err := pl.answer(pos[0], strings.Join(pos[1:], " ")); err != nil {
+			return fail("%v", err)
+		}
 		return 0
 	case "retry":
 		if len(pos) != 1 {
@@ -724,8 +735,8 @@ func defaultStages() map[string]stageFunc {
 	m["spec:planning"] = stageFeaturePlan
 	m["plan:planning"] = stageStories
 	m["story:amigos"] = stageAmigos
-	m["story:ready"] = stageImplement
-	m["story:architect-review"] = stageReview
-	m["story:handoff"] = stageHandoff
+	for k, f := range laterStages {
+		m[k] = f
+	}
 	return m
 }

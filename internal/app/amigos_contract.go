@@ -100,6 +100,9 @@ type StoryContract struct {
 	Gates         []Gate         `json:"gates"`
 	Verdict       Verdict        `json:"verdict"`
 	Disagreements []Disagreement `json:"disagreements"`
+	Deliverable   bool           `json:"deliverable"`    // architect: the story stands on its own once merged (flag off, if it has one)
+	Flag          string         `json:"flag,omitempty"` // the feature flag the story ships behind, if any
+	ReadyRoles    []string       `json:"ready_roles,omitempty"`
 }
 
 // DecisionEntry is one line of the decision log.
@@ -142,6 +145,8 @@ type Turn struct {
 	SplitInto     []string       `json:"split_into,omitempty"`
 	LayerPlan     []Layer        `json:"layer_plan,omitempty"`
 	Disagreements []Disagreement `json:"disagreements,omitempty"`
+	Deliverable   bool           `json:"deliverable,omitempty"`
+	Flag          string         `json:"flag,omitempty"`
 	Ready         bool           `json:"ready"`
 }
 

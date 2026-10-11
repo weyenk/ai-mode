@@ -41,9 +41,9 @@ func count(xs []string, prefix string) int {
 
 func s12turns() map[string][]Turn {
 	return map[string][]Turn{
-		"product":   {{Rules: []string{"r1"}, Questions: []string{"Q1"}}},
-		"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}}},
-		"architect": {{Ready: true}, ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A")},
+		"product":   {{Rules: []string{"r1"}, Questions: []string{"Q1"}, Ready: true}},
+		"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true}, ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A")},
 	}
 }
 
@@ -95,7 +95,7 @@ func TestLoop_S15_DisagreementParksRegardless(t *testing.T) {
 
 func TestLoop_S27_UnparseableReplyReaskedOnce(t *testing.T) {
 	turns := func() map[string][]Turn {
-		return map[string][]Turn{"product": {{Rules: []string{"r1"}}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}}}}, "architect": {{Ready: true}}}
+		return map[string][]Turn{"product": {{Rules: []string{"r1"}, Ready: true}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}}, "architect": {{Ready: true, Deliverable: true}}}
 	}
 	o := runLoop(1, 1.0, turns(), map[string][]error{"product": {errors.New("bad json")}}, nil, nil)
 	if o.err != nil || o.c.Verdict != VerdictReady || !reflect.DeepEqual(o.asker.Calls, []string{"product", "product", "qa", "architect"}) {
@@ -134,9 +134,9 @@ func TestLoop_S29_ResumeContinuesFromSnapshot(t *testing.T) {
 		State:    MeetingState{MeetingID: "m1", Round: 1},
 	}
 	o := runLoop(2, 1.0, map[string][]Turn{
-		"product":   {{}},
-		"qa":        {{}},
-		"architect": {ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A"), {Ready: true}},
+		"product":   {{Ready: true}},
+		"qa":        {{Ready: true}},
+		"architect": {ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A"), {Ready: true, Deliverable: true}},
 	}, nil, func(op *meetingOptions) { op.Resume = snap }, nil)
 	if o.err != nil || o.c.Verdict != VerdictReady || o.c.Questions[0].State != QuestionResolved {
 		t.Fatalf("got %q %+v %v", o.c.Verdict, o.c.Questions, o.err)
@@ -196,5 +196,25 @@ func TestLoop_AuditRecordsScoreTimestampAndRationale(t *testing.T) {
 	}
 	if n != 3 {
 		t.Fatalf("want 3 decisions, got %d", n)
+	}
+}
+
+func TestLoop_P7_ReadyNeedsAllThreeAmigosAndADeliverableStory(t *testing.T) {
+	turns := func(productReady, deliverable bool) map[string][]Turn {
+		return map[string][]Turn{
+			"product":   {{Rules: []string{"r1"}, Ready: productReady}},
+			"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+			"architect": {{Ready: true, Deliverable: deliverable, Flag: "none"}},
+		}
+	}
+	if o := runLoop(1, 1.0, turns(false, true), nil, nil, nil); o.c.Verdict != VerdictNotReady || strings.Join(o.c.ReadyRoles, ",") != "qa,architect" {
+		t.Fatalf("product not ready must block: %q %v", o.c.Verdict, o.c.ReadyRoles)
+	}
+	if o := runLoop(1, 1.0, turns(true, false), nil, nil, nil); o.c.Verdict != VerdictNotReady {
+		t.Fatalf("a story architect does not confirm as deliverable on its own is not ready: %q", o.c.Verdict)
+	}
+	o := runLoop(1, 1.0, turns(true, true), nil, nil, nil)
+	if o.c.Verdict != VerdictReady || !o.c.Deliverable || o.c.Flag != "" {
+		t.Fatalf("all three ready and deliverable: %q %+v", o.c.Verdict, o.c)
 	}
 }

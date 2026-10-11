@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -124,5 +125,25 @@ func runAmigos(args []string, run meetingRunner, stdin io.Reader, stdout, stderr
 	if *out != "" {
 		os.WriteFile(*out, []byte(sb.String()), 0o600)
 	}
+	if *story != "" && *story != "-" {
+		if err := saveStoryVerdict(*story, id, c); err != nil {
+			fmt.Fprintln(stderr, "warning: could not save the verdict next to the story: "+err.Error())
+		}
+	}
 	return exitCodeFor(c.Verdict)
+}
+
+// storyContractPath is where the verdict of a story file is kept: <story without extension>.contract.json.
+func storyContractPath(story string) string {
+	return strings.TrimSuffix(story, filepath.Ext(story)) + ".contract.json"
+}
+
+// saveStoryVerdict records the meeting's verdict and contract next to the story file, so the implement stage
+// (`ai-mode work start`) can refuse a story that is not ready.
+func saveStoryVerdict(story, meetingID string, c StoryContract) error {
+	b, err := json.MarshalIndent(map[string]any{"meeting_id": meetingID, "verdict": c.Verdict, "story_file": filepath.Base(story), "contract": c}, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(storyContractPath(story), append(b, '\n'), 0o644)
 }
