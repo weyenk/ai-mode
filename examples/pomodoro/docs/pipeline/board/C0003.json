@@ -1,0 +1,27 @@
+{
+  "id": "C0003",
+  "title": "Pomodoro CLI — feature plan",
+  "type": "plan",
+  "stage": "planning",
+  "context": "hobby",
+  "parent": "C0002",
+  "artifacts": {
+    "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
+    "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md"
+  },
+  "created": "2026-10-11T16:21:09Z",
+  "updated": "2026-10-11T16:21:09Z",
+  "notes": [
+    {
+      "ts": "2026-10-11T16:21:09Z",
+      "by": "bot-architect",
+      "stage": "→ planning",
+      "done": "Feature plan card created.",
+      "artifacts": [
+        "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md"
+      ],
+      "why": "One feature plan per spec in the MVP.",
+      "next": "Stories are cut from the plan (stage 6)."
+    }
+  ]
+}

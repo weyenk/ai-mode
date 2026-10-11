@@ -2,7 +2,7 @@
   "id": "C0002",
   "title": "Pomodoro CLI",
   "type": "spec",
-  "stage": "planning",
+  "stage": "tracking",
   "context": "hobby",
   "parent": "C0001",
   "order": 1,
@@ -11,7 +11,7 @@
     "spec-reviews": "docs/pipeline/specs/reviews/"
   },
   "created": "2026-10-11T16:14:36Z",
-  "updated": "2026-10-11T16:17:12Z",
+  "updated": "2026-10-11T16:21:09Z",
   "notes": [
     {
       "ts": "2026-10-11T16:14:36Z",
@@ -37,6 +37,17 @@
       ],
       "why": "0 blocking review item(s) raised; chief's decisions are in the spec's Review log.",
       "next": "architect writes the feature plan: contracts, stories with their scenarios, flags; `ai-mode plan lint --feature` must pass."
+    },
+    {
+      "ts": "2026-10-11T16:21:09Z",
+      "by": "bot-architect",
+      "stage": "planning → tracking",
+      "done": "Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003.",
+      "artifacts": [
+        "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md"
+      ],
+      "why": "`ai-mode plan lint --feature` passes: every spec scenario is in exactly one story, dependencies are acyclic, flags are consistent.",
+      "next": "Stage 6 turns each story into a story file and card."
     }
   ]
 }

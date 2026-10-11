@@ -15,7 +15,8 @@ _empty_
 | Card | Type | Stage | Parent | Title | Latest note |
 | --- | --- | --- | --- | --- | --- |
 | C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
-| C0002 | spec | planning | C0001 | Pomodoro CLI | spec → planning (bot-architect): Spec written by architect (5 scenarios), reviewed by product, research, security, ux, design, architect, merged by chief. |
+| C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
+| C0003 | plan | planning | C0002 | Pomodoro CLI — feature plan | → planning (bot-architect): Feature plan card created. |
 
 ## review
 
