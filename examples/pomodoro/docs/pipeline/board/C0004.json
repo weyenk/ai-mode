@@ -2,11 +2,10 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "needs-human",
+  "stage": "amigos",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
-  "prev_stage": "amigos",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0004-core-timer-engine.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
@@ -14,7 +13,7 @@
     "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T16:30:50Z",
+  "updated": "2026-10-11T16:36:36Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -53,6 +52,17 @@
       ],
       "why": "Verdict paused from meeting 20261011-162451-cc03e6; ready: ; 5 rules, 6 examples; layers: 1 Core State Machine \u0026 Transitions [] examples [1 2]; 2 Signal Handling \u0026 Process Lifecycle [] examples [3]; no flag. Escalated: [escalated] Does the counter for '4 focus sessions' reset after a Long Break, or is it a cumulative counter for the entire app lifetime? | [parked] What is the exact terminal escape sequence or format required for the 'in-place' update? Is it just \\r, or does it require ANSI codes to clear the line if the new string is shorter? | [parked] The current `Run() error` signature lacks a mechanism (like `context.Context` or a shutdown channel) to receive the `SIGINT` signal from the main loop. Should we update the signature to `Run(ctx context.Context) error` to facilitate graceful exit?",
       "next": "The requester answers with `ai-mode pipeline answer C0004 \"\u003canswer\u003e\"`, which adds it to the story and re-runs amigos."
+    },
+    {
+      "ts": "2026-10-11T16:36:36Z",
+      "by": "requester (answered by the operator, Claude, from the original request)",
+      "stage": "needs-human → amigos",
+      "done": "The requester answered.",
+      "artifacts": [
+        "docs/pipeline/stories/C0004-core-timer-engine.md"
+      ],
+      "why": "Every fourth focus session (the 4th, 8th, 12th, ...) is followed by the long break instead of a short one, so the four-session cycle starts over after each long break; the completed-focus total printed on Ctrl-C counts the whole run. The in-place line is written as a carriage return, the status text…",
+      "next": "Amigos runs again with the answer in the story."
     }
   ]
 }

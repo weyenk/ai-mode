@@ -73,3 +73,7 @@ func (t *Timer) Run() error {
 ```
 
 - The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.
+
+## Answers from the requester
+
+- Every fourth focus session (the 4th, 8th, 12th, ...) is followed by the long break instead of a short one, so the four-session cycle starts over after each long break; the completed-focus total printed on Ctrl-C counts the whole run. The in-place line is written as a carriage return, the status text, then the ANSI erase-to-end-of-line sequence ESC[K so a shorter line leaves no leftovers. I have no preference on internal signatures: Run taking a context.Context that main cancels on Ctrl-C (signal.NotifyContext) is fine. (requester (answered by the operator, Claude, from the original request), 2026-10-11)
