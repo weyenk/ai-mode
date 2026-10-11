@@ -1,0 +1,25 @@
+{
+  "id": "C0001",
+  "title": "Simple pomodoro timer",
+  "type": "feature",
+  "stage": "new",
+  "context": "hobby",
+  "artifacts": {
+    "request": "docs/pipeline/requests/C0001-simple-pomodoro-timer.md"
+  },
+  "created": "2026-10-11T16:11:27Z",
+  "updated": "2026-10-11T16:11:27Z",
+  "notes": [
+    {
+      "ts": "2026-10-11T16:11:27Z",
+      "by": "human",
+      "stage": "→ new",
+      "done": "Request created.",
+      "artifacts": [
+        "docs/pipeline/requests/C0001-simple-pomodoro-timer.md"
+      ],
+      "why": "Intake.",
+      "next": "The next tick runs viability (research, product, architect)."
+    }
+  ]
+}
