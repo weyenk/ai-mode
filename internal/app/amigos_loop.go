@@ -121,6 +121,9 @@ func (l *loopRun) ask(role, focus string) (string, string, error) {
 
 func (l *loopRun) askTurn(role, focus string) (Turn, error) {
 	prompt := l.tc.Prompt(role, l.in, l.c, focus) + roundNote(l.round, l.opts.Rounds)
+	if focus == "" {
+		prompt += l.gapNote()
+	}
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		p := prompt
@@ -157,10 +160,18 @@ func (l *loopRun) merge(round int, role string, t Turn) error {
 	c := &l.c
 	for _, r := range t.Rules {
 		if !hasString(c.Rules, r) {
+			if _, sim := closestRule(c.Rules, r); sim >= ruleSameThreshold {
+				continue // a paraphrase or a truncated copy of an existing rule is not a new rule
+			}
 			c.Rules = append(c.Rules, r)
 		}
 	}
 	for _, e := range t.Examples {
+		if !hasString(c.Rules, e.Rule) {
+			if best, sim := closestRule(c.Rules, e.Rule); sim >= ruleLinkThreshold {
+				e.Rule = best // roles cite rules in their own words; attach the example to the rule it means
+			}
+		}
 		if !slices.Contains(c.Examples, e) && !hasExampleText(c.Examples, e.Text) {
 			c.Examples = append(c.Examples, e)
 		}
@@ -328,4 +339,77 @@ func hasExampleText(xs []Example, text string) bool {
 		}
 	}
 	return false
+}
+
+const (
+	ruleSameThreshold = 0.8 // word overlap at which a "new" rule is a restatement of an existing one
+	ruleLinkThreshold = 0.5 // word overlap at which an example's cited rule is taken to mean an existing rule
+)
+
+func ruleWords(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	}) {
+		if len(w) >= 3 {
+			out[w] = true
+		}
+	}
+	return out
+}
+
+// ruleSimilarity is 1 when one rule's normalized text contains the other's, else the word-set Jaccard overlap.
+func ruleSimilarity(a, b string) float64 {
+	norm := func(s string) string {
+		return strings.Trim(strings.Join(strings.Fields(strings.ToLower(s)), " "), ".!;: ")
+	}
+	na, nb := norm(a), norm(b)
+	if na == "" || nb == "" {
+		return 0
+	}
+	if strings.Contains(na, nb) || strings.Contains(nb, na) {
+		return 1
+	}
+	wa, wb := ruleWords(a), ruleWords(b)
+	inter := 0
+	for w := range wa {
+		if wb[w] {
+			inter++
+		}
+	}
+	union := len(wa) + len(wb) - inter
+	if union == 0 {
+		return 0
+	}
+	return float64(inter) / float64(union)
+}
+
+func closestRule(rules []string, r string) (string, float64) {
+	best, bestSim := "", 0.0
+	for _, x := range rules {
+		if s := ruleSimilarity(x, r); s > bestSim {
+			best, bestSim = x, s
+		}
+	}
+	return best, bestSim
+}
+
+// gapNote lists the rules that still have no example, so turns close the gap the ready check measures.
+func (l *loopRun) gapNote() string {
+	var gaps []string
+	for _, r := range l.c.Rules {
+		ok := false
+		for _, e := range l.c.Examples {
+			if e.Rule == r {
+				ok = true
+			}
+		}
+		if !ok {
+			gaps = append(gaps, "- "+r)
+		}
+	}
+	if len(gaps) == 0 {
+		return ""
+	}
+	return "Rules with no example yet (the story cannot be ready until each has one; quote the rule exactly in the example's \"rule\" field):\n" + strings.Join(gaps, "\n") + "\n"
 }

@@ -266,3 +266,30 @@ func (r *recordingAsker) Ask(role, user string, n int) (string, error) {
 	*r.prompts = append(*r.prompts, user)
 	return r.fakeAsker.Ask(role, user, n)
 }
+
+func TestLoop_ParaphrasedRulesAreMergedAndExamplesRelinked(t *testing.T) {
+	r1 := "The timer must move between focus, short break and long break by the four-session cycle, each with its configured length."
+	o := runLoop(1, 1.0, map[string][]Turn{
+		"product": {{Rules: []string{r1, "The timer must move between focus, short break and long break by the four-session cycle.", "SIGINT prints the completed focus count and exits 0."}, Ready: true}},
+		"qa": {{Examples: []Example{
+			{Rule: "The timer must move between focus, short break and long break by the four-session cycle", Text: "after focus 4 comes a long break"},
+			{Rule: "On SIGINT the program prints the completed focus count and exits with 0", Text: "2 done, ctrl-c prints 'Completed 2 focus sessions'"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true}},
+	}, nil, nil, nil)
+	if len(o.c.Rules) != 2 {
+		t.Fatalf("the truncated copy of r1 is not a new rule: %q", o.c.Rules)
+	}
+	if o.c.Examples[0].Rule != r1 || o.c.Examples[1].Rule != "SIGINT prints the completed focus count and exits 0." {
+		t.Fatalf("examples not relinked: %+v", o.c.Examples)
+	}
+	if o.c.Verdict != VerdictReady {
+		t.Fatalf("every rule has an example now: %q", o.c.Verdict)
+	}
+}
+
+func TestLoop_TurnsListRulesWithoutExamples(t *testing.T) {
+	l := &loopRun{c: StoryContract{Rules: []string{"r1", "r2"}, Examples: []Example{{Rule: "r1", Text: "e"}}}}
+	if g := l.gapNote(); !strings.Contains(g, "r2") || strings.Contains(g, "r1\n") {
+		t.Fatalf("gap note %q", g)
+	}
+}
