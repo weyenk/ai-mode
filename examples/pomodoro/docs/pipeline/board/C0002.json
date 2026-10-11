@@ -1,0 +1,21 @@
+{
+  "id": "C0002",
+  "title": "Pomodoro CLI",
+  "type": "spec",
+  "stage": "spec",
+  "context": "hobby",
+  "parent": "C0001",
+  "order": 1,
+  "created": "2026-10-11T16:14:36Z",
+  "updated": "2026-10-11T16:14:36Z",
+  "notes": [
+    {
+      "ts": "2026-10-11T16:14:36Z",
+      "by": "bot-architect",
+      "stage": "→ spec",
+      "done": "Spec card created from the request split.",
+      "why": "Implementation of the terminal-based timer logic, flag parsing, and signal handling.",
+      "next": "architect writes the spec; six specialists review it; chief merges."
+    }
+  ]
+}

@@ -10,7 +10,8 @@ _empty_
 
 | Card | Type | Stage | Parent | Title | Latest note |
 | --- | --- | --- | --- | --- | --- |
-| C0001 | feature | spec |  | Simple pomodoro timer | new → spec (bot-product): Viability: GO for a hobby request. |
+| C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
+| C0002 | spec | spec | C0001 | Pomodoro CLI | → spec (bot-architect): Spec card created from the request split. |
 
 ## building
 
