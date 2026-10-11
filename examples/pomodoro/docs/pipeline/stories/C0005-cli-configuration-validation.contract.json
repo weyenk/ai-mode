@@ -1,0 +1,117 @@
+{
+  "contract": {
+    "story": "# CLI Configuration \u0026 Validation\n\n- **Card:** C0005 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST2) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** C0004 · **Size:** S · **Flag:** none\n\n## Story\n\nAs a macOS user, I want to configure custom focus and break durations via command-line flags, so that I can tailor my Pomodoro sessions to my workflow without distractions.\n\n## Scope\n\nAdd flag parsing for custom durations and implement input validation (negative/large values).\n\n## Scenarios (from the spec)\n\n- **S3 — Custom Configuration.** Given flags `-focus 50 -short 10`, when the timer starts, then the first session lasts 50 minutes.\n- **S5 — Invalid Input.** Given `-focus -1`, when the program starts, then it prints an error and exits.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.",
+    "rules": [
+      "The program must validate custom focus and break durations to ensure they are positive and do not exceed 24 hours.",
+      "Duration flags must be validated to be strictly greater than zero.",
+      "Duration flags must be validated to be no greater than 24 hours (1440 minutes).",
+      "Invalid duration input must cause the program to exit with a non-zero status code and a clear error message to stderr."
+    ],
+    "examples": [
+      {
+        "rule": "The program must validate custom focus and break durations to ensure they are positive and do not exceed 24 hours.",
+        "text": "Given flags `-focus 1500 -short 60`, when the program starts, then it prints an error and exits because 1500 minutes exceeds 24 hours."
+      },
+      {
+        "rule": "Duration flags must be validated to be strictly greater than zero.",
+        "text": "Given flags `-focus 0 -short 5`, when the program starts, then it prints an error message 'focus duration must be positive' and exits with code 1."
+      },
+      {
+        "rule": "Duration flags must be validated to be strictly greater than zero.",
+        "text": "Given flags `-focus -10 -short 5`, when the program starts, then it prints an error message 'focus duration must be positive' and exits with code 1."
+      },
+      {
+        "rule": "Duration flags must be validated to be no greater than 24 hours (1440 minutes).",
+        "text": "Given flags `-focus 1441 -short 10`, when the program starts, then it prints an error message 'focus duration exceeds maximum of 24 hours' and exits with code 1."
+      },
+      {
+        "rule": "Duration flags must be validated to be no greater than 24 hours (1440 minutes).",
+        "text": "Given flags `-focus 1440 -short 10`, when the program starts, then the validation passes and the timer initializes with a 24-hour focus duration."
+      },
+      {
+        "rule": "The program must validate custom focus and break durations to ensure they are positive and do not exceed 24 hours.",
+        "text": "Given flags `-focus 50 -short 10`, when the program starts, then the validation passes and the first session lasts 50 minutes."
+      },
+      {
+        "rule": "Invalid duration input must cause the program to exit with a non-zero status code and a clear error message to stderr.",
+        "text": "Given flags `-focus abc -short 10`, when the program starts, then it prints a parsing error and exits with a non-zero status."
+      }
+    ],
+    "questions": [
+      {
+        "text": "What is the exact behavior for durations that are valid but very large (e.g., 12 hours)?",
+        "state": "resolved",
+        "score": 0,
+        "answers": [
+          "Valid durations up to 24 hours are accepted. The timer will run for that duration. No special truncation or warning is needed, just standard validation bounds."
+        ]
+      },
+      {
+        "text": "Does the `-long` flag also require validation, or is it only `-focus` and `-short`?",
+        "state": "escalated",
+        "score": 0.3333333333333333,
+        "answers": [
+          "Yes, the `-long` flag must be validated using the same constraints (strictly greater than zero and no more than 24 hours) to ensure consistency and prevent resource exhaustion.",
+          "Yes, the `-long` flag must also be validated (strictly greater than zero and no more than 24 hours) to ensure consistency across all duration flags and to adhere to the global constraint regarding resource exhaustion.",
+          "The `-long` flag must also be validated to be positive and not exceed 24 hours to maintain consistency across all duration flags and to adhere to the global constraint regarding resource exhaustion."
+        ]
+      },
+      {
+        "text": "What is the default duration for `-long` if it is not specified?",
+        "state": "parked",
+        "score": 0.3333333333333333,
+        "answers": [
+          "The default duration for `-long` will be 15 minutes, adhering to the standard 25/5/15 Pomodoro pattern.",
+          "The `-long` duration will default to 15 minutes. To ensure a predictable baseline, the defaults for all flags will be: `-focus` 25 minutes, `-short` 5 minutes, and `-long` 15 minutes.",
+          "The default duration for `-long` will be 20 minutes, following the standard 25/5/20 Pomodoro pattern (25m focus, 5m short, 20m long). These defaults should be implemented as package-level constants in `main.go`."
+        ]
+      }
+    ],
+    "size": 2,
+    "split_into": null,
+    "layer_plan": [
+      {
+        "n": 1,
+        "name": "CLI entry point and flag parsing",
+        "scenarios": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "test_level": "functional"
+      }
+    ],
+    "gates": [
+      {
+        "name": "static-analysis",
+        "state": "active"
+      },
+      {
+        "name": "mutation",
+        "state": "active"
+      },
+      {
+        "name": "performance",
+        "state": "not-available"
+      },
+      {
+        "name": "ai-evals",
+        "state": "not-available"
+      },
+      {
+        "name": "dynamic-security",
+        "state": "not-applicable"
+      }
+    ],
+    "verdict": "paused",
+    "disagreements": null,
+    "deliverable": true
+  },
+  "meeting_id": "20261011-163050-9515d2",
+  "story_file": "C0005-cli-configuration-validation.md",
+  "verdict": "paused"
+}

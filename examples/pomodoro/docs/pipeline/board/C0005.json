@@ -2,20 +2,22 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "amigos",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
+  "prev_stage": "amigos",
   "artifacts": {
+    "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
     "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
     "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-11T16:24:51Z",
+  "updated": "2026-10-11T16:35:13Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -43,6 +45,17 @@
       "done": "Retry requested.",
       "why": "A human cleared the block.",
       "next": "The next tick re-runs amigos."
+    },
+    {
+      "ts": "2026-10-11T16:35:13Z",
+      "by": "bot-amigos",
+      "stage": "amigos → needs-human",
+      "done": "Amigos paused: a question needs the requester.",
+      "artifacts": [
+        "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json"
+      ],
+      "why": "Verdict paused from meeting 20261011-163050-9515d2; ready: ; 4 rules, 7 examples; layers: 1 CLI entry point and flag parsing [functional] examples [1 2 3 4 5 6 7]; no flag. Escalated: [escalated] Does the `-long` flag also require validation, or is it only `-focus` and `-short`? | [parked] What is the default duration for `-long` if it is not specified?",
+      "next": "The requester answers with `ai-mode pipeline answer C0005 \"\u003canswer\u003e\"`, which adds it to the story and re-runs amigos."
     }
   ]
 }
