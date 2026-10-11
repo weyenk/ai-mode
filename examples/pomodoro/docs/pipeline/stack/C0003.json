@@ -5,5 +5,16 @@
   "slug": "simple-pomodoro-timer",
   "worktree": "/Users/noahkruswicki/.local/state/ai-mode/pipeline/worktrees/C0003-ad3108da6276",
   "module": "examples/pomodoro",
-  "layers": null
+  "layers": [
+    {
+      "n": 1,
+      "branch": "simple-pomodoro-timer-01-core-timer-engine",
+      "story": "C0004",
+      "layer": 1,
+      "name": "Core Timer Engine",
+      "tasks": [
+        "T01"
+      ]
+    }
+  ]
 }
