@@ -1,0 +1,16 @@
+{
+  "branch": "simple-pomodoro-timer-01-core-timer-engine",
+  "review": {
+    "approve": true,
+    "comments": [
+      {
+        "file": "examples/pomodoro/timer.go",
+        "line": 103,
+        "severity": "nit",
+        "comment": "The Timer.emit method duplicates the formatting logic found in updateOutputFn. It should ideally use the updateOutputFn seam to ensure a single source of truth for the status line format and to allow for easier testing/overriding of the output format."
+      }
+    ]
+  },
+  "round": 1,
+  "story": "C0004"
+}
