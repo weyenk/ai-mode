@@ -2,18 +2,22 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "ready",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
+  "prev_stage": "ready",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0004-core-timer-engine.contract.json",
+    "contract-md": "docs/pipeline/stories/C0004-core-timer-engine.contract.md",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
     "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
-    "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
+    "stack": "docs/pipeline/stack/C0003.json",
+    "story": "docs/pipeline/stories/C0004-core-timer-engine.md",
+    "story-plan": "docs/pipeline/stories/C0004-core-timer-engine.plan.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T18:06:36Z",
+  "updated": "2026-10-11T23:14:52Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -115,6 +119,14 @@
       ],
       "why": "Verdict ready from meeting 20261011-175234-ca2b46; ready: product, qa, architect; 8 rules, 22 examples; layers: 1 Core Timer Engine [functional] examples [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22]; no flag.",
       "next": "Stage 8: architect writes the story plan, qa writes failing tests, coder makes them pass, one stack layer at a time."
+    },
+    {
+      "ts": "2026-10-11T23:14:52Z",
+      "by": "bot-chief",
+      "stage": "ready → needs-human",
+      "done": "Stage ready stopped before finishing.",
+      "why": "tdd-check failed: T02: test TestLoop_S1_ShortBreakAfterFocus is missing at the tip; T02: test TestLoop_S2_FullCycle is missing at the tip; T02: test TestLoop_S14_Boundary is missing at the tip; T02: test TestLoop_S16_CycleRestart is missing at the tip; T02: at the red commit 8ee18b4b the tests pass; they were never red",
+      "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0004`."
     }
   ]
 }

@@ -132,3 +132,11 @@ func (t *Timer) Run() error {
 
 - Every fourth focus session (the 4th, 8th, 12th, ...) is followed by the long break instead of a short one, so the four-session cycle starts over after each long break; the completed-focus total printed on Ctrl-C counts the whole run. The in-place line is written as a carriage return, the status text, then the ANSI erase-to-end-of-line sequence ESC[K so a shorter line leaves no leftovers. I have no preference on internal signatures: Run taking a context.Context that main cancels on Ctrl-C (signal.NotifyContext) is fine. (requester (answered by the operator, Claude, from the original request), 2026-10-11)
 - Status lines, updated in place each second: a focus session shows 'Session N: MM:SS' (N counts focus sessions from 1), a short break shows 'Break: MM:SS', a long break shows 'Long break: MM:SS'. On Ctrl-C it prints exactly one line, 'Completed N focus sessions' (only fully finished focus sessions count; nothing about the interrupted one), and exits with status 0. The 24-hour maximum applies to each length on its own (focus, short break, long break), not to a whole cycle. (requester (answered by the operator, Claude, from the original request), 2026-10-11)
+
+## Amendments
+
+Architect's rulings where the contract was inconsistent or a test could not be met; rules win over examples.
+
+- S3 (TestCompletion_S3_LongBreak, test review of T05): Contradictory state: completedFocus=4 and currentSession=4 implies the 4th session is running, which contradicts the requirement that 4 sessions are already completed. → Change runCompletionTest arguments from (t, 4, 4) to (t, 4, 5)
+- S10 (TestCompletion_S10_AfterSession4, test review of T05): Contradictory state: completedFocus=4 and currentSession=4 implies the 4th session is running, which contradicts the requirement that 4 sessions are already completed. → Change runCompletionTest arguments from (t, 4, 4) to (t, 4, 5)
+- S20 (TestCompletion_S20_Session5Start, test review of T05): Contradicts S3/R1: if completedFocus=4, currentSession 5 is the LongBreak, not a Focus Session. → Redefine S20 to either use a different session index or acknowledge the 5th period is the break.
