@@ -35,6 +35,7 @@ func commands() map[string]command {
 		"ask":        {"Ask a role one question (chat/completions)", cmdAsk},
 		"team":       {"Consult several roles on one topic (architect first), print a combined report", cmdTeam},
 		"amigos":     {"Run a Three Amigos refinement on one story (product, qa, architect)", cmdAmigos},
+		"pipeline":   {"Dev pipeline: request cards through viability, spec, plan, stories, amigos, build, review, PRs", cmdPipeline},
 		"agent":      {"Run a role as a tool-using agent: owned paths only, allowlisted commands, no shell", cmdAgent},
 		"setup-qwen": {"Install the ai-mode routing rules (~/.qwen/QWEN.md) and SessionStart hook (Qwen Code)", cmdSetupQwen},
 		"hook":       {"Qwen Code hook entry point (session-start, prompt-expansion), installed by setup-qwen", cmdHook},
