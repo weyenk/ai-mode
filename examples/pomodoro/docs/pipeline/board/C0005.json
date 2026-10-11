@@ -1,0 +1,32 @@
+{
+  "id": "C0005",
+  "title": "CLI Configuration \u0026 Validation",
+  "type": "story",
+  "stage": "amigos",
+  "context": "hobby",
+  "parent": "C0003",
+  "order": 2,
+  "depends_on": [
+    "C0004"
+  ],
+  "artifacts": {
+    "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
+    "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
+    "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
+  },
+  "created": "2026-10-11T16:21:16Z",
+  "updated": "2026-10-11T16:21:16Z",
+  "notes": [
+    {
+      "ts": "2026-10-11T16:21:16Z",
+      "by": "bot-architect",
+      "stage": "→ amigos",
+      "done": "Story ST2 cut from the feature plan; product worded it.",
+      "artifacts": [
+        "docs/pipeline/stories/C0005-cli-configuration-validation.md"
+      ],
+      "why": "Covers S3, S5; size S; stack position 2.",
+      "next": "Three amigos (product, qa, architect) refine it into a Story Contract."
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   "id": "C0003",
   "title": "Pomodoro CLI — feature plan",
   "type": "plan",
-  "stage": "planning",
+  "stage": "tracking",
   "context": "hobby",
   "parent": "C0002",
   "artifacts": {
@@ -10,7 +10,7 @@
     "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md"
   },
   "created": "2026-10-11T16:21:09Z",
-  "updated": "2026-10-11T16:21:09Z",
+  "updated": "2026-10-11T16:21:16Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:09Z",
@@ -22,6 +22,18 @@
       ],
       "why": "One feature plan per spec in the MVP.",
       "next": "Stories are cut from the plan (stage 6)."
+    },
+    {
+      "ts": "2026-10-11T16:21:16Z",
+      "by": "bot-architect",
+      "stage": "planning → tracking",
+      "done": "Cut 2 stories (C0004, C0005), in stack order.",
+      "artifacts": [
+        "docs/pipeline/stories/C0004-core-timer-engine.md",
+        "docs/pipeline/stories/C0005-cli-configuration-validation.md"
+      ],
+      "why": "One story file per feature-plan story, in the format `ai-mode amigos --story` reads.",
+      "next": "Each story goes to the three amigos."
     }
   ]
 }
