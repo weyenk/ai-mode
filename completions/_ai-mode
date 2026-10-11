@@ -23,7 +23,10 @@ _ai-mode() {
     'amigos:Three Amigos refinement of one story'
     'setup-qwen:Install routing rules and SessionStart hook for Qwen Code'
     'hook:Qwen Code hook entry point (session-start, prompt-expansion, pre-tool-use)'
-    'plan:Lint a plan or verify a task is red then green'
+    'plan:Lint a plan, verify a task is red then green, or tdd-check a branch'
+    'pipeline:Dev pipeline: request cards through all ten stages'
+    'work:Start work on a ready story (stage 8)'
+    'agent:Run a role as a tool-using agent (owned paths, allowlisted commands)'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
     'proxy:Run the debug logging proxy (normally via use --debug)'
@@ -76,11 +79,33 @@ _ai-mode() {
       ;;
     plan)
       if (( CURRENT == 3 )); then
-        _values 'subcommand' 'lint' 'verify' 'apply'
+        _values 'subcommand' 'lint' 'verify' 'apply' 'tdd-check'
       elif [[ $words[CURRENT] == -* ]]; then
-        _values 'option' '--json' '--task' '--repo' '--phase' '--skeleton' '--fix'
+        _values 'option' '--json' '--task' '--repo' '--phase' '--skeleton' '--fix' '--feature' '--story'
       else
         _files
+      fi
+      ;;
+    pipeline)
+      if (( CURRENT == 3 )); then
+        _values 'subcommand' 'new' 'status' 'board' 'show' 'tick' 'run' 'stage' 'retry' 'answer' 'launchd'
+      elif [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '--repo' '--push' '--no-commit' '--max-ticks' '--type' '--context' '--body' '--interval' '--by'
+      fi
+      ;;
+    work)
+      if (( CURRENT == 3 )); then
+        _values 'subcommand' 'start'
+      elif [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '--repo' '--push'
+      fi
+      ;;
+    agent)
+      if [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '--repo' '--own' '--read-only' '--allow' '--context' '--max-turns' '--max-wall' '--max-tokens' '--transcript' '--json' '--profile' '--caller'
+      else
+        roles=(${(f)"$(ai-mode agents 2>/dev/null | awk '/^  /{print $1}')"})
+        _values 'role' $roles
       fi
       ;;
     team)

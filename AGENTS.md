@@ -99,6 +99,21 @@ Verify any flag against `internal/app/` (or `ai-mode <cmd> -h`) before relying o
 - `ai-mode plan verify <plan.md> --task Tnn|all [--repo DIR] [--json]` — on a temporary copy of the repo, apply a **code** packet's ancestors, then Phase A (must compile and fail on an assertion), then Phase B (gofmt, `go vet`, green, full `go test ./...`). Contract tasks skip the red step; spec packets report `n/a`. Exit 0 verified/n/a, 2 failed. `make plan-example` runs both on the worked example.
 - `ai-mode plan apply <plan.md> --task Tnn [--phase A|B|all] [--repo DIR]` — write a task's file blocks into the repo exactly as the packet gives them (no judgment calls; executors then run the packet's `Run:` command). Exit 0 written, 1 error.
 - `ai-mode ask <role> "<question>"` — one-shot chat to a role (system prompt + user message; `--max-tokens` (default 2048; architect gets at least 10240 for thinking), `--profile`, pipe stdin when no message argument is given). A reply cut off by `--max-tokens` ends with a `⚠ … cut off` line on stderr telling the caller to re-run with a larger value; without it chief re-ran the identical command until Qwen Code's loop detection halted the session. **Roles are plain chat models with no file or shell tools: they only see the prompt.** Ground them with `--context PATH` (repeatable; a file's contents or a directory's file listing; secret-looking files and binaries refused; over `--context-max-chars`, default 200000, is an error). Never tell a role to "read" or "explore" a path without supplying it. As a backstop, files under the working directory that the question names are attached automatically (noted on stderr; `--no-auto-context` turns it off): chief once sent `Spec path: docs/…md` with no `--context` and security replied "standing by for the spec content".
+- `ai-mode pipeline <new|status|show|tick|run|stage|retry|answer|launchd> [--repo DIR] [--push]` — the ten-stage dev pipeline
+  (`docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md`, MVP design `docs/superpowers/specs/2026-10-11-dev-pipeline-mvp-design.md`).
+  Cards and artifacts live in `<repo>/docs/pipeline/` (file board until Vikunja lands); `tick` takes a per-target lock, runs one stage
+  on one card (in-flight work first, one feature at a time, stories in stack order), notes and commits it. Stages: viability →
+  spec (architect writes, six reviews, chief merges) → feature plan (`plan lint --feature`) → stories → amigos (ready needs all three,
+  no human approval) → implement → architect review → draft PRs. `needs-human` cards continue with `answer` (paused amigos) or `retry`.
+- `ai-mode work start <story card> [--repo DIR] [--push]` — stage 8 for one story: refuses unless its saved amigos verdict is ready;
+  architect writes the story plan (lint + verify in its loop) in a separate git worktree holding the feature's linear stack; per task
+  qa writes tests + stubs that must fail on their assertions (red commit), coder makes them pass with tests read-only (green commit).
+- `ai-mode agent <role> <task> [--repo DIR] [--own PATH]... [--read-only PATH]... [--allow CMD]...` — a role as a tool loop
+  (list/read/search/write/edit/run/finish): writes only owned paths, runs only allowlisted argv prefixes, no shell; JSONL transcript
+  under the state dir's `agent/`. The pipeline's agent-mode stages use it instead of Qwen Code with `--yolo`.
+- `ai-mode plan lint --feature <plan>` checks a feature plan; `ai-mode plan tdd-check <plan> [--repo DIR] [--story CARD]` re-runs each
+  task's red commit (Task/Phase/Story trailers) in a scratch checkout, requires the tip green and no test edit after red except a
+  `Phase: review` fix.
 - `ai-mode stop [--force]` — stop the managed server.
 - `ai-mode use <profile> --debug` — front the server with a logging proxy on the public port (llama-server moves to port+10000) so Qwen/other clients' chat traffic shows up in `events`/`stats`/`review`. Off by default; `use <profile>` without the flag returns to normal. `restart` keeps the mode; `doctor` flags a dead proxy.
 - Observability: `events`, `trace`, `stats`, `ps`, and `review` (label real calls; `--export` → eval cases). See README.
@@ -172,7 +187,9 @@ request, so it only looks like a toggle. Thinking is set per role in the preset 
 
 ## Guardrails
 
-- **Don't commit or push unless the user explicitly asks.**
+- **Don't commit or push unless the user explicitly asks.** (`ai-mode pipeline` commits its own artifacts and, with `--push`,
+  pushes them; stage 10 opens draft PRs per roadmap decision D3. Only a human merges: the guard blocks `gh pr merge` /
+  `gh stack merge` for every model.)
 - **Don't invent CLI flags** — confirm in `internal/app/`.
 - Don't expose the API beyond `127.0.0.1` without care; weights can be large downloads.
   dev-shop deliberately uses `host = 0.0.0.0` so the web UI is reachable from other Macs on the LAN **and**

@@ -553,6 +553,7 @@ const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
   status                 the board by column (also: board)
   show <card>            one card with its notes and artifacts
   tick [--push]          stage 2: run one stage on one card, commit the artifacts
+  stage <card> [--push]  run one card's current stage now (what the per-stage skills call)
   run [--push] [--max-ticks N]   tick until nothing can advance
   retry <card>           move a needs-human card back to the stage it stopped at
   answer <card> <text> [--by WHO]   add the requester's answer to a story amigos paused on, and re-run amigos
@@ -617,6 +618,27 @@ func cmdPipeline(args []string) int {
 		}
 		if err := pl.retry(pos[0]); err != nil {
 			return fail("%v", err)
+		}
+		return 0
+	case "stage":
+		if len(pos) != 1 {
+			return fail("usage: ai-mode pipeline stage <card> [--repo DIR] [--push]")
+		}
+		c, err := pl.board.load(pos[0])
+		if err != nil {
+			return fail("%v", err)
+		}
+		release, err := acquireLock(pipelineLockPath(pl.target))
+		if err != nil {
+			return fail("%v", err)
+		}
+		defer release()
+		if code := pl.ensureProfile(); code != 0 {
+			return code
+		}
+		if err := pl.runStage(&c); err != nil {
+			fmt.Fprintf(os.Stderr, "%s blocked: %v\n", c.ID, err)
+			return 2
 		}
 		return 0
 	case "tick", "run":

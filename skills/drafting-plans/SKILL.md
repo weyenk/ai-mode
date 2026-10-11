@@ -15,7 +15,20 @@ reads, no plan. Hand off instead:
 - **Approved spec:** run `ai-mode ask architect "Write the implementation plan for this spec with the drafting-plans
   skill." --context <spec> --context <Story Contract, if any> --caller chief`, or tell the human to `/model architect`
   and re-run `/drafting-plans` there so architect can read the repo and run `ai-mode plan lint`. Then summarize.
+- **In the dev pipeline** both modes run as architect agents: the **feature plan** at stage 5 (`ai-mode pipeline stage
+  <spec card>`) and the **story plan** at stage 8 (`ai-mode work start <story card>`). Run those commands; do not plan.
 </CHIEF-STOP>
+
+## Two modes
+
+- **Feature-plan mode** (stage 5, input: a reviewed spec). Output: `## Contracts` (files, exported types and signatures in
+  one Go block, test seams) and `## Stories` with a JSON story graph `{"stories":[{"id":"ST1","title","scope","scenarios":
+  ["S1"],"depends_on":[],"size":"XS|S|M|L","flag":""}],"flags":[{"name","kind":"temporary|release","used_by":[],
+  "removal_story":""}]}`, plus a `### STn:` note per story saying why it is deliverable on its own. No packets.
+  `ai-mode plan lint --feature <plan>` must pass: every spec scenario in exactly one story, dependencies acyclic, sizes
+  XS–L, every temporary flag has a removal story that depends on all its users.
+- **Story-plan mode** (stage 8, input: one ready Story Contract): everything below. Its scenarios are the contract's
+  examples (S<n> = example n), and its `**Spec:**` is the contract rendered as markdown.
 
 Derived from `superpowers:writing-plans` (bite-sized steps, no placeholders, TDD), changed for our setup:
 **architect plans, qa and coder execute, executors are small local models, work should run in parallel without
