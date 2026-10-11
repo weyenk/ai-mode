@@ -1,98 +1,110 @@
 {
   "contract": {
-    "story": "# Core Timer Engine\n\n- **Card:** C0004 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST1) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** none · **Size:** M · **Flag:** none\n\n## Story\n\nAs a macOS user, I want a lightweight terminal-based Pomodoro timer, so that I can manage focus sessions and breaks without distractions.\n\n## Scope\n\nImplement the basic timer loop, session transitions (Short/Long break logic), and terminal output using carriage returns.\n\n## Scenarios (from the spec)\n\n- **S1 — Standard Cycle.** Given default durations, when 25m focus and 5m short break pass, then the terminal shows \"Session 1: 25:00\" → \"Session 1: 00:00\" → \"Break: 05:00\".\n- **S2 — Long Break Trigger.** Given default durations, when 4 focus sessions and 3 short breaks complete, then the 4th break must be 15 minutes long.\n- **S4 — Graceful Exit.** Given a running timer, when `SIGINT` is received, then the program prints the completed count and exits without a stack trace.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.",
+    "story": "# Core Timer Engine\n\n- **Card:** C0004 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST1) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** none · **Size:** M · **Flag:** none\n\n## Story\n\nAs a macOS user, I want a lightweight terminal-based Pomodoro timer, so that I can manage focus sessions and breaks without distractions.\n\n## Scope\n\nImplement the basic timer loop, session transitions (Short/Long break logic), and terminal output using carriage returns.\n\n## Scenarios (from the spec)\n\n- **S1 — Standard Cycle.** Given default durations, when 25m focus and 5m short break pass, then the terminal shows \"Session 1: 25:00\" → \"Session 1: 00:00\" → \"Break: 05:00\".\n- **S2 — Long Break Trigger.** Given default durations, when 4 focus sessions and 3 short breaks complete, then the 4th break must be 15 minutes long.\n- **S4 — Graceful Exit.** Given a running timer, when `SIGINT` is received, then the program prints the completed count and exits without a stack trace.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.\n\n## Answers from the requester\n\n- Every fourth focus session (the 4th, 8th, 12th, ...) is followed by the long break instead of a short one, so the four-session cycle starts over after each long break; the completed-focus total printed on Ctrl-C counts the whole run. The in-place line is written as a carriage return, the status text, then the ANSI erase-to-end-of-line sequence ESC[K so a shorter line leaves no leftovers. I have no preference on internal signatures: Run taking a context.Context that main cancels on Ctrl-C (signal.NotifyContext) is fine. (requester (answered by the operator, Claude, from the original request), 2026-10-11)",
     "rules": [
-      "The Pomodoro timer must transition between focus sessions, short breaks, and long breaks according to predefined logic, using carriage returns for terminal output.",
-      "After every 4th completed focus session, the next break must be a Long Break (15m); otherwise it must be a Short Break (5m).",
-      "Terminal output must use carriage returns (\\r) to update the countdown in-place, not append new lines, until a phase change or exit.",
-      "If the timer is interrupted by SIGINT, the program must print the count of completed focus sessions and exit with code 0, without a stack trace.",
-      "The timer must reject or clamp any configured session duration exceeding 24 hours."
+      "The timer must transition to a long break after every fourth focus session, resetting the four-session cycle after each long break."
     ],
     "examples": [
       {
-        "rule": "The Pomodoro timer must transition between focus sessions, short breaks, and long breaks according to predefined logic, using carriage returns for terminal output.",
-        "text": "Given default durations of 25 minutes for focus and 5 minutes for short breaks, the timer should display 'Session 1: 25:00' → 'Session 1: 00:00' → 'Break: 05:00'."
+        "rule": "The timer must transition to a long break after every fourth focus session, resetting the four-session cycle after each long break.",
+        "text": "After 4 focus sessions (each 25 minutes), the timer transitions to a long break (15 minutes) instead of a short break (5 minutes). After the long break completes, the cycle starts again with the next focus session."
       },
       {
-        "rule": "After every 4th completed focus session, the next break must be a Long Break (15m); otherwise it must be a Short Break (5m).",
-        "text": "Sessions 1-3 complete Focus -\u003e ShortBreak. Session 4 completes Focus -\u003e LongBreak. Session 5 completes Focus -\u003e ShortBreak (counter resets after long break)."
+        "rule": "The timer must transition to a long break after every fourth focus session, resetting the four-session cycle after each long break.",
+        "text": "With default durations (25m focus, 5m short, 15m long), after exactly 4 completed focus sessions and 3 completed short breaks, the 4th break must be a 15-minute long break. After that long break completes, the next focus session is session 5, and the cycle counter resets so the next long break occurs after session 8, not session 5."
       },
       {
-        "rule": "Terminal output must use carriage returns (\\r) to update the countdown in-place, not append new lines, until a phase change or exit.",
-        "text": "At 24:59, output buffer contains '\\rSession 1: 24:59'. At 00:01, buffer ends with '\\rSession 1: 00:01'. No newline \\n is written during active countdown."
+        "rule": "The timer must transition to a long break after every fourth focus session, resetting the four-session cycle after each long break.",
+        "text": "If the user interrupts with SIGINT during the 2nd focus session (before any break has occurred), the completed-focus count printed must be 0 (or however many focus sessions fully completed, e.g. 3 if interrupted during the 4th focus session), and no long break is triggered."
       },
       {
-        "rule": "If the timer is interrupted by SIGINT, the program must print the count of completed focus sessions and exit with code 0, without a stack trace.",
-        "text": "User presses Ctrl+C during Focus session 2. Program prints 'Completed focus sessions: 1' (or similar) and exits cleanly. stderr is empty."
+        "rule": "The in-place terminal line must be written as carriage return + status text + ESC[K so a shorter line leaves no leftover characters.",
+        "text": "When the countdown ticks from 'Session 1: 25:00' to 'Session 1: 24:59', the writer output must be '\\rSession 1: 24:59\\x1b[K'. If the next state changes to 'Break: 05:00' (shorter line), the output must be '\\rBreak: 05:00\\x1b[K' so no residual ':25:00' characters remain visible in the terminal."
       },
       {
-        "rule": "The timer must reject or clamp any configured session duration exceeding 24 hours.",
-        "text": "Configuration sets focus duration to 25 hours. Timer initialization returns an error or clamps the value to 24 hours. It does not start counting for 25 hours."
+        "rule": "The in-place terminal line must be written as carriage return + status text + ESC[K so a shorter line leaves no leftover characters.",
+        "text": "Transition from 'Session 4: 00:01' to 'Long Break: 15:00' must emit '\\rLong Break: 15:00\\x1b[K' (longer line) and then subsequent ticks 'Long Break: 14:59' emit '\\rLong Break: 14:59\\x1b[K', verifying both shorter-to-longer and longer-to-shorter line transitions produce no artifacts."
       },
       {
-        "rule": "After every 4th completed focus session, the next break must be a Long Break (15m); otherwise it must be a Short Break (5m).",
-        "text": "If the timer is interrupted after 3 focus sessions and restarted, it should not immediately trigger a Long Break unless it has actually completed 4 focus sessions in this cycle."
+        "rule": "A maximum session length must not exceed 24 hours to prevent resource exhaustion.",
+        "text": "Constructing a Timer with focusDuration = 25 * time.Hour (exceeds 24h) must be rejected (constructor returns an error or Run returns an error immediately) and no timer tick should ever be written to the io.Writer. Similarly, focusDuration = 24 * time.Hour is the boundary: it must be accepted and the countdown must start at 'Session 1: 24:00'."
+      },
+      {
+        "rule": "A maximum session length must not exceed 24 hours to prevent resource exhaustion.",
+        "text": "If shortDuration or longDuration is set to 0, the timer must either reject construction or skip the break phase immediately (document behavior); a zero-duration break must not cause an infinite fast loop that starves the scheduler or floods the Writer."
+      },
+      {
+        "rule": "When SIGINT is received, the program prints the completed-focus count for the whole run and exits without a stack trace.",
+        "text": "After 3 focus sessions and 2 short breaks have fully completed, the user presses Ctrl-C during the 4th focus session at the 12:34 mark. The final output must contain the completed-focus count '3' (or '3 focus sessions completed'), exit code 0 (or a clean non-zero without a Go panic trace), and no 'panic:' or goroutine dump on stderr."
       }
     ],
     "questions": [
       {
-        "text": "What is the exact logic for transitioning to a long break after completing 4 focus sessions and 3 short breaks?",
+        "text": "How will the timer handle cases where the user interrupts a session before it completes?",
         "state": "resolved",
         "score": 0,
         "answers": [
-          "The transition is based on the count of completed Focus sessions. After the 4th Focus session completes, the next state is LongBreak. The counter should then reset to 0 (or continue modulo 4) to allow subsequent cycles to trigger LongBreak every 4th session."
+          "The timer should print the completed count and exit gracefully without a stack trace when `SIGINT` is received, as specified in scenario S4."
         ]
       },
       {
-        "text": "Does the counter for '4 focus sessions' reset after a Long Break, or is it a cumulative counter for the entire app lifetime?",
+        "text": "What is the exact human-readable format of the status line for each state (Focus vs ShortBreak vs LongBreak)? The spec example shows 'Session 1: 25:00' and 'Break: 05:00' but S2 requires distinguishing a long break — should it print 'Long Break: 15:00', 'Break: 15:00 (long)', or reuse 'Break: 15:00' so the user can tell them apart?",
         "state": "escalated",
-        "score": 0.6666666666666666,
+        "score": 0.3333333333333333,
         "answers": [
-          "The counter resets after a Long Break. This is explicitly stated in the contract examples: 'Session 5 completes Focus -\u003e ShortBreak (counter resets after long break).'",
-          "The counter resets after a Long Break. This ensures the 4-session cycle (3 short breaks followed by 1 long break) can repeat indefinitely.",
-          "The counter resets after a Long Break. This is explicitly stated in the contract examples: 'Session 5 completes Focus -\u003e ShortBreak (counter resets after long break).'"
+          "We will use 'Long Break: MM:SS' for long breaks and 'Break: MM:SS' for short breaks, alongside 'Session X: MM:SS' for focus sessions. This maintains the '[State]: [Time]' pattern and provides clear distinction without the visual clutter of parentheses.",
+          "We will use 'Long Break: MM:SS' for long breaks and 'Break: MM:SS' for short breaks. This provides a clear distinction and follows the established pattern of '[State]: [Time]' used in the focus sessions, without the visual clutter of parentheses.",
+          ""
         ]
       },
       {
-        "text": "What is the exact terminal escape sequence or format required for the 'in-place' update? Is it just \\r, or does it require ANSI codes to clear the line if the new string is shorter?",
+        "text": "What is the exact output format of the completed-focus count on SIGINT (e.g., 'Completed focus sessions: 3' vs '3 sessions completed') and does it also print the current partial session duration or the current state label?",
         "state": "parked",
         "score": 0.3333333333333333,
         "answers": [
-          "To ensure a clean update and prevent 'ghost' characters from previous, longer strings, we should use `\\r` followed by the ANSI escape sequence `\\x1b[K` (EL - Erase in Line). This clears everything from the cursor position to the end of the line.",
-          "We should use '\\r\\x1b[K'. The '\\r' moves the cursor to the beginning of the line, and '\\x1b[K' is the ANSI escape sequence to clear the line from the cursor to the end. This is necessary to prevent 'ghost' characters from appearing if a new, shorter string (e.g., '9:59') is printed over a previously longer one (e.g., '10:00').",
-          "We should use '\\r\\x1b[K'. The '\\r' returns the cursor to the start of the line, and '\\x1b[K' is the ANSI escape sequence for 'Erase in Line' (EL), which clears everything from the cursor to the end of the line. This is necessary to prevent 'ghost' characters from being left behind when a new string (like 'Break: 5:00') is shorter than the preceding string (like 'Session 1: 25:00')."
+          "The format will be 'Focus sessions completed: X' (where X is the count of fully finished focus sessions). To keep the exit message a clean summary of completed work, it will not include the current partial session duration or the state label.",
+          "The format will be 'Completed focus sessions: X' (e.g., 'Completed focus sessions: 3'). To maintain a clean and focused exit message, it will not include the current partial session duration or state label.",
+          "The format will be 'Completed focus sessions: X' where X is the number of fully completed sessions. To ensure the exit message is a clean summary, it will not include the current partial session's duration or state label."
         ]
       },
       {
-        "text": "The current `Run() error` signature lacks a mechanism (like `context.Context` or a shutdown channel) to receive the `SIGINT` signal from the main loop. Should we update the signature to `Run(ctx context.Context) error` to facilitate graceful exit?",
+        "text": "What exit code does the program return on graceful SIGINT exit — 0 or a non-zero like 130 (bash convention for Ctrl-C)? Tests asserting the exit path need a concrete value.",
         "state": "parked",
         "score": 0.3333333333333333,
         "answers": [
-          "Yes. We should update the signature to `Run(ctx context.Context) error`. This is the idiomatic Go pattern for cancellation and lifecycle management. It allows the `Timer` loop to use a `select` statement to listen for `ctx.Done()`, directly supporting the requirement for a graceful exit (S4). It also enhances testability by allowing us to inject a cancelled context to simulate interrupts.",
-          "Yes. Using `context.Context` is the idiomatic Go approach for handling cancellation. It allows the `main` function to manage the signal trap (e.g., via `signal.NotifyContext`) and propagate the interruption to the `Timer.Run` loop. This also significantly improves testability for Scenario S4, as we can simulate an interrupt in unit tests by cancelling a context rather than relying on complex OS-level signal mocking.",
-          "Yes. Updating the signature to `Run(ctx context.Context) error` is the idiomatic Go approach for managing component lifecycles. It allows the `main` function to handle `os/signal` (via `signal.NotifyContext`) and propagate the cancellation signal directly to the `Timer` loop, which is essential for implementing the Graceful Exit (S4) and simplifies unit testing by allowing us to simulate interrupts using a cancelled context."
+          "The program will return exit code 0. Since the application is designed to intercept `SIGINT` to perform a programmed, graceful shutdown (printing the final session count), the exit represents a successful completion of the shutdown routine rather than an unhandled termination.",
+          "The program will return exit code 0. Because the application intercepts the SIGINT signal to perform a controlled cleanup and print a final summary, it is executing a successful shutdown sequence rather than terminating due to an unhandled error or crash.",
+          "Exit code 0. The program is specifically designed to intercept SIGINT to trigger a graceful shutdown and print a final summary. Because the program successfully completes its intended termination logic (printing the completed count), this should be treated as a successful execution of the shutdown routine."
+        ]
+      },
+      {
+        "text": "Does the 24-hour maximum apply per-duration (focus, short, long each ≤ 24h) or to the sum of a full cycle? The story says 'maximum session length', which is ambiguous between a single phase and a cycle.",
+        "state": "parked",
+        "score": 0.3333333333333333,
+        "answers": [
+          "The 24-hour maximum applies per-duration (each individual phase). In Pomodoro terminology, a 'session' refers to a single period of focus or break. This interpretation aligns with the goal of preventing resource exhaustion (e.g., preventing extremely long-running timer loops or duration overflows) and simplifies the validation logic to checking the individual duration fields during initialization.",
+          "The 24-hour limit applies to each individual phase duration (Focus, Short Break, and Long Break) independently. This interprets 'session length' as the length of a single session/phase and provides a simple, deterministic validation check during construction to prevent resource exhaustion from extreme duration values.",
+          "The 24-hour maximum applies to each individual duration (focus, short, and long) separately. This is confirmed by Example 6, which states that a `focusDuration` of 25 hours must be rejected, implying the check is performed on the individual duration value during construction."
         ]
       }
     ],
-    "size": 2,
+    "size": 3,
     "split_into": null,
     "layer_plan": [
       {
         "n": 1,
-        "name": "Core State Machine \u0026 Transitions",
+        "name": "Core Timer Engine",
         "scenarios": [
           1,
-          2
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
         ],
-        "test_level": ""
-      },
-      {
-        "n": 2,
-        "name": "Signal Handling \u0026 Process Lifecycle",
-        "scenarios": [
-          3
-        ],
-        "test_level": ""
+        "test_level": "functional"
       }
     ],
     "gates": [
@@ -121,7 +133,7 @@
     "disagreements": null,
     "deliverable": true
   },
-  "meeting_id": "20261011-162451-cc03e6",
+  "meeting_id": "20261011-163641-1a66c1",
   "story_file": "C0004-core-timer-engine.md",
   "verdict": "paused"
 }

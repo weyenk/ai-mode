@@ -2,10 +2,11 @@
   "id": "C0004",
   "title": "Core Timer Engine",
   "type": "story",
-  "stage": "amigos",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 1,
+  "prev_stage": "amigos",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0004-core-timer-engine.contract.json",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
@@ -13,7 +14,7 @@
     "story": "docs/pipeline/stories/C0004-core-timer-engine.md"
   },
   "created": "2026-10-11T16:21:15Z",
-  "updated": "2026-10-11T16:36:36Z",
+  "updated": "2026-10-11T16:44:31Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:15Z",
@@ -63,6 +64,17 @@
       ],
       "why": "Every fourth focus session (the 4th, 8th, 12th, ...) is followed by the long break instead of a short one, so the four-session cycle starts over after each long break; the completed-focus total printed on Ctrl-C counts the whole run. The in-place line is written as a carriage return, the status text…",
       "next": "Amigos runs again with the answer in the story."
+    },
+    {
+      "ts": "2026-10-11T16:44:31Z",
+      "by": "bot-amigos",
+      "stage": "amigos → needs-human",
+      "done": "Amigos paused: a question needs the requester.",
+      "artifacts": [
+        "docs/pipeline/stories/C0004-core-timer-engine.contract.json"
+      ],
+      "why": "Verdict paused from meeting 20261011-163641-1a66c1; ready: ; 1 rules, 8 examples; layers: 1 Core Timer Engine [functional] examples [1 2 3 4 5 6 7 8]; no flag. Escalated: [escalated] What is the exact human-readable format of the status line for each state (Focus vs ShortBreak vs LongBreak)? The spec example shows 'Session 1: 25:00' and 'Break: 05:00' but S2 requires distinguishing a long break — should it print 'Long Break: 15:00', 'Break: 15:00 (long)', or reuse 'Break: 15:00' so the user can tell them apart? | [parked] What is the exact output format of the completed-focus count on SIGINT (e.g., 'Completed focus sessions: 3' vs '3 sessions completed') and does it also print the current partial session duration or the current state label? | [parked] What exit code does the program return on graceful SIGINT exit — 0 or a non-zero like 130 (bash convention for Ctrl-C)? Tests asserting the exit path need a concrete value. | [parked] Does the 24-hour maximum apply per-duration (focus, short, long each ≤ 24h) or to the sum of a full cycle? The story says 'maximum session length', which is ambiguous between a single phase and a cycle.",
+      "next": "The requester answers with `ai-mode pipeline answer C0004 \"\u003canswer\u003e\"`, which adds it to the story and re-runs amigos."
     }
   ]
 }
