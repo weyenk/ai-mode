@@ -4,12 +4,6 @@ import "errors"
 
 var errStageNotBuilt = errors.New("stage not built yet")
 
-func stageFeaturePlan(pl *pipeline, c *card) (string, cardNote, error) {
-	return "", cardNote{}, errStageNotBuilt
-}
-func stageStories(pl *pipeline, c *card) (string, cardNote, error) {
-	return "", cardNote{}, errStageNotBuilt
-}
 func stageAmigos(pl *pipeline, c *card) (string, cardNote, error) {
 	return "", cardNote{}, errStageNotBuilt
 }

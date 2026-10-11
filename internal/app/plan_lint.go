@@ -315,16 +315,21 @@ func cmdPlanLint(args []string) int {
 	asJSON := fs.Bool("json", false, "Print findings as JSON")
 	skeleton := fs.Bool("skeleton", false, "Skip per-packet checks (the graph exists but the packets are not written yet)")
 	fix := fs.Bool("fix", false, "First repair mechanical mistakes in place: gofmt whole-file Go blocks, restore excerpts that differ from the spec only in markup")
+	feature := fs.Bool("feature", false, "Lint a feature plan (stage 5: contracts, stories, flags) instead of a story plan")
 	pos, code, ok := parse(fs, args)
 	if !ok {
 		return code
 	}
 	if len(pos) != 1 {
-		return fail("usage: ai-mode plan lint <plan.md> [--json] [--skeleton] [--fix]")
+		return fail("usage: ai-mode plan lint <plan.md> [--feature] [--json] [--skeleton] [--fix]")
 	}
 	data, err := os.ReadFile(pos[0])
 	if err != nil {
 		return fail("%v", err)
+	}
+	if *feature {
+		findings, order := lintFeatureFile(pos[0], data)
+		return printLint(findings, nil, "order", order, *asJSON)
 	}
 	var fixed []string
 	if *fix {
@@ -358,14 +363,19 @@ func cmdPlanLint(args []string) int {
 			waves = strings.Join(ws, " ")
 		}
 	}
+	return printLint(findings, fixed, "waves", waves, *asJSON)
+}
+
+// printLint prints lint findings (text or JSON) and returns the exit code: 2 when any ERR, else 0.
+func printLint(findings []planFinding, fixed []string, orderName, order string, asJSON bool) int {
 	bad := false
 	for _, f := range findings {
 		if f.Level == "ERR" {
 			bad = true
 		}
 	}
-	if *asJSON {
-		b, _ := json.MarshalIndent(map[string]any{"ok": !bad, "findings": findings, "waves": waves, "fixed": fixed}, "", "  ")
+	if asJSON {
+		b, _ := json.MarshalIndent(map[string]any{"ok": !bad, "findings": findings, orderName: order, "fixed": fixed}, "", "  ")
 		fmt.Println(string(b))
 	} else {
 		for _, n := range fixed {
@@ -374,8 +384,8 @@ func cmdPlanLint(args []string) int {
 		for _, f := range findings {
 			fmt.Printf("%s: %s\n", f.Level, f.Msg)
 		}
-		if waves != "" {
-			fmt.Println("waves: " + waves)
+		if order != "" {
+			fmt.Println(orderName + ": " + order)
 		}
 		if bad {
 			fmt.Println("RESULT: FAIL")
