@@ -30,8 +30,9 @@ type stackLayer struct {
 }
 
 type stackState struct {
-	Plan     string       `json:"plan"` // plan card that owns the stack
-	Base     string       `json:"base"` // branch the stack starts from (the pipeline branch)
+	Plan     string       `json:"plan"`     // plan card that owns the stack
+	Base     string       `json:"base"`     // branch the stack starts from (the pipeline branch); PRs target it
+	BaseSHA  string       `json:"base_sha"` // the base commit the stack was built on (the branch keeps moving with notes)
 	Slug     string       `json:"slug"`
 	Worktree string       `json:"worktree"`
 	Module   string       `json:"module"` // the target's path inside the git repo
@@ -65,8 +66,14 @@ func (st *stackState) tip() string {
 	if n := len(st.Layers); n > 0 {
 		return st.Layers[n-1].Branch
 	}
+	if st.BaseSHA != "" {
+		return st.BaseSHA
+	}
 	return st.Base
 }
+
+// baseRef is the commit the stack starts from.
+func (st *stackState) baseRef() string { return firstNonEmpty(st.BaseSHA, st.Base) }
 
 // ensureWorktree creates (or reuses) the plan's git worktree, checked out at the stack tip, and returns the module dir in it.
 func (pl *pipeline) ensureWorktree(st *stackState) (string, error) {
@@ -99,9 +106,21 @@ func (pl *pipeline) ensureWorktree(st *stackState) (string, error) {
 			return "", fmt.Errorf("git worktree add: %s", out)
 		}
 	}
+	if st.BaseSHA == "" {
+		// the commit the worktree was created at; with layers already on it, where they leave the base branch
+		args := []string{"rev-parse", "HEAD"}
+		if len(st.Layers) > 0 {
+			args = []string{"merge-base", st.Base, st.Layers[0].Branch}
+		}
+		sha, err := gitIn(st.Worktree, args...)
+		if err != nil {
+			return "", fmt.Errorf("finding the stack's base commit: %s", sha)
+		}
+		st.BaseSHA = sha
+	}
 	co := []string{"checkout", "-q", st.tip()}
 	if len(st.Layers) == 0 {
-		co = []string{"checkout", "-q", "--detach", st.Base} // the base branch stays checked out in the main checkout
+		co = []string{"checkout", "-q", "--detach", st.BaseSHA} // the base branch stays checked out in the main checkout
 	}
 	if out, err := gitIn(st.Worktree, co...); err != nil {
 		return "", fmt.Errorf("checkout %s in the worktree: %s", st.tip(), out)
@@ -506,7 +525,7 @@ func (ex *executor) layerFor(n int) *stackLayer {
 // means the task is done, "red" means coder still has to make it pass.
 func (ex *executor) donePhases() map[string]string {
 	out := map[string]string{}
-	log, err := gitIn(ex.st.Worktree, "log", "--format=%B%x00", ex.st.Base+".."+ex.st.tip())
+	log, err := gitIn(ex.st.Worktree, "log", "--format=%B%x00", ex.st.baseRef()+".."+ex.st.tip())
 	if err != nil {
 		return out
 	}

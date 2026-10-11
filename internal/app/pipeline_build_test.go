@@ -106,6 +106,7 @@ func scriptedAgents(t *testing.T, calls *[]string) func(agentSpec) (*agentSessio
 
 func TestImplementStage_PlanRedGreenOnAStackLayer(t *testing.T) {
 	pl, st := buildFixture(t)
+	pl.git = true // the pipeline commits notes to the base branch mid-stage; the stack must not care
 	var calls []string
 	pl.newAgent = scriptedAgents(t, &calls)
 	next, note, err := stageImplement(pl, &st)
@@ -120,7 +121,7 @@ func TestImplementStage_PlanRedGreenOnAStackLayer(t *testing.T) {
 		t.Fatalf("stack %+v", stack)
 	}
 	wtMod := filepath.Join(stack.Worktree, "examples", "demo")
-	log := gitT(t, wtMod, "log", "--format=%s", "pipe..demo-request-01-core")
+	log := gitT(t, wtMod, "log", "--format=%s", stack.BaseSHA+"..demo-request-01-core")
 	if log != "feat(T02): Add\ntest(T02): red — Add\ncontract(T01): Contract" {
 		t.Fatalf("commits:\n%s", log)
 	}

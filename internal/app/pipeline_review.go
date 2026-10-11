@@ -37,9 +37,19 @@ func (r layerReview) blocking() []reviewComment {
 
 const reviewRounds = 3
 
+// below is the branch a layer is stacked on: the pipeline branch for the bottom layer (PRs target it).
 func (st *stackState) below(n int) string {
 	if n <= 1 {
 		return st.Base
+	}
+	return st.Layers[n-2].Branch
+}
+
+// belowRef is the commit a layer's diff starts from: the recorded base commit for the bottom layer, since the
+// pipeline branch keeps receiving notes after the stack was built on it.
+func (st *stackState) belowRef(n int) string {
+	if n <= 1 {
+		return st.baseRef()
 	}
 	return st.Layers[n-2].Branch
 }
@@ -97,7 +107,7 @@ func stageReview(pl *pipeline, c *card) (string, cardNote, error) {
 	for _, l := range layers {
 		approved := false
 		for round := 1; round <= reviewRounds; round++ {
-			diff, _ := gitIn(mod, "diff", st.below(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
+			diff, _ := gitIn(mod, "diff", st.belowRef(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
 			pl.logf("  review: layer %d (%s) round %d, %d diff lines …", l.N, l.Branch, round, strings.Count(diff, "\n"))
 			var rv layerReview
 			parsed := false
@@ -167,7 +177,7 @@ func (pl *pipeline) fixLayer(st *stackState, mod string, c *card, l *stackLayer,
 		return fmt.Errorf("checkout %s: %s", l.Branch, out)
 	}
 	oldTip, _ := gitIn(st.Worktree, "rev-parse", l.Branch)
-	files, _ := gitIn(mod, "diff", "--name-only", "--relative", st.below(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
+	files, _ := gitIn(mod, "diff", "--name-only", "--relative", st.belowRef(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
 	var tests, code []string
 	for _, f := range strings.Fields(files) {
 		if strings.HasSuffix(f, "_test.go") {
@@ -272,7 +282,7 @@ func stageHandoff(pl *pipeline, c *card) (string, cardNote, error) {
 			}
 		}
 		if l.PR == "" {
-			stat, _ := gitIn(mod, "diff", "--stat", st.below(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
+			stat, _ := gitIn(mod, "diff", "--stat", st.belowRef(l.N)+".."+l.Branch, "--", ".", ":(exclude)docs")
 			body := pl.prBody(c, l, len(layers), &st, string(contract), stat)
 			title := fmt.Sprintf("%s: %s (%d/%d)", c.Title, l.Name, l.Layer, len(layers))
 			url, err := gitHub(st.Worktree, "pr", "create", "--draft", "--base", st.below(l.N), "--head", l.Branch, "--title", title, "--body", body)
