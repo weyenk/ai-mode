@@ -2,106 +2,105 @@
   "contract": {
     "story": "# CLI Configuration \u0026 Validation\n\n- **Card:** C0005 · **Plan:** C0003 (docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md, story ST2) · **Spec:** docs/pipeline/specs/C0002-pomodoro-cli.md\n- **Depends on:** C0004 · **Size:** S · **Flag:** none\n\n## Story\n\nAs a macOS user, I want to configure custom focus and break durations via command-line flags, so that I can tailor my Pomodoro sessions to my workflow without distractions.\n\n## Scope\n\nAdd flag parsing for custom durations and implement input validation (negative/large values).\n\n## Scenarios (from the spec)\n\n- **S3 — Custom Configuration.** Given flags `-focus 50 -short 10`, when the timer starts, then the first session lasts 50 minutes.\n- **S5 — Invalid Input.** Given `-focus -1`, when the program starts, then it prints an error and exits.\n\n## Global Constraints\n\n- Language: Go (standard library only).\n- Platform: macOS Terminal.\n- No external dependencies or network/disk access.\n- Maximum session length must not exceed 24 hours to prevent resource exhaustion.\n\n## Contracts (from the feature plan)\n\nThe seams the stories share, decided now so no story depends on another story's internals:\n- `main.go` (package `main`) will contain the core logic.\n- Interfaces for `Clock` and `Writer` will be defined in `main.go` to allow dependency injection for testing.\n- The logic will be encapsulated in a `Timer` struct that manages the state machine and countdown.\n\n```go\npackage main\n\nimport (\n\t\"io\"\n\t\"time\"\n)\n\n// Clock defines the interface for time-related operations to allow for testing.\ntype Clock interface {\n\tNow() time.Time\n\tAfter(d time.Duration) \u003c-chan time.Time\n}\n\n// TimerState represents the current phase of the Pomodoro timer.\ntype TimerState int\n\nconst (\n\tFocus TimerState = iota\n\tShortBreak\n\tLongBreak\n)\n\n// Timer manages the Pomodoro countdown and session transitions.\ntype Timer struct {\n\tfocusDuration  time.Duration\n\tshortDuration  time.Duration\n\tlongDuration   time.Duration\n\tclock          Clock\n\tout            io.Writer\n\tcompletedFocus int\n\tcurrentSession int\n\t// internal state tracking\n}\n\n// Run starts the timer loop and handles transitions.\nfunc (t *Timer) Run() error {\n\treturn nil\n}\n```\n\n- The test suite will use a `FakeClock` implementation of `Clock` and a `bytes.Buffer` as the `io.Writer`.\n\n## Answers from the requester\n\n- All three lengths (-focus, -short, -long) follow the same rules: whole minutes, at least 1 and at most 1440 (24 hours); anything else prints an error naming the flag and exits with status 2 before any session starts. Defaults when a flag is not given: -focus 25, -short 5, -long 15. (requester (answered by the operator, Claude, from the original request), 2026-10-11)",
     "rules": [
-      "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes."
+      "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+      "The program must validate all three durations (-focus, -short, -long) to be between 1 and 1440 minutes, exiting with status 2 and a specific error message upon encountering the first invalid flag.",
+      "Validation must check -focus, then -short, then -long in that fixed order and stop at the first out-of-range value, exiting with status 2 and a message naming that flag.",
+      "Valid durations (1–1440 whole minutes) must be applied to the corresponding Timer field before any session countdown begins; defaults apply only to flags that were not supplied."
     ],
     "examples": [
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flags -focus 50 -short 10, when the timer starts, then the first session lasts 50 minutes."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given flags `-focus 50 -short 10`, when the timer starts, then the first session lasts 50 minutes."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flags -focus 50 -short 10 -long 15, when the timer starts, then the first session lasts 50 minutes, the short break lasts 10 minutes, and the long break lasts 15 minutes."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given `-focus -1`, when the program starts, then it prints an error and exits."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given no flags are provided, when the timer starts, then it uses defaults: -focus 25, -short 5, -long 15."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given `-focus 0`, when the program starts, then it prints 'Invalid value for -focus: must be between 1 and 1440 minutes.' and exits with status 2."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flag -focus -1, when the program starts, then it prints an error naming the flag (e.g., 'Invalid value for -focus: -1') and exits with status 2 before any session starts."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given `-focus 1441`, when the program starts, then it prints 'Invalid value for -focus: must be between 1 and 1440 minutes.' and exits with status 2."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flag -short 0, when the program starts, then it prints an error naming the flag and exits with status 2 before any session starts."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given `-focus 1440`, when the timer starts, then the first session lasts 1440 minutes (24 hours)."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flag -long 1441, when the program starts, then it prints an error naming the flag and exits with status 2 before any session starts."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given `-short 1`, when the timer starts, then the short break lasts 1 minute."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flags -focus 1 -short 1 -long 1440, when the timer starts, then the timer uses exactly 1 minute for focus, 1 minute for short break, and 1440 minutes for long break."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to ensure they are whole minutes, at least 1 minute, and no more than 1440 minutes (24 hours). If any value is invalid, the program must print an error message naming the flag and exit with status 2 before starting any session.",
+        "text": "Given `-long 1441`, when the program starts, then it prints 'Invalid value for -long: must be between 1 and 1440 minutes.' and exits with status 2."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flag -focus 2.5, when the program starts, then it prints an error because values must be whole minutes, and exits with status 2."
+        "rule": "The program must validate all three durations (-focus, -short, -long) to be between 1 and 1440 minutes, exiting with status 2 and a specific error message upon encountering the first invalid flag.",
+        "text": "Given `-short 1441`, when the program starts, then it prints 'Invalid value for -short: must be between 1 and 1440 minutes.' and exits with status 2."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flag -focus abc, when the program starts, then it prints an error naming the flag and exits with status 2."
+        "rule": "Validation must check -focus, then -short, then -long in that fixed order and stop at the first out-of-range value, exiting with status 2 and a message naming that flag.",
+        "text": "Given `-focus 200 -short -1 -long 5`, when the program starts, it prints 'Invalid value for -focus: must be between 1 and 1440 minutes.' and exits 2, never mentioning -short."
       },
       {
-        "rule": "The user should be able to configure custom focus, short break, and long break durations using command-line flags, with validation ensuring values are between 1 and 1440 minutes.",
-        "text": "Given flags -focus 50 -short -5, when the program starts, then it prints an error naming -short (not -focus) and exits with status 2, even though -focus was valid."
+        "rule": "Validation must check -focus, then -short, then -long in that fixed order and stop at the first out-of-range value, exiting with status 2 and a message naming that flag.",
+        "text": "Given `-focus 0 -short -1 -long 5`, the first error is for -focus (0), not -short, and exit status is 2."
+      },
+      {
+        "rule": "Valid durations (1–1440 whole minutes) must be applied to the corresponding Timer field before any session countdown begins; defaults apply only to flags that were not supplied.",
+        "text": "Given no flags, the Timer is constructed with focusDuration=25*time.Minute, shortDuration=5*time.Minute, longDuration=15*time.Minute, and the first countdown uses 25 minutes."
+      },
+      {
+        "rule": "Valid durations (1–1440 whole minutes) must be applied to the corresponding Timer field before any session countdown begins; defaults apply only to flags that were not supplied.",
+        "text": "Given `-focus 50` only, focusDuration=50*time.Minute, shortDuration stays 5*time.Minute, longDuration stays 15*time.Minute."
       }
     ],
     "questions": [
       {
-        "text": "What is the exact error message that should be displayed for invalid input?",
+        "text": "What is the exact format of the error message that should be printed for invalid inputs?",
         "state": "resolved",
         "score": 0,
         "answers": [
-          "The error message should name the flag and indicate that the value is invalid, e.g., 'Invalid value for -focus: -1'."
+          "The error message should include the name of the flag and a description of the issue, such as 'Invalid value for -focus: must be between 1 and 1440 minutes.'"
         ]
       },
       {
-        "text": "What is the exact Go flag package behavior for non-numeric input (e.g., -focus abc) and does the program need custom error formatting for Go's default flag parsing errors, or is the Go flag package's default output acceptable?",
+        "text": "How will the program handle cases where multiple flags are invalid at once?",
+        "state": "resolved",
+        "score": 0,
+        "answers": [
+          "The program should validate flags in a defined order (-focus, -short, -long) and report the first invalid flag it encounters. It should exit immediately with status 2 without checking the remaining flags."
+        ]
+      },
+      {
+        "text": "Are non-integer inputs like `-focus 2.5` expected to be rejected by validation with the same status-2 error, or should they be handled as a flag-parsing failure before the 1–1440 check runs?",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "We should implement the `flag.Value` interface for the duration flags. This allows us to consolidate both type parsing (string to int) and range validation (1-1440) within the `Set(string) error` method. This ensures a uniform error message format (e.g., 'Invalid value for -focus: value') for both type mismatches and out-of-range values, fulfilling the requirement for a consistent error pattern without the implementation complexity of a custom `flag.FlagSet` or `ErrorUse` override.",
-          "Go's `flag` package defaults to `invalid value \"abc\" for flag -focus: parse error` and exits with status 2. To achieve a unified error format ('Invalid value for -flag: value') for both type-parsing errors and our manual range-validation errors, we should implement a custom `flag.Value` type. This approach is the most maintainable as it encapsulates all validation logic within the type itself and avoids the complexity of a custom `flag.FlagSet` or error interceptor.",
-          "Go's `flag` package defaults to printing `invalid value \"abc\" for flag -focus: parse error` and exiting with status 2. To ensure the error message strictly follows the requested pattern ('Invalid value for -flag: value') for both type mismatches and range violations, we should implement custom `flag.Value` types for the duration flags. This allows the `Set(string) error` method to consolidate both the parsing and the range validation, returning a uniform error format."
+          "It will be handled as a flag-parsing failure by the Go `flag` package if we use `flag.Int`. This satisfies the requirement to exit with status 2 and name the flag, avoiding the need for the extra complexity of manual string-to-int parsing logic.",
+          "It will be a flag-parsing failure. Since the requirement specifies 'whole minutes', we will use integer flags. The Go `flag` package will detect the type mismatch for `2.5` during parsing and exit with status 2, which satisfies the requirement to exit on error, even if the message is the standard parser error rather than our custom range error.",
+          "To ensure a consistent error message format and a guaranteed exit status 2, non-integer inputs should be treated as validation failures. The implementation should parse the flags as strings and then attempt to convert them to integers; if the conversion fails (e.g., due to a decimal point), we catch that error and use our standardized error reporting mechanism to report it as an invalid value for the specific flag."
         ]
       },
       {
-        "text": "Should the error message go to stderr or stdout? The contract says 'io.Writer' but exit status 2 implies command-line error semantics; clarification needed on whether output goes to stderr (standard for CLI errors) or the injected io.Writer.",
+        "text": "The exact error message format for values below 1",
         "state": "resolved",
         "score": 1,
         "answers": [
-          "Errors should go to stderr to follow CLI conventions. To ensure testability, we should inject an io.Writer for validation errors (defaulting to os.Stderr in production) separate from the Timer's operational io.Writer. This allows the test suite to capture and verify errors using a bytes.Buffer independently of the timer's countdown output.",
-          "Validation errors should be directed to `stderr` in production to follow CLI conventions. To ensure testability, the validation logic must use an injectable `io.Writer` (achieved by configuring a custom `flag.FlagSet.Output`). This allows the test suite to inject a `bytes.Buffer` to capture and verify error messages, while production uses `os.Stderr`.",
-          "Validation and usage errors should be directed to `stderr` to adhere to CLI standards. To maintain testability, the validation logic must accept an injectable `io.Writer` that defaults to `os.Stderr` in production, keeping the `Timer.out` writer strictly for the operational countdown output."
-        ]
-      },
-      {
-        "text": "Since Go's `flag` package produces its own error format for non-numeric input (e.g., `invalid value \"abc\" for flag -focus`), should we implement a custom `flag.FlagSet` to ensure the error message strictly follows the 'Invalid value for -flag: value' pattern for all failure modes?",
-        "state": "escalated",
-        "score": 0.6666666666666666,
-        "answers": [
-          "No. We should implement the `flag.Value` interface for the duration flags. This allows us to consolidate both type parsing (converting string to int) and range validation (checking 1-1440) within the `Set(string) error` method. This ensures a uniform error message format for both type mismatches and out-of-range values, fulfilling the requirement for a consistent error pattern without the implementation complexity of a custom `flag.FlagSet` or `ErrorUse` override.",
-          "No. We should implement the `flag.Value` interface for the duration flags. This allows us to consolidate both type parsing (string to int) and range validation (1-1440) within the `Set(string) error` method. While the `flag` package will still wrap our error with its own prefix (e.g., `invalid value ... for flag ...: `), this approach is the most maintainable and follows 'boring technology' principles, providing a unified way to handle all validation logic within a single, testable type without the overhead of overriding `flag.FlagSet` or `ErrorUse`.",
-          ""
-        ]
-      },
-      {
-        "text": "To ensure the test suite can verify error messages, should we redirect the `flag` package's error output to the same `io.Writer` used by the `Timer`?",
-        "state": "parked",
-        "score": 0.6666666666666666,
-        "answers": [
-          "Yes. We should use a custom `flag.FlagSet` and configure its `Output` to point to the same `io.Writer` provided to the `Timer`. This allows the test suite to use a single `bytes.Buffer` to verify both configuration/validation errors and operational countdown output, significantly simplifying the test harness and ensuring a single source of truth for all observable program output.",
-          "No. We should inject a separate `errorWriter` for the validation logic and use a custom `flag.FlagSet` that points to it. This preserves the separation of concerns between the `Timer`'s operational output (the countdown) and CLI diagnostic/error output, while still allowing the test suite to intercept and verify error messages by injecting a `bytes.Buffer` into the validation and setup phase.",
-          "Yes. For the test suite, we should use a custom `flag.FlagSet` and redirect its `Output` to the same `io.Writer` used for validation and the `Timer`. This allows a single `bytes.Buffer` in our tests to capture and verify all program output—both error messages and operational countdown messages—making the test assertions significantly simpler and more reliable."
+          "To ensure consistency with the existing test examples and simplify the validation logic, we will use a unified error message for any value outside the allowed range (both \u003c 1 and \u003e 1440): 'Invalid value for [flag]: must be between 1 and 1440 minutes.'",
+          "The format is 'Invalid value for -[flag]: must be between 1 and 1440 minutes.', consistent with the examples for both under-range (e.g., -focus 0) and over-range (e.g., -focus 1441) values.",
+          "The error message for values below 1 follows the same format as values above 1440: 'Invalid value for -[flag]: must be between 1 and 1440 minutes.'"
         ]
       }
     ],
-    "size": 1,
+    "size": 2,
     "split_into": null,
     "layer_plan": [
       {
         "n": 1,
-        "name": "CLI Entrypoint \u0026 Validation",
+        "name": "CLI implementation",
         "scenarios": [
           1,
           2,
@@ -112,7 +111,9 @@
           7,
           8,
           9,
-          10
+          10,
+          11,
+          12
         ],
         "test_level": "functional"
       }
@@ -139,11 +140,38 @@
         "state": "not-applicable"
       }
     ],
-    "verdict": "paused",
-    "disagreements": null,
-    "deliverable": true
+    "verdict": "ready",
+    "disagreements": [
+      {
+        "item": "The exact error message format for values below 1",
+        "roles": [
+          "qa"
+        ],
+        "positions": [
+          "The existing example for `-focus 0` says the message is 'Invalid value for -focus: must be between 1 and 1440 minutes.'",
+          "A more accurate message would distinguish below-range from above-range, but the requester-confirmed format is a single 'between 1 and 1440' message, so tests should assert that exact string."
+        ]
+      },
+      {
+        "item": "The exact error message format for values below 1",
+        "roles": [
+          "product",
+          "qa"
+        ],
+        "positions": [
+          "The existing example for `-focus 0` says the message is 'Invalid value for -focus: must be between 1 and 1440 minutes.'",
+          "A more accurate message would distinguish below-range from above-range, but the requester-confirmed format is a single 'between 1 and 1440' message, so tests should assert that exact string."
+        ]
+      }
+    ],
+    "deliverable": true,
+    "ready_roles": [
+      "product",
+      "qa",
+      "architect"
+    ]
   },
-  "meeting_id": "20261011-173937-6da5c8",
+  "meeting_id": "20261011-232838-2e8d92",
   "story_file": "C0005-cli-configuration-validation.md",
-  "verdict": "paused"
+  "verdict": "ready"
 }

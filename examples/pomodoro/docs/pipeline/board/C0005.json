@@ -2,7 +2,7 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "amigos",
+  "stage": "ready",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
@@ -16,7 +16,7 @@
     "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-11T17:52:34Z",
+  "updated": "2026-10-11T23:33:26Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -104,6 +104,17 @@
       "done": "Retry requested.",
       "why": "A human cleared the block.",
       "next": "The next tick re-runs amigos."
+    },
+    {
+      "ts": "2026-10-11T23:33:26Z",
+      "by": "bot-amigos",
+      "stage": "amigos → ready",
+      "done": "Amigos: ready. Product, qa and architect agree on the Story Contract.",
+      "artifacts": [
+        "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json"
+      ],
+      "why": "Verdict ready from meeting 20261011-232838-2e8d92; ready: product, qa, architect; 4 rules, 12 examples; layers: 1 CLI implementation [functional] examples [1 2 3 4 5 6 7 8 9 10 11 12]; no flag.",
+      "next": "Stage 8: architect writes the story plan, qa writes failing tests, coder makes them pass, one stack layer at a time."
     }
   ]
 }
