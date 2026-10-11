@@ -25,6 +25,16 @@ const demoStoryPlan = "# Add story plan\n\n" +
 	"### T01: Contract\n\n**Spec excerpt:** none\n\n**Phase A: the types.**\n\n```go file=contract.go\npackage demo\n\n// Adder adds two numbers.\ntype Adder func(a, b int) int\n```\n\nRun: `go vet ./...`\n\n" +
 	"### T02: Add\n\n**Spec excerpt:** none\n\n- S1 `TestAdd_S1_SumsTwoNumbers`: Given 2 and 3, when Add runs, then it returns 5.\n\nRun: `go test ./... -run TestAdd_S1`\n"
 
+const demoStoryPlanJSON = `{"goal": "add two numbers", "architecture": "one file", "review_focus": ["negative numbers (S1)"],
+ "boundaries": [{"boundary": "adder", "artifact": "contract.go", "fixtures": "none", "fake": "none", "provider_check": "add_test.go", "owner": "T01"}],
+ "tasks": [
+  {"id": "T01", "title": "Contract", "kind": "contract", "packet": "code", "owns": ["contract.go"], "produces": ["type Adder"], "stack_layer": 1, "test_level": "contract",
+   "files": [{"path": "contract.go", "phase": "A", "code": "package demo\n\n// Adder adds two numbers.\ntype Adder func(a, b int) int\n"}]},
+  {"id": "T02", "title": "Add", "kind": "impl", "packet": "spec", "depends_on": ["T01"], "owns": ["add.go", "add_test.go"], "produces": ["func Add(a, b int) int"],
+   "consumes": ["Adder"], "stack_layer": 1, "test_level": "unit",
+   "scenarios": [{"id": "S1", "test": "TestAdd_S1_SumsTwoNumbers", "check": "Given 2 and 3, when Add runs, then it returns 5"}]}
+ ]}`
+
 const demoTest = "package demo\n\nimport \"testing\"\n\nfunc TestAdd_S1_SumsTwoNumbers(t *testing.T) {\n\tif got := Add(2, 3); got != 5 {\n\t\tt.Fatalf(\"want 5, got %d\", got)\n\t}\n}\n"
 
 func gitT(t *testing.T, dir string, args ...string) string {
@@ -75,7 +85,7 @@ func scriptedAgents(t *testing.T, calls *[]string) func(agentSpec) (*agentSessio
 		var replies []agentMsg
 		switch s.Role {
 		case "architect":
-			replies = []agentMsg{call("1", "write_file", map[string]any{"path": "docs/pipeline/stories/C0004-add.plan.md", "content": demoStoryPlan})}
+			replies = []agentMsg{call("1", "write_file", map[string]any{"path": "docs/pipeline/stories/C0004-add.plan.json", "content": demoStoryPlanJSON})}
 		case "qa":
 			replies = []agentMsg{
 				call("1", "write_file", map[string]any{"path": "add_test.go", "content": demoTest}),
@@ -155,7 +165,11 @@ func TestTDDCheck_FlagsTestsEditedAfterRed(t *testing.T) {
 	}
 	stack, _ := pl.loadStack("C0003")
 	wtMod := filepath.Join(stack.Worktree, "examples", "demo")
-	d, _ := parsePlan(demoStoryPlan)
+	planMD, _ := os.ReadFile(pl.abs("docs/pipeline/stories/C0004-add.plan.md"))
+	d, _ := parsePlan(string(planMD))
+	if len(d.Tasks) != 2 {
+		t.Fatalf("rendered plan has %d tasks", len(d.Tasks))
+	}
 	if res := tddCheck(d, wtMod, "C0004"); !res.ok() {
 		t.Fatalf("clean history should pass: %v", res.problems())
 	}

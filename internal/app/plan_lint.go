@@ -308,8 +308,10 @@ func cmdPlan(args []string) int {
 		return cmdPlanApply(args[1:])
 	case "tdd-check":
 		return cmdPlanTDDCheck(args[1:])
+	case "render":
+		return cmdPlanRender(args[1:])
 	}
-	return fail("unknown plan subcommand %q (want lint, verify, apply or tdd-check)", args[0])
+	return fail("unknown plan subcommand %q (want lint, verify, apply, tdd-check or render)", args[0])
 }
 
 func cmdPlanLint(args []string) int {

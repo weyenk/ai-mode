@@ -236,8 +236,10 @@ func stageImplement(pl *pipeline, c *card) (string, cardNote, error) {
 	if err := pl.writeStoryPlan(c, mod, planRel, contractMD); err != nil {
 		return "", cardNote{}, fmt.Errorf("story plan: %w", err)
 	}
-	if err := copyFile(filepath.Join(mod, planRel), pl.abs(planRel)); err != nil {
-		return "", cardNote{}, err
+	for _, rel := range []string{planRel, strings.TrimSuffix(planRel, ".md") + ".json"} {
+		if err := copyFile(filepath.Join(mod, rel), pl.abs(rel)); err != nil {
+			return "", cardNote{}, err
+		}
 	}
 	c.setArtifact("story-plan", planRel)
 	pl.sync(fmt.Sprintf("pipeline: %s story plan written", c.ID))
@@ -289,102 +291,45 @@ func (pl *pipeline) featureSlug(planCard card) string {
 	return s
 }
 
-const storyPlanAdaptations = `Pipeline adaptations of the skill (they win over the skill text where they differ):
-- The repository root is this Go module; every path in the plan is relative to it. Owned paths like "main.go" or "timer_test.go".
-- Header lines: **Spec:** %s (the Story Contract rendered as markdown; quote it for spec excerpts) and **Story Contract:** %s, and **Context:** tools.
-- Scenarios are the Story Contract's: S<n> is example n of the contract (listed under "## Scenarios" in the spec file). Every one
-  is covered by exactly one task, and its test name carries the id, e.g. TestTimer_S3_LongBreakAfterFourth.
-- When several scenarios check one behaviour with different values, one table-driven test may cover them: its name lists
-  every id it covers (TestDurations_S3_S4_S9_RejectOutOfRange), and each of those scenarios still gets its own coverage row
-  naming that test.
-- Put "hot_files":["go.mod","README.md"] in the task graph. Leave out "branch": the pipeline names the stack branches.
-- stack_layer is the Story Contract's layer number (its "## Layer plan"); every task gets one.
-- Keep it small: one contract task (code packet: shared types, interfaces, and stubbed function variables or stub functions
-  other tasks build on), then a few impl tasks as spec packets (qa writes their tests and stubs, coder implements; you write
-  no implementation code), and an integration task only if main.go needs wiring. A spec packet must say exactly what each
-  test asserts (Given/When/Then with concrete values) and which fakes to use.
-- Run ` + "`ai-mode plan lint --fix %s`" + ` and ` + "`ai-mode plan verify %s --task all --repo .`" + ` until both pass, then finish.`
+const storyPlanExample = `{
+ "goal": "one sentence",
+ "architecture": "two sentences: files, the seam each task builds on",
+ "review_focus": ["the input most likely to break it (S3)", "four more, each naming the scenario that pins it"],
+ "boundaries": [{"boundary": "time", "artifact": "clock.go (Clock interface)", "fixtures": "none", "fake": "fakeClock in clock_test helpers", "provider_check": "timer_test.go", "owner": "T01"}],
+ "tasks": [
+  {"id": "T01", "title": "Contract: shared types", "kind": "contract", "packet": "code", "depends_on": [],
+   "owns": ["clock.go"], "produces": ["type Clock interface"], "consumes": [], "stack_layer": 1, "test_level": "contract",
+   "files": [{"path": "clock.go", "phase": "A", "code": "package main\n\nimport \"time\"\n\n// Clock is the time source; tests pass a fake.\ntype Clock interface {\n\tNow() time.Time\n}\n"}]},
+  {"id": "T02", "title": "Session sequence", "kind": "impl", "packet": "spec", "depends_on": ["T01"],
+   "owns": ["sequence.go", "sequence_test.go"], "produces": ["func nextPhase(p Phase, done int) Phase"], "consumes": ["Clock"],
+   "stack_layer": 1, "test_level": "unit",
+   "scenarios": [{"id": "S1", "test": "TestSequence_S1_ShortBreakAfterFocus", "check": "Given 1 completed focus session, nextPhase(Focus, 1) returns ShortBreak"}],
+   "spec_excerpt": ["exact words copied from the contract file"],
+   "notes": "What to build, the exact signatures, which fakes the tests use."}
+ ]
+}`
 
-// writeStoryPlan has architect write the drafting-plans story plan inside the worktree module, checked by lint and verify.
-func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string) error {
-	if _, err := os.Stat(filepath.Join(mod, planRel)); err == nil {
-		if len(planCheck(mod, planRel, contractMD)) == 0 {
-			return nil // a retried stage keeps a plan that already passes
-		}
-	}
-	skill := drafttingPlansSkillBody()
-	contract, _ := os.ReadFile(filepath.Join(mod, contractMD))
-	task := fmt.Sprintf(`Write the implementation plan for story %s ("%s") to %s, following the drafting-plans skill below in story mode.
-It is the only file you may write. Read the module's code first (list_files, read_file): the plan builds on what exists.
+const storyPlanAdaptations = `How the pipeline uses your plan:
+- You write JSON to %s; ` + "`ai-mode plan render %s`" + ` turns it into the drafting-plans markdown (%s) and lints it.
+  Never write the markdown yourself. Run plan render after every change; fix every ERR it prints; when it says
+  RESULT: PASS, run ` + "`ai-mode plan verify %s --task all --repo .`" + ` (it compiles code packets) and fix any failure.
+- The repository root is this Go module; every path is relative to it.
+- Scenarios are the Story Contract's (S<n> is example n, listed in its "## Scenarios"). Every one is covered by exactly
+  one task; a test name carries the id (TestTimer_S3_LongBreakAfterFourth). Several scenarios checking one behaviour
+  with different values may share one table-driven test whose name lists all their ids (TestDurations_S3_S4_S9_Bounds).
+- A task that covers scenarios owns BOTH its _test.go file and its code file: qa writes the tests and stubs there (red),
+  coder then implements in the same task (green). Never split tests and implementation into separate tasks.
+- packet "code" (with files) only for contract tasks and simple wiring: their code must compile (plan verify checks it).
+  Everything else is packet "spec": no files; notes say exactly what to build and scenarios say exactly what to assert.
+- stack_layer is the Story Contract's layer number ("## Layer plan"); test_level comes from that layer.
+- Keep it small: at most one contract task (only if two tasks share types), then one task per new source file.
+- spec_excerpt: exact phrases copied from the contract file (rules or scenarios), or [] when none fits.
 
-%s
+JSON shape (an example; fields not listed here are rejected):
+%s`
 
-<skill name="drafting-plans">
-%s
-</skill>
-
-The Story Contract (data from the amigos meeting, your spec for this plan):
-<contract path=%q>
-%s
-</contract>`, c.ID, c.Title, planRel, fmt.Sprintf(storyPlanAdaptations, contractMD, strings.TrimSuffix(contractMD, ".md")+".json", planRel, planRel),
-		skill, contractMD, strings.TrimSpace(string(contract)))
-	cmds := [][]string{{"ai-mode", "plan", "lint"}, {"ai-mode", "plan", "verify"}, {"go", "build"}, {"go", "vet"}}
-	_, err := pl.runAgentIn(mod, "architect", "", task, []string{planRel}, nil, cmds, 40, func() []string { return planCheck(mod, planRel, contractMD) })
-	return err
-}
-
-// planCheck is plan lint (with --fix) plus plan verify --task all, in-process, against the worktree module.
-func planCheck(mod, planRel, specRel string) []string {
-	path := filepath.Join(mod, planRel)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return []string{"the plan file " + planRel + " does not exist yet; write it with write_file"}
-	}
-	spec, _ := os.ReadFile(filepath.Join(mod, specRel))
-	if fixed, _ := fixPlan(string(data), string(spec)); fixed != string(data) {
-		_ = os.WriteFile(path, []byte(fixed), 0o644)
-		data = []byte(fixed)
-	}
-	d, err := parsePlan(string(data))
-	if err != nil {
-		return []string{err.Error()}
-	}
-	d.SpecText = string(spec)
-	var out []string
-	if d.SpecPath != specRel {
-		out = append(out, fmt.Sprintf("the **Spec:** line must name %s (found %q)", specRel, d.SpecPath))
-	}
-	for _, f := range lintPlanOpts(d, false) {
-		if f.Level == "ERR" {
-			out = append(out, "plan lint: "+f.Msg)
-		}
-	}
-	if len(d.Tasks) == 0 {
-		out = append(out, "the task graph has no tasks")
-	}
-	for _, t := range d.Tasks {
-		if t.StackLayer < 1 {
-			out = append(out, fmt.Sprintf("%s has no stack_layer (use the Story Contract's layer number)", t.ID))
-		}
-	}
-	if len(out) > 0 {
-		return out
-	}
-	for _, t := range d.Tasks {
-		if r := verifyPlanTask(d, t.ID, mod); r.Status == "failed" {
-			for _, s := range r.Steps {
-				if !s.OK {
-					out = append(out, fmt.Sprintf("plan verify %s failed at %q: %s", t.ID, s.Name, truncateRunes(s.Detail, 1200)))
-					break
-				}
-			}
-		}
-	}
-	return out
-}
-
-// drafttingPlansSkillBody is the drafting-plans skill without its frontmatter, chief block and handoff sections.
-func drafttingPlansSkillBody() string {
+// drafttingPlansRules is the part of the drafting-plans skill that is about decomposition, not the markdown format.
+func drafttingPlansRules() string {
 	data, err := os.ReadFile(filepath.Join(filepath.Dir(presetsDir()), "skills", "drafting-plans", "SKILL.md"))
 	if err != nil {
 		return "(skills/drafting-plans/SKILL.md not found next to the presets)"
@@ -393,10 +338,69 @@ func drafttingPlansSkillBody() string {
 	if i := strings.Index(s, "## The four rules"); i >= 0 {
 		s = s[i:]
 	}
-	if i := strings.Index(s, "## Handoff"); i >= 0 {
+	if i := strings.Index(s, "## Process"); i >= 0 {
 		s = s[:i]
 	}
 	return strings.TrimSpace(s)
+}
+
+// writeStoryPlan has architect write the story plan as JSON inside the worktree module; it is rendered to the
+// drafting-plans markdown and must pass lint, the pipeline's checks and plan verify.
+func (pl *pipeline) writeStoryPlan(c *card, mod, planRel, contractMD string) error {
+	jsonRel := strings.TrimSuffix(planRel, ".md") + ".json"
+	check := func() []string { return storyPlanCheck(mod, jsonRel, contractMD) }
+	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err == nil && len(check()) == 0 {
+		return nil // a retried stage keeps a plan that already passes
+	}
+	contract, _ := os.ReadFile(filepath.Join(mod, contractMD))
+	task := fmt.Sprintf(`Write the implementation plan for story %s ("%s"), following the drafting-plans rules below, as JSON in %s.
+It is the only file you may write. Read the module's code first (list_files, read_file): the plan builds on what exists.
+
+%s
+
+<drafting_plans_rules>
+%s
+</drafting_plans_rules>
+
+The Story Contract (data from the amigos meeting; it is your spec):
+<contract path=%q>
+%s
+</contract>`, c.ID, c.Title, jsonRel, fmt.Sprintf(storyPlanAdaptations, jsonRel, jsonRel, planRel, planRel, storyPlanExample),
+		drafttingPlansRules(), contractMD, strings.TrimSpace(string(contract)))
+	cmds := [][]string{{"ai-mode", "plan", "render"}, {"ai-mode", "plan", "verify"}, {"go", "build"}, {"go", "vet"}}
+	_, err := pl.runAgentIn(mod, "architect", "", task, []string{jsonRel}, nil, cmds, 40, check)
+	return err
+}
+
+// storyPlanCheck renders the JSON plan, collects lint and pipeline findings, then runs plan verify on code packets.
+func storyPlanCheck(mod, jsonRel, specRel string) []string {
+	if _, err := os.Stat(filepath.Join(mod, jsonRel)); err != nil {
+		return []string{"the plan file " + jsonRel + " does not exist yet; write it with write_file"}
+	}
+	mdPath, findings, err := renderStoryPlanFile(filepath.Join(mod, jsonRel), specRel, mod)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	if len(findings) > 0 {
+		return findings
+	}
+	data, _ := os.ReadFile(mdPath)
+	d, err := parsePlan(string(data))
+	if err != nil {
+		return []string{err.Error()}
+	}
+	var out []string
+	for _, t := range d.Tasks {
+		if r := verifyPlanTask(d, t.ID, mod); r.Status == "failed" {
+			for _, st := range r.Steps {
+				if !st.OK {
+					out = append(out, fmt.Sprintf("plan verify %s failed at %q: %s", t.ID, st.Name, truncateRunes(st.Detail, 1200)))
+					break
+				}
+			}
+		}
+	}
+	return out
 }
 
 // ---- executor ---------------------------------------------------------------
