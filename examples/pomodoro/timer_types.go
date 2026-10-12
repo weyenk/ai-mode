@@ -82,10 +82,8 @@ var runTimerFn = func(ctx context.Context, focus, short, long time.Duration) err
 	// Cancel the countdown when the interrupt arrives so Timer.Run returns
 	// promptly.
 	go func() {
-		sig := <-sigCh
-		if sig != nil {
-			cancel()
-		}
+		<-sigCh
+		cancel()
 	}()
 
 	// Run the countdown loop; it returns when the context is cancelled.
@@ -93,13 +91,11 @@ var runTimerFn = func(ctx context.Context, focus, short, long time.Duration) err
 		return err
 	}
 
-	// A SIGINT interrupted the run: print the completion line and exit 0.
-	select {
-	case <-sigCh:
+	// The context is cancelled only on SIGINT: print the completion line and exit 0.
+	if ctx.Err() != nil {
 		code, err := handleSIGINTFn(t, ctx, out)
 		osExit(code)
 		return err
-	default:
 	}
 	return nil
 }
