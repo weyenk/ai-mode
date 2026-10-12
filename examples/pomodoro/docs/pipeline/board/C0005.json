@@ -2,21 +2,24 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "ready",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
+  "prev_stage": "ready",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
+    "contract-md": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.md",
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
     "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
+    "stack": "docs/pipeline/stack/C0003.json",
     "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-11T23:33:26Z",
+  "updated": "2026-10-12T00:29:49Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -115,6 +118,14 @@
       ],
       "why": "Verdict ready from meeting 20261011-232838-2e8d92; ready: product, qa, architect; 4 rules, 12 examples; layers: 1 CLI implementation [functional] examples [1 2 3 4 5 6 7 8 9 10 11 12]; no flag.",
       "next": "Stage 8: architect writes the story plan, qa writes failing tests, coder makes them pass, one stack layer at a time."
+    },
+    {
+      "ts": "2026-10-12T00:29:49Z",
+      "by": "bot-chief",
+      "stage": "ready → needs-human",
+      "done": "Stage ready stopped before finishing.",
+      "why": "story plan: architect stopped (timeout) and the check still fails: plan verify T03 failed at \"phase A: compile (go vet ./...)\": # pomodoro\n# [pomodoro]\nvet: ./completion.go:31:29: undefined: Timer",
+      "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0005`."
     }
   ]
 }
