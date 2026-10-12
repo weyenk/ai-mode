@@ -2,14 +2,13 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "needs-human",
+  "stage": "architect-review",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
-  "prev_stage": "architect-review",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "contract-md": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.md",
@@ -21,7 +20,7 @@
     "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T02:12:41Z",
+  "updated": "2026-10-12T02:15:08Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -187,6 +186,14 @@
       "done": "Stage architect-review stopped before finishing.",
       "why": "fixing the user flows: the agents changed nothing for the blocking comments",
       "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0005`."
+    },
+    {
+      "ts": "2026-10-12T02:15:08Z",
+      "by": "human",
+      "stage": "needs-human → architect-review",
+      "done": "Retry requested.",
+      "why": "A human cleared the block.",
+      "next": "The next tick re-runs architect-review."
     }
   ]
 }
