@@ -12,18 +12,17 @@ _empty_
 
 ## building
 
-| Card | Type | Stage | Parent | Title | Latest note |
-| --- | --- | --- | --- | --- | --- |
-| C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
-| C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
-| C0003 | plan | tracking | C0002 | Pomodoro CLI — feature plan | planning → tracking (bot-architect): Cut 2 stories (C0004, C0005), in stack order. |
-| C0005 | story | handoff | C0003 | CLI Configuration & Validation | architect-review → handoff (bot-architect): Architect approved all 1 layer(s); 0 fix round(s). |
+_empty_
 
 ## review
 
 | Card | Type | Stage | Parent | Title | Latest note |
 | --- | --- | --- | --- | --- | --- |
+| C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
+| C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
+| C0003 | plan | tracking | C0002 | Pomodoro CLI — feature plan | planning → tracking (bot-architect): Cut 2 stories (C0004, C0005), in stack order. |
 | C0004 | story | review | C0003 | Core Timer Engine | review (operator (Claude)): Correction to the hand-off note above: it was invented by chief (fixed in the pipeline since). The facts: one draft PR, https://github.com/weyenk/ai-mode/pull/19 (layer 1, branch simple-pomodoro-timer-01-core-timer-engine, tasks T01-T06, 22 contract scenarios with tests written first, 2 contract amendments by architect). There is no time-zone support and there are no PRs #20/#21. main is still an empty stub here; the CLI story C0005 wires it, stacked on this PR. |
+| C0005 | story | review | C0003 | CLI Configuration & Validation | handoff → review (bot-chief): Opened 1 draft PR(s), one per layer: https://github.com/weyenk/ai-mode/pull/20. |
 
 ## done
 

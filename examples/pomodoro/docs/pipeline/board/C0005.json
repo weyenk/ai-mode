@@ -2,7 +2,7 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "handoff",
+  "stage": "review",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
@@ -20,7 +20,7 @@
     "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T03:27:29Z",
+  "updated": "2026-10-12T03:27:33Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -285,6 +285,17 @@
       ],
       "why": "layer 2 approved in round 1 (1 nit(s)); user flows traced from main: work (round 1). No open blocking comments, go test ./... green at the tip, tdd-check passes.",
       "next": "Stage 10 pushes the layers and opens draft PRs for a human."
+    },
+    {
+      "ts": "2026-10-12T03:27:33Z",
+      "by": "bot-chief",
+      "stage": "handoff → review",
+      "done": "Opened 1 draft PR(s), one per layer: https://github.com/weyenk/ai-mode/pull/20.",
+      "artifacts": [
+        "https://github.com/weyenk/ai-mode/pull/20"
+      ],
+      "why": "layer 2 \"CLI implementation\" on branch simple-pomodoro-timer-02-cli-implementation, PR https://github.com/weyenk/ai-mode/pull/20, tasks T00, T01, T02, T03; 12 contract scenarios, each with a test written first; 2 contract amendment(s) by architect (see the contract).",
+      "next": "A human reviews bottom-up and merges bottom-up. Only a human merges."
     }
   ]
 }
