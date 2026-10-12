@@ -106,9 +106,10 @@ func (t *Timer) transition(state *TimerState) {
 	}
 }
 
-// emit writes the in-place status line for the current phase: a carriage
-// return, the label and countdown, then the ANSI erase-to-end-of-line so a
-// shorter line leaves no remnant.
+// emit writes the in-place status line for the current phase: the ANSI
+// erase-to-end-of-line prefix (carriage return + \x1b[K) so the previous line
+// is cleared, then the label and countdown. This way the new line remains on
+// screen rather than being immediately erased.
 func (t *Timer) emit(state TimerState, elapsed int) {
 	remaining := int64(t.durationFor(state)/time.Second) - int64(elapsed)
 	if remaining < 0 {
@@ -125,5 +126,5 @@ func (t *Timer) emit(state TimerState, elapsed int) {
 	case LongBreak:
 		label = "Long break"
 	}
-	fmt.Fprintf(t.out, "%s: %02d:%02d\r\x1b[K", label, m, s)
+	fmt.Fprintf(t.out, "\r\x1b[K%s: %02d:%02d", label, m, s)
 }

@@ -136,10 +136,10 @@ func TestTimer_S1_ShortBreakAfterFourth(t *testing.T) {
 	out := runForTicks(t, focusDur, shortDur, longDur, 6900)
 
 	// Assert: the phase entering at t=6900s is a 15-minute LongBreak.
-	if got, want := out.lineAt(t, 6899), "Session 4: 00:01\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 6899), "\r\x1b[KSession 4: 00:01"; got != want {
 		t.Errorf("last tick of 4th focus session = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 6900), "Long break: 15:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 6900), "\r\x1b[KLong break: 15:00"; got != want {
 		t.Errorf("break after 4th focus session = %q, want %q", got, want)
 	}
 }
@@ -155,11 +155,11 @@ func TestTimer_S2_FullCycle(t *testing.T) {
 		tick int
 		line string
 	}{
-		{0, "Session 1: 25:00\r\x1b[K"},     // Focus, Session 1
-		{1500, "Break: 05:00\r\x1b[K"},      // t=25m -> ShortBreak 5m
-		{1800, "Session 2: 25:00\r\x1b[K"},  // t=30m -> Focus Session 2
-		{6900, "Long break: 15:00\r\x1b[K"}, // t=115m -> LongBreak (not ShortBreak) 15m
-		{7800, "Session 5: 25:00\r\x1b[K"},  // after long break -> Focus Session 5
+		{0, "\r\x1b[KSession 1: 25:00"},     // Focus, Session 1
+		{1500, "\r\x1b[KBreak: 05:00"},      // t=25m -> ShortBreak 5m
+		{1800, "\r\x1b[KSession 2: 25:00"},  // t=30m -> Focus Session 2
+		{6900, "\r\x1b[KLong break: 15:00"}, // t=115m -> LongBreak (not ShortBreak) 15m
+		{7800, "\r\x1b[KSession 5: 25:00"},  // after long break -> Focus Session 5
 	}
 	for _, m := range milestones {
 		if got, want := out.lineAt(t, m.tick), m.line; got != want {
@@ -174,14 +174,14 @@ func TestTimer_S5_OutputFormat(t *testing.T) {
 	// Act: run 25 minutes.
 	out := runForTicks(t, focusDur, shortDur, longDur, 1500)
 
-	// Assert: exact pinned lines, each carrying the \r and ANSI erase-to-EOL.
-	if got, want := out.lineAt(t, 0), "Session 1: 25:00\r\x1b[K"; got != want {
+	// Assert: exact pinned lines, each carrying the \r and ANSI erase-to-EOL prefix.
+	if got, want := out.lineAt(t, 0), "\r\x1b[KSession 1: 25:00"; got != want {
 		t.Errorf("t=0: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 1499), "Session 1: 00:01\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 1499), "\r\x1b[KSession 1: 00:01"; got != want {
 		t.Errorf("t=1499s: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 1500), "Break: 05:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 1500), "\r\x1b[KBreak: 05:00"; got != want {
 		t.Errorf("t=1500s: status line = %q, want %q", got, want)
 	}
 	for _, n := range []int{0, 1499, 1500} {
@@ -199,13 +199,13 @@ func TestTimer_S7_BreakTransitionOutput(t *testing.T) {
 	out := runForTicks(t, focusDur, shortDur, longDur, 1500)
 
 	// Assert: writer received the exact pinned countdown strings.
-	if got, want := out.lineAt(t, 0), "Session 1: 25:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 0), "\r\x1b[KSession 1: 25:00"; got != want {
 		t.Errorf("t=0: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 1439), "Session 1: 01:01\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 1439), "\r\x1b[KSession 1: 01:01"; got != want {
 		t.Errorf("t=1439s: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 1500), "Break: 05:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 1500), "\r\x1b[KBreak: 05:00"; got != want {
 		t.Errorf("t=1500s: status line = %q, want %q", got, want)
 	}
 }
@@ -217,7 +217,7 @@ func TestTimer_S8_LongBreakLabel(t *testing.T) {
 	out := runForTicks(t, focusDur, shortDur, longDur, 6900)
 
 	// Assert: the LongBreak's first line uses the two-word 'Long break' label.
-	if got, want := out.lineAt(t, 6900), "Long break: 15:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 6900), "\r\x1b[KLong break: 15:00"; got != want {
 		t.Errorf("LongBreak first status line = %q, want %q", got, want)
 	}
 }
@@ -229,13 +229,13 @@ func TestTimer_S14_BoundaryOneMinute(t *testing.T) {
 	out := runForTicks(t, time.Minute, shortDur, longDur, 60)
 
 	// Assert: countdown steps 01:00 -> 00:01 -> break, never negative.
-	if got, want := out.lineAt(t, 0), "Session 1: 01:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 0), "\r\x1b[KSession 1: 01:00"; got != want {
 		t.Errorf("t=0: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 59), "Session 1: 00:01\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 59), "\r\x1b[KSession 1: 00:01"; got != want {
 		t.Errorf("t=59s: status line = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 60), "Break: 05:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 60), "\r\x1b[KBreak: 05:00"; got != want {
 		t.Errorf("t=60s: status line = %q, want %q", got, want)
 	}
 }
@@ -249,7 +249,7 @@ func TestTimer_S15_ZeroDuration(t *testing.T) {
 	out := runForTicks(t, 0, shortDur, longDur, 1)
 
 	// Assert: output stays well-formed (never negative) and no 00:00 remnant.
-	if got, want := out.lineAt(t, 0), "Session 1: 00:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 0), "\r\x1b[KSession 1: 00:00"; got != want {
 		t.Errorf("t=0: status line = %q, want %q", got, want)
 	}
 	line := out.lineAt(t, 1)
@@ -265,10 +265,10 @@ func TestTimer_S16_CycleRestart(t *testing.T) {
 	out := runForTicks(t, focusDur, shortDur, longDur, 7800)
 
 	// Assert: long break runs down to 00:01, then Session 5 starts fresh.
-	if got, want := out.lineAt(t, 7799), "Long break: 00:01\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 7799), "\r\x1b[KLong break: 00:01"; got != want {
 		t.Errorf("last tick of long break = %q, want %q", got, want)
 	}
-	if got, want := out.lineAt(t, 7800), "Session 5: 25:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 7800), "\r\x1b[KSession 5: 25:00"; got != want {
 		t.Errorf("first tick after long break = %q, want %q", got, want)
 	}
 }
@@ -280,7 +280,7 @@ func TestTimer_S18_InitialOutput(t *testing.T) {
 	out := runForTicks(t, focusDur, shortDur, longDur, 0)
 
 	// Assert: writer received exactly the initial line at t=0.
-	if got, want := out.lineAt(t, 0), "Session 1: 25:00\r\x1b[K"; got != want {
+	if got, want := out.lineAt(t, 0), "\r\x1b[KSession 1: 25:00"; got != want {
 		t.Errorf("initial status line = %q, want %q", got, want)
 	}
 }

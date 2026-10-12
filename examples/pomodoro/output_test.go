@@ -21,20 +21,22 @@ func writeStatus(t *testing.T, state TimerState, session int, remaining time.Dur
 	return buf.String()
 }
 
-// S5: in-place focus output is the exact pinned line, terminated by a carriage
-// return and the ANSI erase-to-end-of-line sequence, at t=0, the last second and
-// on the ShortBreak transition.
+// S5: in-place focus output is the exact pinned line, prefixed by a carriage
+// return and the ANSI erase-to-end-of-line sequence (to clear the previous
+// line before printing the new one), at t=0, the last second and on the
+// ShortBreak transition.
 func TestOutput_S5_Formatting(t *testing.T) {
 	// Arrange: default 25m focus and 5m short-break durations.
 	// Act + Assert: each update must be the exact in-place line and must carry
-	// the trailing "\r\x1b[K" that overwrites the previous line in place.
-	if got, want := writeStatus(t, Focus, 1, 25*time.Minute), "Session 1: 25:00\r\x1b[K"; got != want {
+	// the leading "\r\x1b[K" that clears the previous line before writing the
+	// new status.
+	if got, want := writeStatus(t, Focus, 1, 25*time.Minute), "\r\x1b[KSession 1: 25:00"; got != want {
 		t.Errorf("t=0: status line = %q, want %q", got, want)
 	}
-	if got, want := writeStatus(t, Focus, 1, 1*time.Second), "Session 1: 00:01\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, Focus, 1, 1*time.Second), "\r\x1b[KSession 1: 00:01"; got != want {
 		t.Errorf("t=24m59s: status line = %q, want %q", got, want)
 	}
-	if got, want := writeStatus(t, ShortBreak, 1, 5*time.Minute), "Break: 05:00\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, ShortBreak, 1, 5*time.Minute), "\r\x1b[KBreak: 05:00"; got != want {
 		t.Errorf("t=25m (ShortBreak): status line = %q, want %q", got, want)
 	}
 	for _, line := range []string{
@@ -42,8 +44,8 @@ func TestOutput_S5_Formatting(t *testing.T) {
 		writeStatus(t, Focus, 1, 1*time.Second),
 		writeStatus(t, ShortBreak, 1, 5*time.Minute),
 	} {
-		if !strings.HasSuffix(line, "\r\x1b[K") {
-			t.Errorf("status line %q is not terminated by \\r + ANSI erase-to-end-of-line", line)
+		if !strings.HasPrefix(line, "\r\x1b[K") {
+			t.Errorf("status line %q is not prefixed by \\r + ANSI erase-to-end-of-line", line)
 		}
 	}
 }
@@ -54,13 +56,13 @@ func TestOutput_S7_ShortBreak(t *testing.T) {
 	// Arrange: default 25m focus and 5m short-break durations.
 	// Act + Assert: the countdown shows 00:01 at the last second and the break
 	// line shows 05:00 once the phase is ShortBreak.
-	if got, want := writeStatus(t, Focus, 1, 1500*time.Second), "Session 1: 25:00\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, Focus, 1, 1500*time.Second), "\r\x1b[KSession 1: 25:00"; got != want {
 		t.Errorf("focus start: status line = %q, want %q", got, want)
 	}
-	if got, want := writeStatus(t, Focus, 1, 1*time.Second), "Session 1: 00:01\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, Focus, 1, 1*time.Second), "\r\x1b[KSession 1: 00:01"; got != want {
 		t.Errorf("last second of focus: status line = %q, want %q", got, want)
 	}
-	if got, want := writeStatus(t, ShortBreak, 1, 300*time.Second), "Break: 05:00\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, ShortBreak, 1, 300*time.Second), "\r\x1b[KBreak: 05:00"; got != want {
 		t.Errorf("ShortBreak transition: status line = %q, want %q", got, want)
 	}
 }
@@ -69,7 +71,7 @@ func TestOutput_S7_ShortBreak(t *testing.T) {
 func TestOutput_S8_LongBreak(t *testing.T) {
 	// Arrange: default 15m long-break duration.
 	// Act + Assert: the long break line uses the two-word "Long break" label.
-	if got, want := writeStatus(t, LongBreak, 1, 15*time.Minute), "Long break: 15:00\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, LongBreak, 1, 15*time.Minute), "\r\x1b[KLong break: 15:00"; got != want {
 		t.Errorf("LongBreak: status line = %q, want %q", got, want)
 	}
 }
@@ -78,7 +80,7 @@ func TestOutput_S8_LongBreak(t *testing.T) {
 func TestOutput_S18_Initial(t *testing.T) {
 	// Arrange: default 25m focus duration; the timer has just started.
 	// Act + Assert: the writer receives exactly the initial line at t=0.
-	if got, want := writeStatus(t, Focus, 1, 25*time.Minute), "Session 1: 25:00\r\x1b[K"; got != want {
+	if got, want := writeStatus(t, Focus, 1, 25*time.Minute), "\r\x1b[KSession 1: 25:00"; got != want {
 		t.Errorf("initial status line = %q, want %q", got, want)
 	}
 }
