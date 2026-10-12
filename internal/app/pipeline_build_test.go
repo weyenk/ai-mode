@@ -421,3 +421,19 @@ func TestTerminalScreen_EraseAfterTextLeavesNothing(t *testing.T) {
 		t.Fatalf("CR, text, erase keeps the latest status: %q %d", screen, bells)
 	}
 }
+
+func TestQuoteVisible_RendersTheQuoteLikeATerminal(t *testing.T) {
+	obs := observation{ScreenBefore: "Session 1: 24:58", Screen: "Completed 0 focus sessions\n"}
+	for q, want := range map[string][2]bool{
+		"\r\x1b[KSession 1: 24:58":     {true, true},
+		"Session 1: 24:58\r\x1b[K":     {false, true}, // erased after it is drawn
+		"Completed 0 focus sessions\n": {true, true},
+		"Completed 3 focus sessions":   {false, true},
+		"n/a":                          {false, false},
+	} {
+		v, qd := quoteVisible(q, obs)
+		if v != want[0] || qd != want[1] {
+			t.Errorf("quoteVisible(%q) = %v %v, want %v", q, v, qd, want)
+		}
+	}
+}

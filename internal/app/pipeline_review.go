@@ -249,6 +249,27 @@ Reply with ONE fenced json block: `+"```json\n"+`{"file": "path.go", "line": 1, 
 	return rc
 }
 
+// quoteVisible renders a quote the way a terminal would (models quote raw sequences like "\r\x1b[KSession 1: 24:58")
+// and reports whether every visible line of it is on the screen before or after Ctrl-C; quoted is false for no quote.
+func quoteVisible(quote string, obs observation) (visible, quoted bool) {
+	q := strings.TrimSpace(quote)
+	if q == "" || strings.EqualFold(q, "n/a") || strings.EqualFold(q, "none") {
+		return false, false
+	}
+	lines, _ := terminalScreen(q)
+	any := false
+	for _, l := range lines {
+		if l = strings.TrimSpace(l); l == "" {
+			continue
+		}
+		any = true
+		if !strings.Contains(obs.Screen, l) && !strings.Contains(obs.ScreenBefore, l) {
+			return false, true
+		}
+	}
+	return any, true
+}
+
 func mentioned(cs []reviewComment, promise string) bool {
 	for _, c := range cs {
 		if ruleSimilarity(c.Comment, promise) >= 0.3 {
@@ -513,12 +534,15 @@ The request and the rules outrank the contract's examples. Do not comment on sty
 	for i, item := range rv.Checklist {
 		// a "yes" must quote what the run shows; a quote that is not there is a claim from the code, so it counts as "no"
 		if strings.EqualFold(strings.TrimSpace(item.Observed), "yes") {
-			q := strings.TrimSpace(item.Quote)
-			if q == "" || !(strings.Contains(obs.Screen, q) || strings.Contains(obs.ScreenBefore, q)) {
+			switch visible, quoted := quoteVisible(item.Quote, obs); {
+			case !quoted:
+				rv.Checklist[i].Observed = "n/a" // a yes without a quote is not evidence either way
+				rv.Checklist[i].Evidence += " (no quote from the run, so unverified)"
+			case !visible:
 				rv.Checklist[i].Observed = "no"
-				rv.Checklist[i].Evidence = fmt.Sprintf("a user does not see it: %q is not on the terminal before or after Ctrl-C (text that is written and then erased does not count)", q)
-				item = rv.Checklist[i]
+				rv.Checklist[i].Evidence = fmt.Sprintf("a user does not see it: %q is not on the terminal before or after Ctrl-C (text that is written and then erased does not count)", item.Quote)
 			}
+			item = rv.Checklist[i]
 		}
 		if strings.EqualFold(strings.TrimSpace(item.Observed), "no") && !mentioned(block, item.Promise) {
 			// a promise the run shows is broken is blocking even when architect wrote no comment for it; ask where to fix it
