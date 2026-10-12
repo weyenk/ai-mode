@@ -4,7 +4,9 @@
 made here and marked **Decided here**; each is cheap to revisit.
 **Roadmap:** `docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md` (stage order, contracts, invariants, D1–D4).
 **Acceptance run:** a "simple pomodoro timer" feature request goes from intake to open draft PRs with no human step
-other than intake, and the code in those PRs was written by the local roles, not by the operator.
+other than intake, and the code in those PRs was written by the local roles, not by the operator. The pomodoro module was
+only a test target for the workflow; its code (draft PRs weyenk/ai-mode#19 and #20) and its `docs/pipeline/` records are
+not kept on this branch (they remain in its git history).
 
 ## What this changes in the roadmap
 

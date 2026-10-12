@@ -51,8 +51,8 @@ ai-mode plan verify docs/superpowers/plans/my-plan.md --task all   # apply each 
 ai-mode plan lint --feature docs/pipeline/plans/C0002-x-feature-plan.md   # a feature plan: every spec scenario in exactly one story, flags consistent
 ai-mode plan tdd-check story.plan.md --repo DIR   # on the executors' branch: each scenario test was red at its red commit, green at the tip, untouched since
 ai-mode agent coder "make the tests pass" --repo DIR --own add.go --read-only add_test.go   # a role as a tool loop: owned paths only, no shell
-ai-mode pipeline new "Simple pomodoro timer" --context hobby --body request.md --repo examples/pomodoro   # file a request card
-ai-mode pipeline run --push --repo examples/pomodoro   # advance it stage by stage until it needs a human or the PRs are open
+ai-mode pipeline new "Simple pomodoro timer" --context hobby --body request.md --repo path/to/module   # file a request card
+ai-mode pipeline run --push --repo path/to/module   # advance it stage by stage until it needs a human or the PRs are open
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 ```
 
@@ -210,7 +210,8 @@ Agent-mode stages run through `ai-mode agent`: the role gets list/read/search/wr
 paths its task owns, and may run only allowlisted commands (`go test|build|vet`, `gofmt`, `ai-mode plan lint|verify`),
 argv only, no shell. A stage that cannot finish moves its card to `blocked` (`needs-human`) with a note saying what to
 decide; `pipeline answer` (a paused story) and `pipeline retry` continue it. Set `AI_MODE_PRESETS` to this checkout's
-`presets/` when running a branch build. The first run built [`examples/pomodoro`](examples/pomodoro/).
+`presets/` when running a branch build. The acceptance run took a throwaway "simple pomodoro timer" request from intake
+to draft PRs; that module was only a test of the workflow and is not kept in the repo.
 
 ### Work board (Vikunja)
 
@@ -230,7 +231,7 @@ ai-mode board init                              # once, in a terminal: sign in a
                                                 # creates bot-chief, bot-product, bot-architect, bot-amigos, bot-qa, bot-coder and stores
                                                 # their tokens plus ai-mode's in ~/.config/ai-mode/board.json (0600); the password is not stored
 ai-mode board status                            # server, version, tokens (doctor runs the same check)
-ai-mode board sync --repo examples/pomodoro     # pull what people did on the board, push the cards
+ai-mode board sync --repo path/to/module        # pull what people did on the board, push the cards
 ```
 
 Each target gets a project named after its directory with the six columns (`init` … `blocked`) as kanban buckets. Every
