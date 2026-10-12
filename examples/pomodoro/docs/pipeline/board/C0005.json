@@ -2,7 +2,7 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "review",
+  "stage": "architect-review",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
@@ -20,7 +20,7 @@
     "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T01:53:15Z",
+  "updated": "2026-10-12T01:54:36Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -170,6 +170,14 @@
       ],
       "why": "layer 2 \"CLI implementation\" on branch simple-pomodoro-timer-02-cli-implementation, PR https://github.com/weyenk/ai-mode/pull/20, tasks T00, T01, T02, T03; 12 contract scenarios, each with a test written first; 2 contract amendment(s) by architect (see the contract).",
       "next": "A human reviews bottom-up and merges bottom-up. Only a human merges."
+    },
+    {
+      "ts": "2026-10-12T01:54:36Z",
+      "by": "operator (Claude), reviewing in the review column",
+      "stage": "review → architect-review",
+      "done": "Reopened from review.",
+      "why": "Ran the built program: 'pomodoro -focus 1 -short 1 -long 1' exits immediately with status 0 and prints nothing. main calls runCLI, which parses and validates the flags and returns without starting the timer, so the request's core flow (start, watch the countdown, Ctrl-C prints the count) does not work. Back to architect review, which now traces the user flows from main.",
+      "next": "The next tick runs architect-review again."
     }
   ]
 }
