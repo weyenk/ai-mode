@@ -375,3 +375,30 @@ func TestStoryPlan_CodePacketMayNotRewriteAnExistingFile(t *testing.T) {
 		t.Fatalf("a committed task's files exist because it wrote them: %v", f)
 	}
 }
+
+func TestObservedRun_ReportsOutputAndCtrlC(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module p\n\ngo 1.22\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte(`package main
+
+import (
+	"fmt"
+	"os"
+	"os/signal"
+)
+
+func main() {
+	fmt.Print("tick\r\x1b[K")
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	<-c
+	fmt.Println("Completed 0 focus sessions")
+}
+`), 0o644)
+	got := observedRun(dir)
+	for _, want := range []string{"received Ctrl-C (SIGINT) and exited (exit status 0)", `"tick\r\x1b[KCompleted 0 focus sessions\n"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
