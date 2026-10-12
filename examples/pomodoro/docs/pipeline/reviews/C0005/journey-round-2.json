@@ -1,0 +1,13 @@
+{
+  "comments": [
+    {
+      "file": "timer.go",
+      "line": 53,
+      "severity": "blocking",
+      "comment": "R5 is not implemented. When a transition occurs (e.g., Focus to Break), the program must print the ASCII bell character '\\a' to notify the user. This should be added inside the 'if' block where t.transition(\u0026state) is called."
+    }
+  ],
+  "round": 2,
+  "story": "C0005",
+  "works": false
+}

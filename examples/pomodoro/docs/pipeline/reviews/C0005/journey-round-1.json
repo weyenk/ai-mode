@@ -1,0 +1,13 @@
+{
+  "comments": [
+    {
+      "file": "timer_types.go",
+      "line": 34,
+      "severity": "blocking",
+      "comment": "runTimerFn is a stub that returns nil immediately. It must be implemented to instantiate a Timer (with a real Clock) and call t.Run(ctx) so the timer actually runs, and it must handle SIGINT to call handleSIGINTFn."
+    }
+  ],
+  "round": 1,
+  "story": "C0005",
+  "works": false
+}

@@ -2,13 +2,14 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "architect-review",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
+  "prev_stage": "architect-review",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "contract-md": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.md",
@@ -20,7 +21,7 @@
     "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T01:54:36Z",
+  "updated": "2026-10-12T02:12:41Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -178,6 +179,14 @@
       "done": "Reopened from review.",
       "why": "Ran the built program: 'pomodoro -focus 1 -short 1 -long 1' exits immediately with status 0 and prints nothing. main calls runCLI, which parses and validates the flags and returns without starting the timer, so the request's core flow (start, watch the countdown, Ctrl-C prints the count) does not work. Back to architect review, which now traces the user flows from main.",
       "next": "The next tick runs architect-review again."
+    },
+    {
+      "ts": "2026-10-12T02:12:41Z",
+      "by": "bot-chief",
+      "stage": "architect-review → needs-human",
+      "done": "Stage architect-review stopped before finishing.",
+      "why": "fixing the user flows: the agents changed nothing for the blocking comments",
+      "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0005`."
     }
   ]
 }
