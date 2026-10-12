@@ -446,8 +446,35 @@ const wiringRule = `
 This is the last story of its feature: after it a user must be able to run the program end to end. The plan must wire it:
 one task owns %s (where func main is) and makes main call a testable run function (taking args, stdout, stderr and the
 seams the program needs, returning an exit code), and that task covers at least one scenario with a journey test that calls
-the run function the way a user starts the program. An empty or stub main is not done.
+the run function the way a user starts the program. The file already exists, so that task is a spec packet (coder edits
+it); never give the whole file in a code packet. An empty or stub main is not done.
 `
+
+// existingFileBlocks: a code packet may only create new files. The JSON plan has no edit modes, so a file block for a
+// file that exists is a whole-file rewrite, and architect's rewrite of timer_types.go dropped the Timer type the rest of
+// the module used. Changes to existing files belong in spec packets, where coder edits with tools.
+func existingFileBlocks(mod, jsonRel string, done map[string]string) []string {
+	data, err := os.ReadFile(filepath.Join(mod, jsonRel))
+	if err != nil {
+		return nil
+	}
+	pj, err := parseStoryPlanJSON(data)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for _, t := range pj.Tasks {
+		if done[t.ID] != "" {
+			continue
+		}
+		for _, f := range t.Files {
+			if _, err := os.Stat(filepath.Join(mod, filepath.FromSlash(f.Path))); err == nil {
+				out = append(out, fmt.Sprintf("%s gives the whole of %s, which already exists: a code packet may only create new files. Make %s a spec packet (no files; coder edits %s with tools) or put new code in a new file", t.ID, f.Path, t.ID, f.Path))
+			}
+		}
+	}
+	return out
+}
 
 // committedNote tells architect which tasks of a re-planned story are already committed and must stay as they are.
 func committedNote(committed map[string]*committedTask) string {
@@ -551,6 +578,7 @@ func storyPlanCheck(mod, jsonRel, specRel string, done map[string]string) []stri
 		}
 		findings = append(findings, f)
 	}
+	findings = append(findings, existingFileBlocks(mod, jsonRel, done)...)
 	if len(findings) > 0 {
 		return findings
 	}

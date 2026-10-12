@@ -359,3 +359,19 @@ func TestWiring_LastStoryMustWireAnEmptyMain(t *testing.T) {
 		t.Fatal("a wired main is not empty")
 	}
 }
+
+func TestStoryPlan_CodePacketMayNotRewriteAnExistingFile(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "types.go"), []byte("package main\n"), 0o644)
+	os.MkdirAll(filepath.Join(dir, "docs"), 0o755)
+	os.WriteFile(filepath.Join(dir, "docs", "p.plan.json"), []byte(`{"goal":"g","architecture":"a","tasks":[
+		{"id":"T01","title":"c","kind":"contract","owns":["types.go","new.go"],"stack_layer":1,
+		 "files":[{"path":"types.go","phase":"A","code":"package main\n"},{"path":"new.go","phase":"A","code":"package main\n"}]}]}`), 0o644)
+	f := existingFileBlocks(dir, "docs/p.plan.json", nil)
+	if len(f) != 1 || !strings.Contains(f[0], "whole of types.go") {
+		t.Fatalf("findings %v", f)
+	}
+	if f := existingFileBlocks(dir, "docs/p.plan.json", map[string]string{"T01": "contract"}); len(f) != 0 {
+		t.Fatalf("a committed task's files exist because it wrote them: %v", f)
+	}
+}
