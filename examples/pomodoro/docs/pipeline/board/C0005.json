@@ -2,7 +2,7 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "ready",
+  "stage": "architect-review",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
@@ -15,10 +15,11 @@
     "plan": "docs/pipeline/plans/C0002-pomodoro-cli-feature-plan.md",
     "spec": "docs/pipeline/specs/C0002-pomodoro-cli.md",
     "stack": "docs/pipeline/stack/C0003.json",
-    "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
+    "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md",
+    "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T00:31:40Z",
+  "updated": "2026-10-12T01:51:45Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -133,6 +134,19 @@
       "done": "Retry requested.",
       "why": "A human cleared the block.",
       "next": "The next tick re-runs ready."
+    },
+    {
+      "ts": "2026-10-12T01:51:45Z",
+      "by": "bot-coder",
+      "stage": "ready → architect-review",
+      "done": "Implemented 4 tasks test-first in 1 layer(s): simple-pomodoro-timer-02-cli-implementation.",
+      "artifacts": [
+        "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md",
+        "docs/pipeline/stories/C0005-cli-configuration-validation.contract.md",
+        "docs/pipeline/stack/C0003.json"
+      ],
+      "why": "Every task was seen red (qa's tests failing on their assertions) before green (coder), test files untouched since red; `plan tdd-check` passes; gofmt, go vet and go test ./... are green on every layer. T00 contract applied. T01: 1 contract amendment(s) by architect (test review). T01: 1 contract amendment(s) by architect (test review). T01 red (qa) then green (coder), 5 scenario test(s). T02 red (qa) then green (coder), 6 scenario test(s). T03 red (qa) then green (coder), 1 scenario test(s).",
+      "next": "architect reviews each layer against the Story Contract; coder fixes in the owning layer."
     }
   ]
 }

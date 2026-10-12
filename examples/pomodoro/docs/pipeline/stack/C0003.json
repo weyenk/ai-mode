@@ -21,6 +21,19 @@
         "T06"
       ],
       "pr": "https://github.com/weyenk/ai-mode/pull/19"
+    },
+    {
+      "n": 2,
+      "branch": "simple-pomodoro-timer-02-cli-implementation",
+      "story": "C0005",
+      "layer": 1,
+      "name": "CLI implementation",
+      "tasks": [
+        "T00",
+        "T01",
+        "T02",
+        "T03"
+      ]
     }
   ]
 }

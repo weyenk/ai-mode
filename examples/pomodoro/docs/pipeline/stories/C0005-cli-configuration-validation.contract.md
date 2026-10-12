@@ -111,3 +111,10 @@ func (t *Timer) Run() error {
 ## Answers from the requester
 
 - All three lengths (-focus, -short, -long) follow the same rules: whole minutes, at least 1 and at most 1440 (24 hours); anything else prints an error naming the flag and exits with status 2 before any session starts. Defaults when a flag is not given: -focus 25, -short 5, -long 15. (requester (answered by the operator, Claude, from the original request), 2026-10-11)
+
+## Amendments
+
+Architect's rulings where the contract was inconsistent or a test could not be met; rules win over examples.
+
+- S2 (TestCLI_S2_FocusNegative, test review of T01): The test passes even if the error message does not name the flag, which violates Rule R1. → Assert that the output contains the flag name, e.g., if !strings.Contains(out.String(), "-focus") { t.Errorf(...) }
+- S9 (S9 (Contract), test review of T01): Scenario contradicts Rule R3. -focus 200 is valid; the first invalid flag is -short -1, so the error must name -short, not -focus. → S9: Given -focus 200 -short -1 -long 5, when the program starts, it prints 'Invalid value for -short: must be between 1 and 1440 minutes.' and exits 2, never mentioning -focus.

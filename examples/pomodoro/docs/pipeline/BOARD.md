@@ -17,7 +17,7 @@ _empty_
 | C0001 | feature | tracking |  | Simple pomodoro timer | spec → tracking (bot-architect): Split into 1 spec(s): C0002. |
 | C0002 | spec | tracking | C0001 | Pomodoro CLI | planning → tracking (bot-architect): Feature plan written: 2 stories (ST1 → ST2), no flags; plan card C0003. |
 | C0003 | plan | tracking | C0002 | Pomodoro CLI — feature plan | planning → tracking (bot-architect): Cut 2 stories (C0004, C0005), in stack order. |
-| C0005 | story | ready | C0003 | CLI Configuration & Validation | needs-human → ready (human): Retry requested. |
+| C0005 | story | architect-review | C0003 | CLI Configuration & Validation | ready → architect-review (bot-coder): Implemented 4 tasks test-first in 1 layer(s): simple-pomodoro-timer-02-cli-implementation. |
 
 ## review
 
