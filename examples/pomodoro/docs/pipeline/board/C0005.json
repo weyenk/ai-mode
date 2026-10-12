@@ -2,14 +2,13 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "needs-human",
+  "stage": "ready",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
-  "prev_stage": "ready",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "contract-md": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.md",
@@ -19,7 +18,7 @@
     "story": "docs/pipeline/stories/C0005-cli-configuration-validation.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T00:29:49Z",
+  "updated": "2026-10-12T00:31:40Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -126,6 +125,14 @@
       "done": "Stage ready stopped before finishing.",
       "why": "story plan: architect stopped (timeout) and the check still fails: plan verify T03 failed at \"phase A: compile (go vet ./...)\": # pomodoro\n# [pomodoro]\nvet: ./completion.go:31:29: undefined: Timer",
       "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0005`."
+    },
+    {
+      "ts": "2026-10-12T00:31:40Z",
+      "by": "human",
+      "stage": "needs-human → ready",
+      "done": "Retry requested.",
+      "why": "A human cleared the block.",
+      "next": "The next tick re-runs ready."
     }
   ]
 }
