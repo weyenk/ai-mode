@@ -26,11 +26,15 @@ const (
 
 // Timer manages the Pomodoro countdown and session transitions.
 type Timer struct {
-	focusDuration  time.Duration
-	shortDuration  time.Duration
-	longDuration   time.Duration
-	clock          Clock
-	out            io.Writer
+	focusDuration time.Duration
+	shortDuration time.Duration
+	longDuration  time.Duration
+	clock         Clock
+	out           io.Writer
+	// bellOut receives the R5 session-end bell (\a) once per transition. It is
+	// separate from out so the in-place status-line stream on out stays intact;
+	// it defaults to os.Stderr (the terminal's standard bell channel).
+	bellOut        io.Writer
 	completedFocus int
 	currentSession int
 }

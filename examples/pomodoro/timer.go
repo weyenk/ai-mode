@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"time"
 )
 
-// NewTimer creates a Timer with the given per-phase durations.
+// NewTimer creates a Timer with the given per-phase durations. Status lines are
+// written to out (the injectable, tested writer); the R5 session-end bell is
+// routed to the terminal's stderr (the standard channel for an audible bell)
+// rather than to out, so the in-place status-line stream stays exactly the
+// sequence of "\r...<ansi>" updates the user (and the tests) observe.
 func NewTimer(focus, short, long time.Duration, clock Clock, out io.Writer) *Timer {
 	return &Timer{
 		focusDuration:  focus,
@@ -15,6 +20,7 @@ func NewTimer(focus, short, long time.Duration, clock Clock, out io.Writer) *Tim
 		longDuration:   long,
 		clock:          clock,
 		out:            out,
+		bellOut:        os.Stderr,
 		currentSession: 1,
 	}
 }
@@ -47,6 +53,7 @@ func (t *Timer) Run(ctx context.Context) error {
 		elapsed++
 		if time.Duration(elapsed)*time.Second >= t.durationFor(state) {
 			t.transition(&state)
+			t.bell()
 			elapsed = 0
 		}
 		t.emit(state, elapsed)
@@ -64,6 +71,18 @@ func (t *Timer) durationFor(state TimerState) time.Duration {
 		return t.longDuration
 	}
 	return 0
+}
+
+// bell emits the ASCII bell character (\a) to the notification writer. Per R5
+// (and User Flow 3) the bell notifies the user that a session has ended, so it
+// is written once per session transition, immediately after the phase advances
+// and before the next status line is emitted. It goes to the dedicated bellOut
+// (defaulting to os.Stderr, the terminal's standard bell channel) rather than
+// to out so the in-place status-line stream on out is not disturbed.
+func (t *Timer) bell() {
+	if t.bellOut != nil {
+		_, _ = io.WriteString(t.bellOut, "\a")
+	}
 }
 
 // transition advances the state machine to the next phase after the current
