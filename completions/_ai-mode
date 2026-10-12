@@ -27,6 +27,7 @@ _ai-mode() {
     'pipeline:Dev pipeline: request cards through all ten stages'
     'work:Start work on a ready story (stage 8)'
     'agent:Run a role as a tool-using agent (owned paths, allowlisted commands)'
+    'board:Work board (Vikunja): init bots and tokens, status, sync a target'
     'classify:Route a task with jev (role or QA layer)'
     'review:Review real calls and label them'
     'proxy:Run the debug logging proxy (normally via use --debug)'
@@ -91,6 +92,13 @@ _ai-mode() {
         _values 'subcommand' 'new' 'status' 'board' 'show' 'tick' 'run' 'stage' 'retry' 'reopen' 'answer' 'note' 'launchd'
       elif [[ $words[CURRENT] == -* ]]; then
         _values 'option' '--repo' '--push' '--no-commit' '--max-ticks' '--type' '--context' '--body' '--interval' '--by' '--stage'
+      fi
+      ;;
+    board)
+      if (( CURRENT == 3 )); then
+        _values 'subcommand' 'init' 'status' 'sync'
+      elif [[ $words[CURRENT] == -* ]]; then
+        _values 'option' '--url' '--register' '--repo'
       fi
       ;;
     work)

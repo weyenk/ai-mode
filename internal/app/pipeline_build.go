@@ -1468,6 +1468,9 @@ func cmdWork(args []string) int {
 	if err != nil {
 		return fail("%v", err)
 	}
+	if err := pl.attachBoard(); err != nil {
+		pl.logf("board: %v (continuing with the file board only)", err)
+	}
 	c, err := pl.board.load(pos[0])
 	if err != nil {
 		return fail("%v", err)

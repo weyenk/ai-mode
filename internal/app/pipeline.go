@@ -18,8 +18,9 @@ import (
 
 // The dev pipeline (docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md) moves a request card
 // through ten stages. `ai-mode pipeline tick` is one scheduler step: take the lock, pick one card,
-// run its next stage, move it, note it, commit the artifacts. Until the Vikunja board (P1) exists the
-// board is one JSON file per card under <target>/docs/pipeline/board/, rendered to BOARD.md.
+// run its next stage, move it, note it, commit the artifacts. The cards are one JSON file each under
+// <target>/docs/pipeline/board/, rendered to BOARD.md; after `ai-mode board init` every sync also mirrors them onto
+// the Vikunja work board (P1) and each tick first pulls what humans did there (board_sync.go).
 
 // cardNote is the note a stage leaves when it finishes or moves a card (roadmap "Card notes").
 type cardNote struct {
@@ -33,19 +34,21 @@ type cardNote struct {
 }
 
 type card struct {
-	ID        string            `json:"id"`
-	Title     string            `json:"title"`
-	Type      string            `json:"type"`  // feature | bug | spike (requests); spec | plan | story
-	Stage     string            `json:"stage"` // stage label; the column derives from it
-	Context   string            `json:"context,omitempty"`
-	Parent    string            `json:"parent,omitempty"`
-	Order     int               `json:"order,omitempty"`      // position among siblings (stories: stack order)
-	DependsOn []string          `json:"depends_on,omitempty"` // sibling cards that must reach review first
-	Prev      string            `json:"prev_stage,omitempty"` // stage before needs-human, for retry
-	Artifacts map[string]string `json:"artifacts,omitempty"`  // kind -> path relative to the target
-	Created   string            `json:"created"`
-	Updated   string            `json:"updated"`
-	Notes     []cardNote        `json:"notes,omitempty"`
+	ID         string            `json:"id"`
+	Title      string            `json:"title"`
+	Type       string            `json:"type"`  // feature | bug | spike (requests); spec | plan | story
+	Stage      string            `json:"stage"` // stage label; the column derives from it
+	Context    string            `json:"context,omitempty"`
+	Parent     string            `json:"parent,omitempty"`
+	Order      int               `json:"order,omitempty"`      // position among siblings (stories: stack order)
+	DependsOn  []string          `json:"depends_on,omitempty"` // sibling cards that must reach review first
+	Prev       string            `json:"prev_stage,omitempty"` // stage before needs-human, for retry
+	Artifacts  map[string]string `json:"artifacts,omitempty"`  // kind -> path relative to the target
+	Created    string            `json:"created"`
+	Updated    string            `json:"updated"`
+	Notes      []cardNote        `json:"notes,omitempty"`
+	BoardTask  int64             `json:"board_task,omitempty"`  // the card's Vikunja task (board_sync.go)
+	BoardNotes int               `json:"board_notes,omitempty"` // how many notes are on the board as comments
 }
 
 func (c *card) setArtifact(kind, rel string) {
@@ -237,6 +240,7 @@ type pipeline struct {
 	git      bool // commit artifacts after each tick
 	push     bool // push the pipeline branch after each commit
 	now      func() string
+	vk       *boardSyncer // the Vikunja board; nil without `ai-mode board init`
 }
 
 func (pl *pipeline) logf(format string, a ...any) {
@@ -356,6 +360,11 @@ func (pl *pipeline) pick(cards []card) *card {
 
 // tick runs one stage on one card. It returns the card it moved (nil when nothing could advance).
 func (pl *pipeline) tick() (*card, error) {
+	if pl.vk != nil {
+		if err := pl.vk.pull(); err != nil {
+			pl.logf("  board pull: %v", err)
+		}
+	}
 	cards, err := pl.board.all()
 	if err != nil {
 		return nil, err
@@ -402,6 +411,11 @@ func (pl *pipeline) sync(msg string) {
 	cards, _ := pl.board.all()
 	_ = os.MkdirAll(pl.docs, 0o755)
 	_ = os.WriteFile(filepath.Join(pl.docs, "BOARD.md"), []byte(renderBoard(cards)), 0o644)
+	if pl.vk != nil {
+		if err := pl.vk.push(); err != nil {
+			pl.logf("  board push: %v", err)
+		}
+	}
 	if !pl.git {
 		return
 	}
@@ -626,7 +640,8 @@ const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
   reopen <card> <why> [--stage S] [--by WHO]   send a card in review back to a stage (default architect-review)
   note <card> <text> [--by WHO]     add a note to a card (a correction or a comment; the stage does not change)
   answer <card> <text> [--by WHO]   add the requester's answer to a story amigos paused on, and re-run amigos
-  launchd [--interval S] print a LaunchAgent plist that runs tick (not installed)`
+  launchd [--interval S] print a LaunchAgent plist that runs tick (not installed)
+After ai-mode board init, every commit also syncs the Vikunja board (AI_MODE_BOARD=off turns it off).`
 
 func cmdPipeline(args []string) int {
 	if len(args) == 0 {
@@ -652,6 +667,9 @@ func cmdPipeline(args []string) int {
 	pl, err := newPipeline(*repo, !*noGit, *push)
 	if err != nil {
 		return fail("%v", err)
+	}
+	if err := pl.attachBoard(); err != nil {
+		pl.logf("board: %v (continuing with the file board only)", err)
 	}
 	switch sub {
 	case "new":
@@ -802,31 +820,39 @@ func pipelineNew(pl *pipeline, title, typ, ctx, bodyPath string) int {
 		}
 		body = string(b)
 	}
-	if strings.TrimSpace(body) == "" {
-		body = title
-	}
-	c, err := pl.newCard(card{Title: title, Type: typ, Stage: "new", Context: ctx})
+	c, err := pl.createRequest(title, typ, ctx, body, "human", 0)
 	if err != nil {
-		return fail("%v", err)
-	}
-	rel := fmt.Sprintf("docs/pipeline/requests/%s-%s.md", c.ID, slugify(title))
-	doc := fmt.Sprintf("# %s\n\n- **Card:** %s\n- **Type:** %s\n- **Context:** %s\n- **Requested:** %s\n\n## Request\n\n%s\n",
-		title, c.ID, typ, ctx, pl.now()[:10], strings.TrimSpace(body))
-	if err := os.MkdirAll(filepath.Dir(pl.abs(rel)), 0o755); err != nil {
-		return fail("%v", err)
-	}
-	if err := os.WriteFile(pl.abs(rel), []byte(doc), 0o644); err != nil {
-		return fail("%v", err)
-	}
-	c.setArtifact("request", rel)
-	pl.addNote(&c, cardNote{By: "human", Stage: "→ new", Done: "Request created.", Artifacts: []string{rel},
-		Why: "Intake.", Next: "The next tick runs viability (research, product, architect)."})
-	if err := pl.board.save(c); err != nil {
 		return fail("%v", err)
 	}
 	pl.sync(fmt.Sprintf("pipeline: %s new %s request (%s)", c.ID, typ, truncateRunes(title, 50)))
 	fmt.Println(c.ID)
 	return 0
+}
+
+// createRequest is stage 1: a request card in init with its request file. by is who asked; task links a request that
+// started as a task on the board.
+func (pl *pipeline) createRequest(title, typ, ctx, body, by string, task int64) (card, error) {
+	title = strings.TrimSpace(title)
+	if strings.TrimSpace(body) == "" {
+		body = title
+	}
+	c, err := pl.newCard(card{Title: title, Type: typ, Stage: "new", Context: ctx, BoardTask: task})
+	if err != nil {
+		return c, err
+	}
+	rel := fmt.Sprintf("docs/pipeline/requests/%s-%s.md", c.ID, slugify(title))
+	doc := fmt.Sprintf("# %s\n\n- **Card:** %s\n- **Type:** %s\n- **Context:** %s\n- **Requested:** %s\n\n## Request\n\n%s\n",
+		title, c.ID, typ, ctx, pl.now()[:10], strings.TrimSpace(body))
+	if err := os.MkdirAll(filepath.Dir(pl.abs(rel)), 0o755); err != nil {
+		return c, err
+	}
+	if err := os.WriteFile(pl.abs(rel), []byte(doc), 0o644); err != nil {
+		return c, err
+	}
+	c.setArtifact("request", rel)
+	pl.addNote(&c, cardNote{By: by, Stage: "→ new", Done: "Request created.", Artifacts: []string{rel},
+		Why: "Intake.", Next: "The next tick runs viability (research, product, architect)."})
+	return c, pl.board.save(c)
 }
 
 func launchdPlist(self, target string, interval int) string {

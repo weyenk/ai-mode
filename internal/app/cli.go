@@ -38,6 +38,7 @@ func commands() map[string]command {
 		"pipeline":   {"Dev pipeline: request cards through viability, spec, plan, stories, amigos, build, review, PRs", cmdPipeline},
 		"work":       {"Stage 8: start work on a ready story (story plan, qa red, coder green, stack layers)", cmdWork},
 		"agent":      {"Run a role as a tool-using agent: owned paths only, allowlisted commands, no shell", cmdAgent},
+		"board":      {"Work board (Vikunja): init bots and tokens, status, sync a target's cards", cmdBoard},
 		"setup-qwen": {"Install the ai-mode routing rules (~/.qwen/QWEN.md) and SessionStart hook (Qwen Code)", cmdSetupQwen},
 		"hook":       {"Qwen Code hook entry point (session-start, prompt-expansion), installed by setup-qwen", cmdHook},
 		"classify":   {"Ask jev to route: which role, or which QA test layer", cmdClassify},

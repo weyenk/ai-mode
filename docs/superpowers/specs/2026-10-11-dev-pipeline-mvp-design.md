@@ -15,7 +15,7 @@ sub-plan can deepen it without changing its neighbours.
 
 | Roadmap item | MVP version | Left for the full sub-plan |
 | --- | --- | --- |
-| P1 work board | File board: one JSON file per card under `docs/pipeline/board/`, rendered to `BOARD.md`; same columns, `stage:`/`type:` labels, parent links and card notes | Vikunja service, Go client, bot users |
+| P1 work board | File board: one JSON file per card under `docs/pipeline/board/`, rendered to `BOARD.md`; same columns, `stage:`/`type:` labels, parent links and card notes. Since 2026-10-12 mirrored both ways onto Vikunja (see "Work board" below) | `init` card templates; human moves other than intake and done |
 | P2 scheduler | `ai-mode pipeline tick` (lock, one stage on one card, commit, optional push) and `ai-mode pipeline run` (ticks until nothing can advance); `ai-mode pipeline launchd` prints a LaunchAgent plist but does not install it | installing the job; starting dev-shop from launchd |
 | P3 viability | `viability` stage on `ai-mode team` roles with per-role JSON estimates; ROI and go/no-go computed by code from a context rubric | richer rubrics, research with browsing |
 | P4 spec | architect decides the split, writes each spec as an agent; specialist review passes (product → research → security → ux → design → architect) as consults; chief merges as an agent that may write only the spec | user-flow authoring by ux as its own step |
@@ -134,3 +134,25 @@ Result of the acceptance run: request C0001 → viability GO → 1 spec (6 revie
 (two requester clarifications) → 10 tasks built test-first on a 2-layer stack → architect and journey review → draft PRs
 weyenk/ai-mode#19 and weyenk/ai-mode#20. The program counts down in place, rings and switches to a break at the end of a
 session, prints `Completed N focus sessions` on Ctrl-C, and rejects lengths outside 1-1440 minutes with exit status 2.
+
+## Work board (2026-10-12)
+
+The MVP first shipped with the file board alone, which was not the roadmap's board. The Vikunja board is now in place:
+
+- **Vikunja runs outside ai-mode, 24/7.** Vikunja v2.7.0 (official macOS arm64 release, sha256 checked) under a user
+  LaunchAgent `local.vikunja` (RunAtLoad, KeepAlive), on Homebrew Postgres 17 (`brew services`), both on loopback only.
+  Postgres instead of SQLite because the 2026-10-10 trial lost most concurrent writes on SQLite and none on Postgres. A
+  vector database cannot back Vikunja (it supports SQLite, MySQL and Postgres); if agents later want semantic search over
+  cards, pgvector in the same Postgres covers it. LaunchAgents run while the owner is logged in; a LaunchDaemon (root)
+  would be needed to run before login.
+- **ai-mode is a client.** `internal/app/vikunja.go` is a thin stdlib client for `/api/v2`, checked against the server's
+  OpenAPI spec. `ai-mode board init` is run by the human (password prompt in the terminal, never stored): it creates one
+  bot user per agent (`bot-chief`, `bot-product`, `bot-architect`, `bot-amigos`, `bot-qa`, `bot-coder`) and stores a
+  scoped token for each, plus one for ai-mode on the owner's account, in `~/.config/ai-mode/board.json` (0600). Bot tokens
+  cannot delete anything or create users or tokens. `ai-mode doctor` reports the board unreachable or the tokens refused.
+- **The repo's card files stay the record; the board mirrors them and takes two kinds of human input.** Push (in
+  `pipeline.sync`, after every stage): one task per card in its column's bucket, labels, `parenttask` and `follows`
+  relations, and each card note as a comment by the bot that wrote it. Pull (start of every tick): a task a human adds to
+  `init` becomes a request card, and a card a human moves to `done` becomes done. Vikunja does not record who moves a task,
+  so that note says "human (on the board)". Other edits on the board are overwritten; corrections go through `pipeline
+  retry|reopen|note|answer`. The cards carry `board_task` and `board_notes` so a sync never duplicates a task or a comment.

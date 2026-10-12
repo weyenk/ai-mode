@@ -164,10 +164,14 @@ func cmdDoctor(args []string) int {
 
 	localBin := filepath.Join(homeDir, ".local", "bin")
 	onPath := contains(filepath.SplitList(os.Getenv("PATH")), localBin)
-	fmt.Printf("~/.local/bin on PATH: %s\n\n", flag(onPath, "yes", "NO"))
+	fmt.Printf("~/.local/bin on PATH: %s\n", flag(onPath, "yes", "NO"))
 	if !onPath {
 		issues = append(issues, "~/.local/bin is not on PATH. Run: "+pathFixCommand())
 	}
+
+	// The work board (Vikunja) runs on its own, not under ai-mode; doctor only checks it is there and usable.
+	issues = append(issues, boardStatus(os.Stdout)...)
+	fmt.Println()
 
 	if len(issues) > 0 {
 		fmt.Println("Issues:")

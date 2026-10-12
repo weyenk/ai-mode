@@ -190,11 +190,12 @@ wrong-but-clear per role) and `ai-mode trace`. `evals/reviewed.jsonl` holds real
 `ai-mode pipeline` runs the ten-stage pipeline from [`docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md`](docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md)
 (MVP design: [`docs/superpowers/specs/2026-10-11-dev-pipeline-mvp-design.md`](docs/superpowers/specs/2026-10-11-dev-pipeline-mvp-design.md))
 against a target Go module. A human files a request; every later stage is done by the dev-shop roles and leaves an
-artifact plus a note on its card in `<module>/docs/pipeline/` (`BOARD.md`; one JSON file per card until the Vikunja board lands):
+artifact plus a note on its card. The cards are JSON files in `<module>/docs/pipeline/board/` (the record, rendered to
+`BOARD.md`), mirrored onto the [Vikunja work board](#work-board-vikunja):
 
 | # | Stage | Who | Artifact |
 | --- | --- | --- | --- |
-| 1 | intake | human: `pipeline new` | `requests/` |
+| 1 | intake | human: a task in the board's `init` column, or `pipeline new` | `requests/` |
 | 2 | scheduler | `pipeline tick` (one stage, one card; `launchd` prints a LaunchAgent) | commits on the branch |
 | 3 | viability | research, product, architect; go/no-go and ROI computed from their estimates | `viability/` |
 | 4 | spec | architect writes, six roles review, chief merges | `specs/`, `specs/reviews/` |
@@ -210,6 +211,36 @@ paths its task owns, and may run only allowlisted commands (`go test|build|vet`,
 argv only, no shell. A stage that cannot finish moves its card to `blocked` (`needs-human`) with a note saying what to
 decide; `pipeline answer` (a paused story) and `pipeline retry` continue it. Set `AI_MODE_PRESETS` to this checkout's
 `presets/` when running a branch build. The first run built [`examples/pomodoro`](examples/pomodoro/).
+
+### Work board (Vikunja)
+
+The board is a [Vikunja](https://vikunja.io) server that runs on its own, around the clock, and outside ai-mode:
+ai-mode never starts or stops it, it only uses its API, and `ai-mode doctor` checks that it answers and that the stored
+tokens work. On the Mac Studio it is set up as:
+
+| Piece | Where |
+| --- | --- |
+| Postgres 17 | Homebrew `postgresql@17`, `brew services` (launchd label `sh.brew.postgresql@17`), localhost only, database `vikunja` |
+| Vikunja v2.7.0 | binary `~/.local/share/vikunja/bin/vikunja`, config `~/.config/vikunja/config.yml` (0600, pinned secret, Postgres over `/tmp`) |
+| Service | `~/Library/LaunchAgents/local.vikunja.plist` (RunAtLoad, KeepAlive), log `~/.local/share/vikunja/logs/vikunja.log` |
+| Web UI and API | http://127.0.0.1:3456 (loopback only; put a reverse proxy in front to reach it from the LAN) |
+
+```bash
+ai-mode board init                              # once, in a terminal: sign in as the board's owner (add --register to create the account);
+                                                # creates bot-chief, bot-product, bot-architect, bot-amigos, bot-qa, bot-coder and stores
+                                                # their tokens plus ai-mode's in ~/.config/ai-mode/board.json (0600); the password is not stored
+ai-mode board status                            # server, version, tokens (doctor runs the same check)
+ai-mode board sync --repo examples/pomodoro     # pull what people did on the board, push the cards
+```
+
+Each target gets a project named after its directory with the six columns (`init` … `blocked`) as kanban buckets. Every
+card is a task titled `<card id> <title>` with `stage:`, `type:` and `context:` labels, a parent link, `follows` links for
+stack order, and one comment per card note, posted by the bot that wrote it (notes by people come from the owner's
+account and name who wrote them). After `board init` every pipeline commit syncs the board (`AI_MODE_BOARD=off` turns it
+off). What people do on the board flows back at the start of each tick: a task added to `init` (labels `type:bug` or
+`type:spike` and `context:…` are optional) becomes a request card, and a card moved to `done` after its PRs are merged
+becomes done. Other edits on the board are overwritten by the next sync; use `pipeline retry`, `reopen`, `note` and
+`answer` for corrections. Override the address with `AI_MODE_BOARD_URL` or `BOARD_URL=` in `~/.config/ai-mode/config`.
 
 ## Superpowers pipeline (Qwen Code)
 

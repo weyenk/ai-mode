@@ -1,6 +1,8 @@
 # Work board and companion services — design notes
 
-Status: **draft, split out of the Three Amigos spec** (`2026-10-10-three-amigos-design.md`) after round-2 product review. Pipeline-level; not specific to `ai-mode amigos`. Captures the board decision, trial results, and the companion-service idea.
+Status: **built 2026-10-12** (Vikunja v2.7.0 on Postgres 17, outside ai-mode under launchd; ai-mode client and sync in
+`internal/app/vikunja.go`, `board.go`, `board_sync.go`; see the dev pipeline MVP design, "Work board"). Originally a
+**draft, split out of the Three Amigos spec** (`2026-10-10-three-amigos-design.md`) after round-2 product review. Pipeline-level; not specific to `ai-mode amigos`. Captures the board decision, trial results, and the companion-service idea.
 
 ## Board decision and trial results (2026-10-10)
 
