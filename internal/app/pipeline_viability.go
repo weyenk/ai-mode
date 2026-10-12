@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -132,8 +133,13 @@ func lastJSONObject(text string) (string, bool) {
 		if j := strings.Index(rest, "```"); j >= 0 {
 			block := strings.TrimSpace(rest[:j])
 			if !json.Valid([]byte(block)) {
-				if fixed := closeJSON(block); json.Valid([]byte(fixed)) {
-					return fixed, true // a model dropped the final brace(s)
+				// models write \x1b inside strings (not JSON) and drop final braces
+				fixed := reHexEscape.ReplaceAllString(block, `\u00$1`)
+				if json.Valid([]byte(fixed)) {
+					return fixed, true
+				}
+				if fixed = closeJSON(fixed); json.Valid([]byte(fixed)) {
+					return fixed, true
 				}
 			}
 			return block, true
@@ -155,6 +161,8 @@ func lastJSONObject(text string) (string, bool) {
 	}
 	return best, best != ""
 }
+
+var reHexEscape = regexp.MustCompile(`\\x([0-9a-fA-F]{2})`)
 
 // closeJSON appends the closing brackets a truncated JSON value is missing (outside strings).
 func closeJSON(s string) string {
