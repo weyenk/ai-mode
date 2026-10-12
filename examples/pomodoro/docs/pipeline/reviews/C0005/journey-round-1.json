@@ -1,10 +1,10 @@
 {
   "comments": [
     {
-      "file": "timer_types.go",
-      "line": 34,
+      "file": "timer.go",
+      "line": 76,
       "severity": "blocking",
-      "comment": "runTimerFn is a stub that returns nil immediately. It must be implemented to instantiate a Timer (with a real Clock) and call t.Run(ctx) so the timer actually runs, and it must handle SIGINT to call handleSIGINTFn."
+      "comment": "R5 is not implemented: the program transitions between sessions but fails to emit the ASCII bell character (\\a) to notify the user that a session has ended, as required by the spec and User Flow 3."
     }
   ],
   "round": 1,

@@ -4,10 +4,10 @@
     "approve": true,
     "comments": [
       {
-        "file": "examples/pomodoro/cli_logic.go",
-        "line": 14,
+        "file": "examples/pomodoro/cli_logic_secondary.go",
+        "line": 1,
         "severity": "nit",
-        "comment": "The logic in init() is duplicated in cli_logic_secondary.go. Consider having init() call runCLISec to centralize the implementation and reduce maintenance surface."
+        "comment": "This file duplicates the entire parsing and validation logic found in cli_logic.go. Instead of duplicating the logic, refactor the core parsing into a single shared function that can be called by both the init() wrapper and the secondary test entry point."
       }
     ]
   },
