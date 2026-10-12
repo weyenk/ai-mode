@@ -360,7 +360,8 @@ wiped as soon as it is drawn; a summary promised on Ctrl-C must appear in stdout
 
 A flow the program cannot perform end to end is a blocking comment (for example: main parses the flags and exits without
 starting the timer; a function that is never called from main; output that never reaches the terminal). Say which file
-and function must change and how. Do not comment on style. Reply with at most 200 words, then ONE fenced json block:
+and function must change and how; when a test asserts the wrong behaviour, name the test file in its own comment too.
+The request and the rules outrank the contract's examples. Do not comment on style. Reply with at most 200 words, then ONE fenced json block:
 `+"```json\n"+`{"checklist": [{"promise": "what the request promises", "observed": "yes|no|n/a", "evidence": "what the run or code shows"}], "works": true, "comments": [{"file": "path", "line": 1, "severity": "blocking", "comment": "what fails for the user and what to change"}]}`+"\n```",
 		c.ID, strings.TrimSpace(request), strings.TrimSpace(flows), strings.TrimSpace(rules), observedRun(mod), truncateLines(code.String(), 80000))
 	var rv struct {
@@ -430,14 +431,17 @@ func (pl *pipeline) fixLayer(st *stackState, mod string, c *card, l *stackLayer,
 		}
 	}
 	brief := fmt.Sprintf("Story %s, layer %d (%s), review round %d.\n\n<story_contract>\n%s\n</story_contract>", c.ID, l.N, l.Name, round, strings.TrimSpace(contract))
-	if len(forTests) > 0 && len(tests) > 0 {
-		task := fmt.Sprintf("Architect's review found blocking problems in this layer's tests. Fix them in the test files you own: %s.\n%s\n\n%s\n\nKeep every scenario test name; then run go vet ./... and go test ./... and call finish.",
-			strings.Join(tests, ", "), strings.Join(forTests, "\n"), brief)
+	if len(tests) > 0 {
+		// test-first again: qa makes the layer's tests assert what the review requires (a test that encodes a wrong
+		// example would otherwise hold coder to it), then coder makes the code pass them
+		all := append(append([]string{}, forTests...), forCode...)
+		task := fmt.Sprintf("Architect's review found blocking problems in this layer:\n%s\n\nYou are qa. Update the tests you own (%s) so they assert the behaviour the review requires, where they do not already; where a test asserts the wrong behaviour (for example an example in the contract the review shows is wrong), change it to the right one. Keep every scenario test name. If the tests already require the right behaviour, change nothing. Run go vet ./... and call finish.\n\n%s",
+			strings.Join(all, "\n"), strings.Join(tests, ", "), brief)
 		if _, err := pl.runAgentIn(mod, "qa", "", task, tests, nil, goCmds(), 30, func() []string { return vetOnly(mod) }); err != nil {
 			return err
 		}
 	}
-	if len(forCode) > 0 || len(tests) == 0 || len(forTests) == 0 {
+	{
 		comments := append(forCode, forTests...)
 		task := fmt.Sprintf("Architect's review found blocking problems in this layer. Fix them in the files you own: %s. The tests are read-only: %s.\n%s\n\n%s\n\nThen run gofmt -l ., go vet ./... and go test ./... and call finish.",
 			strings.Join(code, ", "), strings.Join(tests, ", "), strings.Join(comments, "\n"), brief)

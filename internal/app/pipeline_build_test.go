@@ -204,7 +204,15 @@ func TestReviewStage_BlockingCommentFixedInTheLayerThenApproved(t *testing.T) {
 		reviews = reviews[1:]
 		return r, nil
 	}
+	var fixers []string
 	pl.newAgent = func(s agentSpec) (*agentSession, error) {
+		fixers = append(fixers, s.Role)
+		if s.Role == "qa" {
+			if strings.Join(s.Owns, ",") != "add_test.go" {
+				return nil, fmt.Errorf("qa owns the layer's tests, got %v", s.Owns)
+			}
+			return &agentSession{spec: s, chat: &scriptedChat{replies: []agentMsg{call("1", "finish", map[string]any{"summary": "tests already require it"})}}}, nil
+		}
 		if s.Role != "coder" || strings.Join(s.Owns, ",") != "add.go,contract.go" || strings.Join(s.ReadOnly, ",") != "add_test.go" {
 			return nil, fmt.Errorf("fix goes to coder owning the layer's code, got %s %v %v", s.Role, s.Owns, s.ReadOnly)
 		}
@@ -225,8 +233,8 @@ func TestReviewStage_BlockingCommentFixedInTheLayerThenApproved(t *testing.T) {
 	if _, err := os.Stat(pl.abs("docs/pipeline/reviews/C0004/layer-1-round-2.json")); err != nil {
 		t.Fatal("second review round not saved")
 	}
-	if !strings.Contains(note.Done, "1 fix round") {
-		t.Fatalf("note %+v", note)
+	if !strings.Contains(note.Done, "1 fix round") || strings.Join(fixers, ",") != "qa,coder" {
+		t.Fatalf("note %+v fixers %v", note, fixers)
 	}
 }
 
