@@ -3,11 +3,20 @@ package main
 import (
 	"context"
 	"io"
+	"os"
 	"time"
 )
 
-// main is provided for contract verification.
+// main is the program entry point.
+//
+// T03 Phase A stub: it does not yet wire to runCLI. Phase B refactors it to
+// osExit(runCLI(os.Args[1:], os.Stdout)) so the CLI and the timer engine are
+// exercised through the real entry point.
 func main() {}
+
+// osExit is a seam for os.Exit so tests can capture the exit status without
+// terminating the test process.
+var osExit = os.Exit
 
 // Clock defines the interface for time-related operations to allow for testing.
 type Clock interface {
