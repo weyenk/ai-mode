@@ -151,3 +151,21 @@ func TestPipeline_NewRequestStartsOnlyWhenNothingInFlight(t *testing.T) {
 		t.Fatalf("want C0002, got %v", c)
 	}
 }
+
+func TestPipeline_ReopenSendsAReviewedCardBack(t *testing.T) {
+	pl := newTestPipeline(t)
+	pl.stages["story:architect-review"] = func(pl *pipeline, c *card) (string, cardNote, error) { return "handoff", cardNote{}, nil }
+	c, _ := pl.newCard(card{Title: "CLI", Type: "story", Stage: "amigos"})
+	if err := pl.reopen(c.ID, "architect-review", "x", "human"); err == nil {
+		t.Fatal("a card that is not in review cannot be reopened")
+	}
+	c.Stage = "review"
+	pl.board.save(c)
+	if err := pl.reopen(c.ID, "architect-review", "running it starts no timer", "human"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := pl.board.load(c.ID)
+	if got.Stage != "architect-review" || got.Notes[len(got.Notes)-1].Why != "running it starts no timer" {
+		t.Fatalf("card %+v", got)
+	}
+}

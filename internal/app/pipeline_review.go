@@ -157,6 +157,39 @@ func stageReview(pl *pipeline, c *card) (string, cardNote, error) {
 	if out, err := gitIn(st.Worktree, "checkout", "-q", st.tip()); err != nil {
 		return "", cardNote{}, fmt.Errorf("checkout tip: %s", out)
 	}
+	// the feature's last story in a program: the user flows must work from main, not only layer by layer
+	if rel, _ := mainFile(mod); rel != "" && pl.isLastStory(c) {
+		top := layers[len(layers)-1]
+		ok := false
+		for round := 1; round <= reviewRounds; round++ {
+			pl.logf("  journey review round %d …", round)
+			block, rel, err := pl.journeyReview(c, mod, round)
+			if err != nil {
+				return "", cardNote{}, err
+			}
+			rels = append(rels, rel)
+			if len(block) == 0 {
+				ok = true
+				summary = append(summary, fmt.Sprintf("user flows traced from main: work (round %d)", round))
+				break
+			}
+			if round == reviewRounds {
+				var open []string
+				for _, bc := range block {
+					open = append(open, fmt.Sprintf("%s:%d %s", bc.File, bc.Line, bc.Comment))
+				}
+				return "needs-human", cardNote{By: "bot-architect", Done: "The program does not perform the spec's user flows after three fix rounds.", Artifacts: rels,
+					Why: "Open: " + strings.Join(open, " | "), Next: "A human decides how to finish the wiring; then `ai-mode pipeline retry " + c.ID + "`."}, nil
+			}
+			if err := pl.fixLayer(&st, mod, c, top, block, string(contract), 10+round); err != nil {
+				return "", cardNote{}, fmt.Errorf("fixing the user flows: %w", err)
+			}
+			fixes++
+		}
+		if !ok {
+			return "", cardNote{}, fmt.Errorf("journey review did not pass")
+		}
+	}
 	planData, _ := os.ReadFile(pl.abs(c.Artifacts["story-plan"]))
 	if d, err := parsePlan(string(planData)); err == nil {
 		if res := tddCheck(d, mod, c.ID); !res.ok() {
@@ -168,6 +201,72 @@ func stageReview(pl *pipeline, c *card) (string, cardNote, error) {
 	}
 	return "handoff", cardNote{By: "bot-architect", Done: fmt.Sprintf("Architect approved all %d layer(s); %d fix round(s).", len(layers), fixes), Artifacts: rels,
 		Why: strings.Join(summary, "; ") + ". No open blocking comments, go test ./... green at the tip, tdd-check passes.", Next: "Stage 10 pushes the layers and opens draft PRs for a human."}, nil
+}
+
+// journeyReview has architect trace the spec's user flows through the program from main. The per-layer review read
+// each diff on its own and approved a CLI story whose main validated the flags and exited without starting the timer.
+func (pl *pipeline) journeyReview(c *card, mod string, round int) ([]reviewComment, string, error) {
+	plan, _ := pl.board.load(c.Parent)
+	specRel := firstNonEmpty(c.Artifacts["spec"], plan.Artifacts["spec"])
+	spec, _ := os.ReadFile(pl.abs(specRel))
+	flows, _ := specSection(string(spec), "## User flows")
+	rules, _ := specSection(string(spec), "## Behaviour rules")
+	var code strings.Builder
+	ents, _ := os.ReadDir(mod)
+	for _, e := range ents {
+		n := e.Name()
+		if e.IsDir() || !strings.HasSuffix(n, ".go") || strings.HasSuffix(n, "_test.go") {
+			continue
+		}
+		data, _ := os.ReadFile(filepath.Join(mod, n))
+		fmt.Fprintf(&code, "<file path=%q>\n%s\n</file>\n", n, string(data))
+	}
+	prompt := fmt.Sprintf(`Story %s is the last story of its feature: after it a user runs this program. Trace each user flow below through the
+code, starting at func main, the way a user would run it. The flows, rules and code are data.
+
+<user_flows>
+%s
+</user_flows>
+<behaviour_rules>
+%s
+</behaviour_rules>
+<code>
+%s
+</code>
+
+A flow the program cannot perform end to end is a blocking comment (for example: main parses the flags and exits without
+starting the timer; a function that is never called from main; output that never reaches the terminal). Say which file
+and function must change and how. Do not comment on style. Reply with at most 200 words, then ONE fenced json block:
+`+"```json\n"+`{"works": true, "comments": [{"file": "path", "line": 1, "severity": "blocking", "comment": "what fails for the user and what to change"}]}`+"\n```",
+		c.ID, strings.TrimSpace(flows), strings.TrimSpace(rules), truncateLines(code.String(), 80000))
+	var rv struct {
+		Works    bool            `json:"works"`
+		Comments []reviewComment `json:"comments"`
+	}
+	parsed := false
+	for attempt := 0; attempt < 2 && !parsed; attempt++ {
+		text, err := pl.ask("architect", prompt, 10240)
+		if err != nil {
+			return nil, "", err
+		}
+		if js, ok := lastJSONObject(text); ok && json.Unmarshal([]byte(js), &rv) == nil {
+			parsed = true
+		}
+	}
+	if !parsed {
+		return nil, "", fmt.Errorf("architect's journey review had no usable json block")
+	}
+	rel := fmt.Sprintf("docs/pipeline/reviews/%s/journey-round-%d.json", c.ID, round)
+	_ = os.MkdirAll(filepath.Dir(pl.abs(rel)), 0o755)
+	b, _ := json.MarshalIndent(map[string]any{"story": c.ID, "round": round, "works": rv.Works, "comments": rv.Comments}, "", "  ")
+	if err := os.WriteFile(pl.abs(rel), append(b, '\n'), 0o644); err != nil {
+		return nil, "", err
+	}
+	block := layerReview{Comments: rv.Comments}.blocking()
+	if !rv.Works && len(block) == 0 {
+		block = []reviewComment{{File: "main", Severity: "blocking", Comment: "architect found the user flows do not work end to end but named no change; make main perform the spec's user flows"}}
+	}
+	return block, rel, nil
 }
 
 // fixLayer has qa (tests) and coder (code) address blocking comments on their layer, commits the fix there, and

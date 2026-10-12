@@ -448,6 +448,28 @@ func (pl *pipeline) retry(id string) error {
 	return nil
 }
 
+// reopen sends a card a human reviewed back into the pipeline at stage, with the reason as a note.
+func (pl *pipeline) reopen(id, stage, why, by string) error {
+	c, err := pl.board.load(id)
+	if err != nil {
+		return err
+	}
+	if _, ok := pl.stages[c.Type+":"+stage]; !ok {
+		return fmt.Errorf("no stage runs %s cards at %q", c.Type, stage)
+	}
+	if c.Stage != "review" && c.Stage != "needs-human" {
+		return fmt.Errorf("%s is at %s; only a card in review (or waiting on a human) is reopened", id, c.Stage)
+	}
+	from := c.Stage
+	c.Stage, c.Prev = stage, ""
+	pl.addNote(&c, cardNote{By: by, Stage: from + " → " + stage, Done: "Reopened from review.", Why: strings.TrimSpace(why), Next: "The next tick runs " + stage + " again."})
+	if err := pl.board.save(c); err != nil {
+		return err
+	}
+	pl.sync(fmt.Sprintf("pipeline: %s reopened at %s", id, stage))
+	return nil
+}
+
 // ---- lock -------------------------------------------------------------------
 
 func pipelineLockPath(target string) string {
@@ -601,6 +623,7 @@ const pipelineUsage = `usage: ai-mode pipeline <command> [--repo DIR]
   stage <card> [--push]  run one card's current stage now (what the per-stage skills call)
   run [--push] [--max-ticks N]   tick until nothing can advance
   retry <card>           move a needs-human card back to the stage it stopped at
+  reopen <card> <why> [--stage S] [--by WHO]   send a card in review back to a stage (default architect-review)
   note <card> <text> [--by WHO]     add a note to a card (a correction or a comment; the stage does not change)
   answer <card> <text> [--by WHO]   add the requester's answer to a story amigos paused on, and re-run amigos
   launchd [--interval S] print a LaunchAgent plist that runs tick (not installed)`
@@ -620,7 +643,8 @@ func cmdPipeline(args []string) int {
 	ctxF := fs.String("context", "hobby", "new: the request's context (hobby, enterprise, health, ...)")
 	body := fs.String("body", "", "new: request text from a file, or - for stdin")
 	interval := fs.Int("interval", 900, "launchd: seconds between ticks")
-	by := fs.String("by", "human", "answer: who answers (recorded on the card and in the story)")
+	by := fs.String("by", "human", "answer, note, reopen: who (recorded on the card)")
+	stageF := fs.String("stage", "architect-review", "reopen: the stage the card goes back to")
 	pos, code, ok := parse(fs, args[1:])
 	if !ok {
 		return code
@@ -671,6 +695,14 @@ func cmdPipeline(args []string) int {
 			return fail("%v", err)
 		}
 		pl.sync(fmt.Sprintf("pipeline: %s note", c.ID))
+		return 0
+	case "reopen":
+		if len(pos) < 2 {
+			return fail("usage: ai-mode pipeline reopen <card> <why...> [--stage S] [--by WHO]")
+		}
+		if err := pl.reopen(pos[0], *stageF, strings.Join(pos[1:], " "), *by); err != nil {
+			return fail("%v", err)
+		}
 		return 0
 	case "retry":
 		if len(pos) != 1 {
