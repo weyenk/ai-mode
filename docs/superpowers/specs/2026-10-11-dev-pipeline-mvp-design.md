@@ -107,3 +107,30 @@ in the tool, not by hand-editing an artifact:
 - **Branch builds need `AI_MODE_PRESETS`** pointed at the branch's `presets/` (the user config pins the main checkout).
 - **Requester answers in the acceptance run** were given by the operator from the original request and are logged on the
   cards as such (design decision above).
+
+### Later in the run (stages 8-10)
+
+- **Contract defects are ruled on, not coded around.** Amigos examples contradicted each other (a 25-minute focus ending at
+  t=1440s in one example and t=1500s in another; a status line format the requester had answered differently). qa
+  encodes the contract faithfully, so: architect reviews qa's tests before red is committed, triages a green phase coder
+  cannot reach (a wrong test is fixed by qa as a `Phase: review` commit), and every ruling is appended to the Story
+  Contract under **Amendments**.
+- **Thinking is capped per request.** qa and coder (Qwen3.8 at ~24 tok/s) spent single turns of 16-26k thinking tokens
+  (12-19 minutes); the pipeline now sends `reasoning_effort: low` and `thinking_budget_tokens: 8192` with each of their
+  agent turns (llama-server honours both; no restart), and story plans keep tasks to at most 6 scenarios.
+- **Re-planning a started story keeps its committed tasks;** code packets may only create new files (the JSON plan has no
+  edit modes, and a whole-file rewrite dropped a type the module used).
+- **A program must be runnable, and stage 9 checks it like a user.** Every part was built and tested while `main` stayed an
+  empty stub, then a wired `main` that validated flags and exited. The feature's last story must now wire `main` (a task
+  owning that file, with a journey test), and stage 9 adds a journey review: it builds the program, runs it for 3 seconds,
+  sends Ctrl-C, and gives architect the output plus what a terminal shows (`\r`, erase-to-end and bells applied) before
+  and after Ctrl-C. A checklist "yes" must quote text the user can see; fixes go to the layer that owns the file, test-first
+  (qa, then coder), with the layers above rebased. This caught a Ctrl-C handler that never printed its summary and a
+  status line that erased itself as soon as it was drawn.
+- **The human's review column works as designed:** the operator ran the program from the review column, found it did
+  nothing, and reopened the story (`pipeline reopen`); notes from humans are recorded but never become stage inputs.
+
+Result of the acceptance run: request C0001 → viability GO → 1 spec (6 reviews) → feature plan with 2 stories → amigos
+(two requester clarifications) → 10 tasks built test-first on a 2-layer stack → architect and journey review → draft PRs
+weyenk/ai-mode#19 and weyenk/ai-mode#20. The program counts down in place, rings and switches to a break at the end of a
+session, prints `Completed N focus sessions` on Ctrl-C, and rejects lengths outside 1-1440 minutes with exit status 2.
