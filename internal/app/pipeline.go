@@ -555,6 +555,15 @@ func (pl *pipeline) startAgent(root, role, system string, owns, readOnly []strin
 	return pl.newAgent(spec)
 }
 
+// fixRounds is how many times a session continues with a failing check before the stage stops. architect gets more:
+// its checks (lint, render rules, verify) surface one class of problem per round, and a plan took 3-4 rounds to pass.
+func fixRounds(role string) int {
+	if role == "architect" {
+		return 5
+	}
+	return 2
+}
+
 // drive runs msg (as the first task, or continuing the conversation) and then check; while check reports findings the
 // conversation continues with them, twice at most. Findings left after that are an error.
 func (pl *pipeline) drive(a *agentSession, msg string, cont bool, check func() []string) (agentResult, error) {
@@ -576,7 +585,7 @@ func (pl *pipeline) drive(a *agentSession, msg string, cont bool, check func() [
 			pl.logf("  agent %s %s after %d turns: %s", role, res.Stopped, res.Turns, firstLine(res.Summary))
 			return res, nil
 		}
-		if attempt == 2 {
+		if attempt >= fixRounds(role) {
 			return res, fmt.Errorf("%s stopped (%s) and the check still fails: %s", role, res.Stopped, strings.Join(f, "; "))
 		}
 		pl.logf("  agent %s: check found %d problem(s), continuing: %s", role, len(f), firstLine(f[0]))
