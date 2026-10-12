@@ -1,13 +1,25 @@
 {
   "branch": "simple-pomodoro-timer-02-cli-implementation",
   "review": {
-    "approve": true,
+    "approve": false,
     "comments": [
+      {
+        "file": "examples/pomord/timer_types.go",
+        "line": 70,
+        "severity": "blocking",
+        "comment": "The goroutine `go func() { sig := \u003c-sigCh; ... }()` consumes the signal from `sigCh`. Consequently, the `select` statement below it will find the channel empty and always fall through to the `default` branch, preventing `handleSIGINTFn` from ever being called when a SIGINT occurs."
+      },
       {
         "file": "examples/pomodoro/cli_logic_secondary.go",
         "line": 1,
         "severity": "nit",
-        "comment": "This file contains a duplicate implementation of the logic in cli_logic.go. It would be cleaner to consolidate the logic and test the primary runCLI seam."
+        "comment": "This file is a duplicate implementation of `runCLI` in `cli_logic.go`. If it is strictly for a specific test setup (T02), it should be clearly documented or moved to a test utility."
+      },
+      {
+        "file": "examples/pomodoro/timer_types_test.go",
+        "line": 38,
+        "severity": "nit",
+        "comment": "The test mutates `os.Args` globally. While safe here because tests are not running in parallel, this is a fragile pattern. Consider passing args directly to a function that doesn't rely on the global `os.Args` state."
       }
     ]
   },

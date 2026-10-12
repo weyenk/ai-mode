@@ -2,13 +2,14 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "architect-review",
+  "stage": "needs-human",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
   "depends_on": [
     "C0004"
   ],
+  "prev_stage": "architect-review",
   "artifacts": {
     "contract": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.json",
     "contract-md": "docs/pipeline/stories/C0005-cli-configuration-validation.contract.md",
@@ -20,7 +21,7 @@
     "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T02:41:15Z",
+  "updated": "2026-10-12T02:51:38Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -257,6 +258,14 @@
       "done": "Reopened from review.",
       "why": "The two defects in the previous note are still there (architect's journey review judged them from the code). The review now checks what a terminal shows before and after Ctrl-C, so it goes back once more.",
       "next": "The next tick runs architect-review again."
+    },
+    {
+      "ts": "2026-10-12T02:51:38Z",
+      "by": "bot-chief",
+      "stage": "architect-review → needs-human",
+      "done": "Stage architect-review stopped before finishing.",
+      "why": "architect's journey review had no usable json block",
+      "next": "A human decides how to proceed. After fixing the cause, run `ai-mode pipeline retry C0005`."
     }
   ]
 }
