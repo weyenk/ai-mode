@@ -7,12 +7,11 @@ import (
 	"time"
 )
 
-// main is the program entry point.
-//
-// T03 Phase A stub: it does not yet wire to runCLI. Phase B refactors it to
-// osExit(runCLI(os.Args[1:], os.Stdout)) so the CLI and the timer engine are
-// exercised through the real entry point.
-func main() {}
+// main is the program entry point. It delegates to runCLI with the process
+// arguments and standard output, passing the resulting exit code to osExit.
+func main() {
+	osExit(runCLI(os.Args[1:], os.Stdout))
+}
 
 // osExit is a seam for os.Exit so tests can capture the exit status without
 // terminating the test process.
