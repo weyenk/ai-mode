@@ -1,13 +1,40 @@
 {
+  "checklist": [
+    {
+      "promise": "Start Timer immediately with flags",
+      "observed": "yes",
+      "evidence": "main calls runCLI, which parses flags and calls runTimerFn, which emits initial state before the loop"
+    },
+    {
+      "promise": "Monitor progress with session number and time",
+      "observed": "yes",
+      "evidence": "Timer.emit formats 'Session N: MM:SS' and observed_run shows 'Session 1: 25:00'"
+    },
+    {
+      "promise": "Terminal bell on session end",
+      "observed": "n/a",
+      "evidence": "Timer.bell writes \\a to stderr, but 3s run is too short to trigger transition"
+    },
+    {
+      "promise": "Graceful exit with completed count",
+      "observed": "yes",
+      "evidence": "runTimerFn catches SIGINT and calls handleSIGINTFn to print count"
+    },
+    {
+      "promise": "Invalid configuration error out",
+      "observed": "yes",
+      "evidence": "runCLI validates -focus, -short, -long against 1-1440 range"
+    }
+  ],
   "comments": [
     {
-      "file": "timer.go",
-      "line": 76,
-      "severity": "blocking",
-      "comment": "R5 is not implemented: the program transitions between sessions but fails to emit the ASCII bell character (\\a) to notify the user that a session has ended, as required by the spec and User Flow 3."
+      "file": "timer_types.go",
+      "line": 56,
+      "severity": "nit",
+      "comment": "runTimerFn hardcodes os.Stdout instead of using the writer passed to runCLI, making timer output redirection difficult in tests"
     }
   ],
   "round": 1,
   "story": "C0005",
-  "works": false
+  "works": true
 }

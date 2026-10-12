@@ -7,7 +7,7 @@
         "file": "examples/pomodoro/cli_logic_secondary.go",
         "line": 1,
         "severity": "nit",
-        "comment": "This file duplicates the entire parsing and validation logic found in cli_logic.go. Instead of duplicating the logic, refactor the core parsing into a single shared function that can be called by both the init() wrapper and the secondary test entry point."
+        "comment": "This file contains a duplicate implementation of the logic in cli_logic.go. It would be cleaner to consolidate the logic and test the primary runCLI seam."
       }
     ]
   },
