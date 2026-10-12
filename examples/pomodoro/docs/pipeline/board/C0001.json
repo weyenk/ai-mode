@@ -41,5 +41,7 @@
       "why": "The entire feature is a self-contained command-line utility with no independent subsystems or external integrations.",
       "next": "Each spec card is written and reviewed; this card follows its children."
     }
-  ]
+  ],
+  "board_task": 1,
+  "board_notes": 3
 }

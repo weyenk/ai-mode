@@ -179,5 +179,7 @@
       "why": "Added by hand.",
       "next": "No change to the card's stage."
     }
-  ]
+  ],
+  "board_task": 4,
+  "board_notes": 16
 }

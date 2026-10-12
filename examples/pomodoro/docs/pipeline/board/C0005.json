@@ -297,5 +297,7 @@
       "why": "layer 2 \"CLI implementation\" on branch simple-pomodoro-timer-02-cli-implementation, PR https://github.com/weyenk/ai-mode/pull/20, tasks T00, T01, T02, T03; 12 contract scenarios, each with a test written first; 2 contract amendment(s) by architect (see the contract).",
       "next": "A human reviews bottom-up and merges bottom-up. Only a human merges."
     }
-  ]
+  ],
+  "board_task": 5,
+  "board_notes": 28
 }

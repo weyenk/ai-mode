@@ -49,5 +49,7 @@
       "why": "`ai-mode plan lint --feature` passes: every spec scenario is in exactly one story, dependencies are acyclic, flags are consistent.",
       "next": "Stage 6 turns each story into a story file and card."
     }
-  ]
+  ],
+  "board_task": 2,
+  "board_notes": 3
 }

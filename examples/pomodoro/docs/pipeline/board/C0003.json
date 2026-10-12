@@ -35,5 +35,7 @@
       "why": "One story file per feature-plan story, in the format `ai-mode amigos --story` reads.",
       "next": "Each story goes to the three amigos."
     }
-  ]
+  ],
+  "board_task": 3,
+  "board_notes": 2
 }
