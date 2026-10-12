@@ -1,39 +1,38 @@
 {
   "checklist": [
     {
-      "promise": "Start Timer immediately with flags",
-      "observed": "yes",
-      "evidence": "main calls runCLI, which parses flags and calls runTimerFn, which emits initial state before the loop"
-    },
-    {
-      "promise": "Monitor progress with session number and time",
-      "observed": "yes",
-      "evidence": "Timer.emit formats 'Session N: MM:SS' and observed_run shows 'Session 1: 25:00'"
-    },
-    {
-      "promise": "Terminal bell on session end",
+      "promise": "Start Timer: User runs the program (optionally with flags).",
       "observed": "n/a",
-      "evidence": "Timer.bell writes \\a to stderr, but 3s run is too short to trigger transition"
+      "quote": "",
+      "evidence": "code shows flag parsing in cli_logic.go"
     },
     {
-      "promise": "Graceful exit with completed count",
+      "promise": "Monitor Progress: User watches the terminal as the time remaining decrements and the session number increments.",
       "observed": "yes",
-      "evidence": "runTimerFn catches SIGINT and calls handleSIGINTFn to print count"
+      "quote": "Session 1: 24:58",
+      "evidence": "stdout shows countdown from 25:00 to 24:58"
     },
     {
-      "promise": "Invalid configuration error out",
-      "observed": "yes",
-      "evidence": "runCLI validates -focus, -short, -long against 1-1440 range"
-    }
-  ],
-  "comments": [
+      "promise": "Session Transition: When a session ends, a terminal bell sounds, and the next session type begins automatically.",
+      "observed": "n/a",
+      "quote": "",
+      "evidence": "3s run is insufficient to reach the 25m transition"
+    },
     {
-      "file": "timer_types.go",
-      "line": 56,
-      "severity": "nit",
-      "comment": "runTimerFn hardcodes os.Stdout instead of using the writer passed to runCLI, making timer output redirection difficult in tests"
+      "promise": "Interrupt Timer: User presses Ctrl-C. The program catches SIGINT, stops the timer, and prints the total number of completed focus sessions.",
+      "observed": "yes",
+      "quote": "Completed 0 focus sessions",
+      "evidence": "stdout shows completion message upon SIGINT"
+    },
+    {
+      "promise": "Invalid Configuration: User provides invalid... session lengths... The program should error out and exit before starting.",
+      "observed": "n/a",
+      "quote": "",
+      "evidence": "code shows validation in cli_logic.go"
     }
   ],
+  "comments": [],
+  "observed_run": "Ran 3 seconds, then received Ctrl-C (SIGINT) and exited (exit status 0).\nstdout, Go-quoted so control characters show (\\r carriage return, \\x1b[K erase to end of line, \\a bell): \"\\r\\x1b[KSession 1: 25:00\\r\\x1b[KSession 1: 24:59\\r\\x1b[KSession 1: 24:58\\r\\x1b[KCompleted 0 focus sessions\\n\"\nstderr: \"\"\nWhat the terminal showed just before Ctrl-C (each line quoted; an empty \"\" line means the text was erased): \"Session 1: 24:58\" \nWhat the terminal shows at the end (each line quoted; an empty \"\" line means the text was erased): \"Completed 0 focus sessions\" \"\" \nBells rung: 0\n",
   "round": 1,
   "story": "C0005",
   "works": true
