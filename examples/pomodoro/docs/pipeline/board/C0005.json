@@ -2,7 +2,7 @@
   "id": "C0005",
   "title": "CLI Configuration \u0026 Validation",
   "type": "story",
-  "stage": "review",
+  "stage": "architect-review",
   "context": "hobby",
   "parent": "C0003",
   "order": 2,
@@ -20,7 +20,7 @@
     "story-plan": "docs/pipeline/stories/C0005-cli-configuration-validation.plan.md"
   },
   "created": "2026-10-11T16:21:16Z",
-  "updated": "2026-10-12T02:32:34Z",
+  "updated": "2026-10-12T02:34:38Z",
   "notes": [
     {
       "ts": "2026-10-11T16:21:16Z",
@@ -218,6 +218,14 @@
       ],
       "why": "layer 2 \"CLI implementation\" on branch simple-pomodoro-timer-02-cli-implementation, PR https://github.com/weyenk/ai-mode/pull/20, tasks T00, T01, T02, T03; 12 contract scenarios, each with a test written first; 2 contract amendment(s) by architect (see the contract).",
       "next": "A human reviews bottom-up and merges bottom-up. Only a human merges."
+    },
+    {
+      "ts": "2026-10-12T02:34:38Z",
+      "by": "operator (Claude), reviewing in the review column",
+      "stage": "review → architect-review",
+      "done": "Reopened from review.",
+      "why": "Ran the program again: it now counts down and validates flags, but (1) Ctrl-C exits 0 without printing 'Completed N focus sessions' (the request promises it): runTimerFn's goroutine consumes the signal, so the later select on sigCh always takes default; (2) each status line is written as text then \\r then ESC[K, which erases it as soon as it is drawn; the requester's answer asked for \\r, then the text, then ESC[K. Back to architect review.",
+      "next": "The next tick runs architect-review again."
     }
   ]
 }
