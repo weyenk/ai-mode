@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type wireDeps struct {
@@ -40,6 +41,9 @@ func newMeetingRunnerWith(d wireDeps) meetingRunner {
 			return c, err
 		}
 		c.Gates = planGates(in.Constraints.Exposed)
+		for _, note := range repairLayerPlan(&c) {
+			_ = sink.Write("decision", DecisionEntry{TS: time.Now().UTC().Format(time.RFC3339), Role: "ai-mode", Decision: "layer plan repair", Rationale: note})
+		}
 		if verr := validateLayerPlan(c); verr != nil {
 			if c.Verdict == VerdictReady {
 				c.Verdict = VerdictNotReady
@@ -65,8 +69,12 @@ func newMeetingRunner() meetingRunner {
 		return fail(err)
 	}
 	cwd, _ := os.Getwd()
+	var engine uncertaintyEngine = agreementEngine{}
+	if contains(iniSectionsFile(p.Ini), "fast") {
+		engine = judgedEngine{ask: newRoleAsker(p, "amigos", runAsk), role: "fast"}
+	}
 	return newMeetingRunnerWith(wireDeps{
-		Asker: newRoleAsker(p, "amigos", runAsk), Codec: jsonCodec{}, Engine: agreementEngine{},
+		Asker: newRoleAsker(p, "amigos", runAsk), Codec: jsonCodec{}, Engine: engine,
 		Classifier: newJevClassifier(p, classifyCall), Callers: callers, Roots: []string{cwd},
 		StateDir: stateDir(), MaxAuditBytes: 50 << 20,
 	})

@@ -8,7 +8,8 @@ import (
 )
 
 const (
-	parkThreshold = 0.7
+	// parkThreshold: a question resolves when at least two thirds of the non-empty samples agree (by decision, see judgedEngine)
+	parkThreshold = 0.66
 	sampleCount   = 3
 )
 
@@ -22,6 +23,22 @@ type loopRun struct {
 	ue   uncertaintyEngine
 	au   auditSink
 	c    StoryContract
+	// round is the meeting round the next turn belongs to (0 while sampling outside a round)
+	round int
+}
+
+// roundNote tells a role where the meeting stands, so turns converge instead of adding polish every round:
+// in the last round a story is ready only if all three amigos set ready.
+func roundNote(round, rounds int) string {
+	if round <= 0 || rounds <= 0 {
+		return ""
+	}
+	if round < rounds {
+		return fmt.Sprintf("\nThis is round %d of %d. Raise what matters now; set ready when you have no open concern.\n", round, rounds)
+	}
+	return fmt.Sprintf("\nThis is round %d of %d, the last. The story is ready only if product, qa and architect all set ready in this round. "+
+		"Set ready to true unless something would make the story impossible to build or test as written; do not add questions, rules or "+
+		"examples for polish now (they become a follow-up story).\n", round, rounds)
 }
 
 func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue uncertaintyEngine, au auditSink, lc layerClassifier) (StoryContract, error) {
@@ -42,7 +59,8 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 				return l.c, l.snapshot(round)
 			}
 		}
-		architectReady := false
+		readyRoles := map[string]bool{}
+		l.round = round
 		for _, role := range meetingRoles {
 			turn, err := l.askTurn(role, "")
 			if err != nil {
@@ -51,10 +69,15 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 			if err := l.merge(round, role, turn); err != nil {
 				return l.c, err
 			}
-			if role == "architect" {
-				architectReady = turn.Ready
+			readyRoles[role] = turn.Ready
+		}
+		l.c.ReadyRoles = nil
+		for _, role := range meetingRoles {
+			if readyRoles[role] {
+				l.c.ReadyRoles = append(l.c.ReadyRoles, role)
 			}
 		}
+		l.round = 0
 		for i := range l.c.Questions {
 			if l.c.Questions[i].State == QuestionOpen {
 				if err := l.sample(i); err != nil {
@@ -62,7 +85,7 @@ func runMeeting(in Intake, opts meetingOptions, ra roleAsker, tc turnCodec, ue u
 				}
 			}
 		}
-		if l.ready(architectReady) {
+		if l.ready(len(l.c.ReadyRoles) == len(meetingRoles)) {
 			l.c.Verdict = VerdictReady
 			return l.c, l.snapshot(round)
 		}
@@ -98,7 +121,10 @@ func (l *loopRun) ask(role, focus string) (string, string, error) {
 }
 
 func (l *loopRun) askTurn(role, focus string) (Turn, error) {
-	prompt := l.tc.Prompt(role, l.in, l.c, focus)
+	prompt := l.tc.Prompt(role, l.in, l.c, focus) + roundNote(l.round, l.opts.Rounds)
+	if focus == "" {
+		prompt += l.gapNote()
+	}
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		p := prompt
@@ -135,11 +161,19 @@ func (l *loopRun) merge(round int, role string, t Turn) error {
 	c := &l.c
 	for _, r := range t.Rules {
 		if !hasString(c.Rules, r) {
+			if _, sim := closestRule(c.Rules, r); sim >= ruleSameThreshold {
+				continue // a paraphrase or a truncated copy of an existing rule is not a new rule
+			}
 			c.Rules = append(c.Rules, r)
 		}
 	}
 	for _, e := range t.Examples {
-		if !slices.Contains(c.Examples, e) {
+		if !hasString(c.Rules, e.Rule) {
+			if best, sim := closestRule(c.Rules, e.Rule); sim >= ruleLinkThreshold {
+				e.Rule = best // roles cite rules in their own words; attach the example to the rule it means
+			}
+		}
+		if !slices.Contains(c.Examples, e) && !hasExampleText(c.Examples, e.Text) {
 			c.Examples = append(c.Examples, e)
 		}
 	}
@@ -170,6 +204,10 @@ func (l *loopRun) merge(round int, role string, t Turn) error {
 		}
 	}
 	if role == "architect" {
+		c.Deliverable = t.Deliverable
+		if t.Flag != "" && t.Flag != "none" {
+			c.Flag = t.Flag
+		}
 		if t.Size != 0 {
 			c.Size = t.Size
 		}
@@ -213,6 +251,9 @@ func (l *loopRun) sample(i int) error {
 				break
 			}
 		}
+		if text == "" && len(t.Answers) == 1 {
+			text = t.Answers[0].Text // the turn was asked this one question; a reworded echo of it is still its answer
+		}
 		texts = append(texts, text)
 	}
 	l.c.Questions[i].Answers = texts
@@ -243,8 +284,10 @@ func (l *loopRun) reaskParked(round int) (bool, error) {
 	return false, nil
 }
 
-func (l *loopRun) ready(architectReady bool) bool {
-	if !architectReady {
+// ready: product, qa and architect all reported ready this round, architect confirmed the story is deliverable on
+// its own, every question is resolved and every rule has an example.
+func (l *loopRun) ready(allReady bool) bool {
+	if !allReady || !l.c.Deliverable {
 		return false
 	}
 	for _, q := range l.c.Questions {
@@ -282,4 +325,92 @@ func findQuestion(c *StoryContract, text string) int {
 		}
 	}
 	return -1
+}
+
+// hasExampleText reports whether an example with the same text (ignoring case, spacing and end punctuation) exists,
+// whatever rule it was filed under: roles re-send examples under reworded rules, which duplicated scenarios.
+func hasExampleText(xs []Example, text string) bool {
+	norm := func(s string) string {
+		return strings.Trim(strings.Join(strings.Fields(strings.ToLower(s)), " "), ".!; ")
+	}
+	n := norm(text)
+	for _, x := range xs {
+		if norm(x.Text) == n {
+			return true
+		}
+	}
+	return false
+}
+
+const (
+	ruleSameThreshold = 0.8 // word overlap at which a "new" rule is a restatement of an existing one
+	ruleLinkThreshold = 0.5 // word overlap at which an example's cited rule is taken to mean an existing rule
+)
+
+func ruleWords(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, w := range strings.FieldsFunc(strings.ToLower(s), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9')
+	}) {
+		if len(w) >= 3 {
+			out[w] = true
+		}
+	}
+	return out
+}
+
+// ruleSimilarity is 1 when one rule's normalized text contains the other's, else the word-set Jaccard overlap.
+func ruleSimilarity(a, b string) float64 {
+	norm := func(s string) string {
+		return strings.Trim(strings.Join(strings.Fields(strings.ToLower(s)), " "), ".!;: ")
+	}
+	na, nb := norm(a), norm(b)
+	if na == "" || nb == "" {
+		return 0
+	}
+	if strings.Contains(na, nb) || strings.Contains(nb, na) {
+		return 1
+	}
+	wa, wb := ruleWords(a), ruleWords(b)
+	inter := 0
+	for w := range wa {
+		if wb[w] {
+			inter++
+		}
+	}
+	union := len(wa) + len(wb) - inter
+	if union == 0 {
+		return 0
+	}
+	return float64(inter) / float64(union)
+}
+
+func closestRule(rules []string, r string) (string, float64) {
+	best, bestSim := "", 0.0
+	for _, x := range rules {
+		if s := ruleSimilarity(x, r); s > bestSim {
+			best, bestSim = x, s
+		}
+	}
+	return best, bestSim
+}
+
+// gapNote lists the rules that still have no example, so turns close the gap the ready check measures.
+func (l *loopRun) gapNote() string {
+	var gaps []string
+	for _, r := range l.c.Rules {
+		ok := false
+		for _, e := range l.c.Examples {
+			if e.Rule == r {
+				ok = true
+			}
+		}
+		if !ok {
+			gaps = append(gaps, "- "+r)
+		}
+	}
+	if len(gaps) == 0 {
+		return ""
+	}
+	return "Rules with no example yet (the story cannot be ready until each has one; quote the rule exactly in the example's \"rule\" field):\n" + strings.Join(gaps, "\n") + "\n"
 }

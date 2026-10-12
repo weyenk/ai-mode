@@ -57,8 +57,9 @@ var qwenHooks = []qwenHook{
 	{"SessionStart", "startup|clear|compact", "session-start", "Inject the ai-mode routing rule"},
 	// Skills that belong to architect, never chief.
 	{"UserPromptExpansion", "^drafting-plans$", "prompt-expansion", "Keep chief from running architect's planning skills"},
-	// The same skills invoked by chief through the skill tool.
-	{"PreToolUse", "^skill$", "pre-tool-use", "Block chief from calling architect's planning skills"},
+	// The same skills invoked by chief through the skill tool, plus plan mode,
+	// code edits and destructive shell commands (chief_guard.go).
+	{"PreToolUse", chiefGuardedTools, "pre-tool-use", "Keep chief to routing: no planning skills, plan mode, code edits or destructive commands"},
 }
 
 func (h qwenHook) group() map[string]any {
@@ -152,7 +153,8 @@ func spliceQwenHook(doc []byte, install bool) (out []byte, changed bool, err err
 
 // cmdHook runs as a Qwen Code hook (installed by setup-qwen). session-start
 // prints the using-ai-mode rule; prompt-expansion appends the chief stop to a
-// planning skill; pre-tool-use denies chief's skill-tool call to one. All print
+// planning skill; pre-tool-use denies chief the tool calls that belong to
+// architect or coder (chiefDenial). All print
 // nothing useful unless an ai-mode server is running, so Qwen Code sessions
 // without ai-mode are untouched.
 func cmdHook(args []string) int {
@@ -175,12 +177,13 @@ func cmdHook(args []string) int {
 	}
 	specific := map[string]any{"hookEventName": event}
 	if event == "PreToolUse" {
-		if !denyChiefSkill(input) {
+		reason := chiefDenial(input)
+		if reason == "" {
 			fmt.Println("{}")
 			return 0
 		}
 		specific["permissionDecision"] = "deny"
-		specific["permissionDecisionReason"] = strings.TrimSpace(chiefSkillDenied)
+		specific["permissionDecisionReason"] = reason
 	} else {
 		specific["additionalContext"] = strings.TrimSpace(text)
 	}
@@ -190,24 +193,6 @@ func cmdHook(args []string) int {
 	}
 	fmt.Println(string(out))
 	return 0
-}
-
-// denyChiefSkill reports whether a PreToolUse payload is a `skill` call to an
-// architect skill made by chief. Qwen Code does not send the model, so it is read
-// from the newest assistant record in the transcript; when that can't be read the
-// call counts as chief's, since chief is the front door and architect can still
-// be reached through `ai-mode ask architect`.
-func denyChiefSkill(input []byte) bool {
-	var p struct {
-		ToolName       string                 `json:"tool_name"`
-		ToolInput      struct{ Skill string } `json:"tool_input"`
-		TranscriptPath string                 `json:"transcript_path"`
-	}
-	if json.Unmarshal(input, &p) != nil || p.ToolName != "skill" || !architectSkills[p.ToolInput.Skill] {
-		return false
-	}
-	model := transcriptModel(p.TranscriptPath)
-	return model == "" || model == "chief"
 }
 
 // transcriptModel returns the model of the newest assistant record in a Qwen Code
@@ -290,6 +275,9 @@ func cmdSetupQwen(args []string) int {
 		fmt.Printf("\n<!-- injected at session start by `ai-mode hook session-start` -->\n%s", usingAIMode)
 		fmt.Printf("\n<!-- appended to /drafting-plans by `ai-mode hook prompt-expansion` -->\n%s", chiefPlanningStop)
 		fmt.Printf("\n<!-- denial reason when chief calls drafting-plans via the skill tool (`ai-mode hook pre-tool-use`) -->\n%s", chiefSkillDenied)
+		fmt.Printf("\n<!-- denial reason when chief calls enter_plan_mode -->\n%s", chiefPlanModeDenied)
+		fmt.Printf("\n<!-- denial reason when chief writes outside docs/ (write_file, edit, shell redirects) -->\n%s", chiefWriteDenied)
+		fmt.Printf("\n<!-- denial reason when chief runs a blocked shell command -->\n%s", chiefShellDenied)
 		return 0
 	}
 	if rc := setupQwenHook(*settingsFile, *remove); rc != 0 {

@@ -5,6 +5,11 @@ description: "Build, fix, restack and land a stack of dependent pull requests wi
 
 # PR stack (gh-stack wrapper)
 
+> **Dev pipeline (decision D3, 2026-10-11):** inside `ai-mode pipeline`, stage 8 builds the layers as plain branches in a
+> dedicated worktree and stage 10 pushes them and opens one **draft** PR per layer (`gh pr create --draft --base <layer
+> below>`) without asking: the human confirmed that hand-off in the roadmap. Merging stays human-only, and the PreToolUse
+> guard blocks `gh pr merge` and `gh stack merge` for every model. The gates below still apply to manual use of this skill.
+
 Drive one stack, bottom layer first, with `gh stack` (GitHub's stacked-PR CLI extension). Layers follow
 **feature dependency** (foundation at the bottom), not test types; each layer is one coherent,
 quick-to-review change **plus the tests for that slice, written first**. See the Delivery section of

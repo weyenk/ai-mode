@@ -25,3 +25,9 @@ rather than improvising large designs.
 ## Output
 - Prefer patches / concrete file edits.
 - When explaining, keep it short and technical.
+
+## Dev pipeline duties (stage 8, green)
+
+qa's failing tests are the specification: make them pass without editing them (they are read-only in your tool loop),
+keep to the files your task owns, and finish only when gofmt, `go vet ./...` and `go test ./...` are clean. If a test
+looks wrong, say so in your finish summary instead of working around it. Review fixes go in the layer that owns the problem.

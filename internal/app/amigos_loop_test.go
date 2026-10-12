@@ -41,9 +41,9 @@ func count(xs []string, prefix string) int {
 
 func s12turns() map[string][]Turn {
 	return map[string][]Turn{
-		"product":   {{Rules: []string{"r1"}, Questions: []string{"Q1"}}},
-		"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}}},
-		"architect": {{Ready: true}, ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A")},
+		"product":   {{Rules: []string{"r1"}, Questions: []string{"Q1"}, Ready: true}},
+		"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true}, ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A")},
 	}
 }
 
@@ -95,7 +95,7 @@ func TestLoop_S15_DisagreementParksRegardless(t *testing.T) {
 
 func TestLoop_S27_UnparseableReplyReaskedOnce(t *testing.T) {
 	turns := func() map[string][]Turn {
-		return map[string][]Turn{"product": {{Rules: []string{"r1"}}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}}}}, "architect": {{Ready: true}}}
+		return map[string][]Turn{"product": {{Rules: []string{"r1"}, Ready: true}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}}, "architect": {{Ready: true, Deliverable: true}}}
 	}
 	o := runLoop(1, 1.0, turns(), map[string][]error{"product": {errors.New("bad json")}}, nil, nil)
 	if o.err != nil || o.c.Verdict != VerdictReady || !reflect.DeepEqual(o.asker.Calls, []string{"product", "product", "qa", "architect"}) {
@@ -134,9 +134,9 @@ func TestLoop_S29_ResumeContinuesFromSnapshot(t *testing.T) {
 		State:    MeetingState{MeetingID: "m1", Round: 1},
 	}
 	o := runLoop(2, 1.0, map[string][]Turn{
-		"product":   {{}},
-		"qa":        {{}},
-		"architect": {ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A"), {Ready: true}},
+		"product":   {{Ready: true}},
+		"qa":        {{Ready: true}},
+		"architect": {ans("Q1", "A"), ans("Q1", "A"), ans("Q1", "A"), {Ready: true, Deliverable: true}},
 	}, nil, func(op *meetingOptions) { op.Resume = snap }, nil)
 	if o.err != nil || o.c.Verdict != VerdictReady || o.c.Questions[0].State != QuestionResolved {
 		t.Fatalf("got %q %+v %v", o.c.Verdict, o.c.Questions, o.err)
@@ -196,5 +196,100 @@ func TestLoop_AuditRecordsScoreTimestampAndRationale(t *testing.T) {
 	}
 	if n != 3 {
 		t.Fatalf("want 3 decisions, got %d", n)
+	}
+}
+
+func TestLoop_P7_ReadyNeedsAllThreeAmigosAndADeliverableStory(t *testing.T) {
+	turns := func(productReady, deliverable bool) map[string][]Turn {
+		return map[string][]Turn{
+			"product":   {{Rules: []string{"r1"}, Ready: productReady}},
+			"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+			"architect": {{Ready: true, Deliverable: deliverable, Flag: "none"}},
+		}
+	}
+	if o := runLoop(1, 1.0, turns(false, true), nil, nil, nil); o.c.Verdict != VerdictNotReady || strings.Join(o.c.ReadyRoles, ",") != "qa,architect" {
+		t.Fatalf("product not ready must block: %q %v", o.c.Verdict, o.c.ReadyRoles)
+	}
+	if o := runLoop(1, 1.0, turns(true, false), nil, nil, nil); o.c.Verdict != VerdictNotReady {
+		t.Fatalf("a story architect does not confirm as deliverable on its own is not ready: %q", o.c.Verdict)
+	}
+	o := runLoop(1, 1.0, turns(true, true), nil, nil, nil)
+	if o.c.Verdict != VerdictReady || !o.c.Deliverable || o.c.Flag != "" {
+		t.Fatalf("all three ready and deliverable: %q %+v", o.c.Verdict, o.c)
+	}
+}
+
+func TestLoop_SampleTakesTheOnlyAnswerEvenIfTheQuestionIsReworded(t *testing.T) {
+	reworded := Turn{Answers: []Answer{{Question: "q1 (reworded)", Text: "A"}}}
+	o := runLoop(1, 1.0, map[string][]Turn{
+		"product":   {{Rules: []string{"r1"}, Questions: []string{"Q1"}, Ready: true}},
+		"qa":        {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true}, reworded, reworded, reworded},
+	}, nil, nil, nil)
+	if got := o.c.Questions[0].Answers; len(got) != 3 || got[0] != "A" || got[2] != "A" {
+		t.Fatalf("answers %v", got)
+	}
+}
+
+func TestLoop_SameExampleUnderAnotherRuleIsNotAdded(t *testing.T) {
+	o := runLoop(1, 1.0, map[string][]Turn{
+		"product":   {{Rules: []string{"r1", "r1 (reworded)"}}},
+		"qa":        {{Examples: []Example{{Rule: "r1", Text: "Given -focus -1, when it starts, then it errors."}, {Rule: "r1 (reworded)", Text: "given  -focus -1, when it starts, then it errors"}}}},
+		"architect": {{}},
+	}, nil, nil, nil)
+	if len(o.c.Examples) != 1 {
+		t.Fatalf("want 1 example, got %+v", o.c.Examples)
+	}
+}
+
+func TestLoop_TurnsKnowTheRoundAndTheLastOneAsksToConverge(t *testing.T) {
+	fa := &fakeAsker{Answers: map[string]string{"product": "x", "qa": "x", "architect": "x"}}
+	var prompts []string
+	codec := &promptSpy{fakeCodec: fakeCodec{Turns: map[string][]Turn{"product": {{}, {}}, "qa": {{}, {}}, "architect": {{}, {}}}}, seen: &prompts}
+	runMeeting(Intake{Story: "s"}, meetingOptions{Rounds: 2, MeetingID: "m"}, &recordingAsker{fa, &prompts}, codec, &fakeEngine{ScoreVal: 1}, &memAudit{LevelStr: "off"}, &fakeClassifier{})
+	if len(prompts) < 6 || !strings.Contains(prompts[0], "round 1 of 2") || !strings.Contains(prompts[5], "round 2 of 2, the last") {
+		t.Fatalf("prompts: %q", prompts)
+	}
+}
+
+type promptSpy struct {
+	fakeCodec
+	seen *[]string
+}
+
+type recordingAsker struct {
+	*fakeAsker
+	prompts *[]string
+}
+
+func (r *recordingAsker) Ask(role, user string, n int) (string, error) {
+	*r.prompts = append(*r.prompts, user)
+	return r.fakeAsker.Ask(role, user, n)
+}
+
+func TestLoop_ParaphrasedRulesAreMergedAndExamplesRelinked(t *testing.T) {
+	r1 := "The timer must move between focus, short break and long break by the four-session cycle, each with its configured length."
+	o := runLoop(1, 1.0, map[string][]Turn{
+		"product": {{Rules: []string{r1, "The timer must move between focus, short break and long break by the four-session cycle.", "SIGINT prints the completed focus count and exits 0."}, Ready: true}},
+		"qa": {{Examples: []Example{
+			{Rule: "The timer must move between focus, short break and long break by the four-session cycle", Text: "after focus 4 comes a long break"},
+			{Rule: "On SIGINT the program prints the completed focus count and exits with 0", Text: "2 done, ctrl-c prints 'Completed 2 focus sessions'"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true}},
+	}, nil, nil, nil)
+	if len(o.c.Rules) != 2 {
+		t.Fatalf("the truncated copy of r1 is not a new rule: %q", o.c.Rules)
+	}
+	if o.c.Examples[0].Rule != r1 || o.c.Examples[1].Rule != "SIGINT prints the completed focus count and exits 0." {
+		t.Fatalf("examples not relinked: %+v", o.c.Examples)
+	}
+	if o.c.Verdict != VerdictReady {
+		t.Fatalf("every rule has an example now: %q", o.c.Verdict)
+	}
+}
+
+func TestLoop_TurnsListRulesWithoutExamples(t *testing.T) {
+	l := &loopRun{c: StoryContract{Rules: []string{"r1", "r2"}, Examples: []Example{{Rule: "r1", Text: "e"}}}}
+	if g := l.gapNote(); !strings.Contains(g, "r2") || strings.Contains(g, "r1\n") {
+		t.Fatalf("gap note %q", g)
 	}
 }

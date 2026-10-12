@@ -55,7 +55,7 @@ func TestWire_S23_GateRunsBeforeAnyModelCall(t *testing.T) {
 }
 
 func TestWire_S34_ResumeLoadsSnapshot(t *testing.T) {
-	d, fa := deps(t, map[string][]Turn{"product": {{}}, "qa": {{}}, "architect": {{Ready: true}}})
+	d, fa := deps(t, map[string][]Turn{"product": {{Ready: true}}, "qa": {{Ready: true}}, "architect": {{Ready: true, Deliverable: true}}})
 	snap := Snapshot{Contract: StoryContract{Story: "saved story", Rules: []string{"r1"}, Examples: []Example{{Rule: "r1", Text: "e1"}}, LayerPlan: []Layer{{N: 1, Name: "core", Scenarios: []int{1}}}}, State: MeetingState{MeetingID: "m1", Round: 1}}
 	s, _ := newFileAudit("summary", filepath.Join(d.StateDir, "amigos", "m1"), 0)
 	s.Write("contract", snap)
@@ -76,16 +76,21 @@ func TestWire_S34_ResumeLoadsSnapshot(t *testing.T) {
 
 func TestWire_S35_InvalidLayerPlanDowngradesReady(t *testing.T) {
 	mk := func(scen []int) map[string][]Turn {
-		return map[string][]Turn{"product": {{Rules: []string{"r1"}}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}, {Rule: "r1", Text: "e2"}}}},
-			"architect": {{Ready: true, LayerPlan: []Layer{{N: 1, Name: "core", Scenarios: scen}}}}}
+		var plan []Layer
+		if scen != nil {
+			plan = []Layer{{N: 1, Name: "core", Scenarios: scen}}
+		}
+		return map[string][]Turn{"product": {{Rules: []string{"r1"}, Ready: true}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}, {Rule: "r1", Text: "e2"}}, Ready: true}},
+			"architect": {{Ready: true, Deliverable: true, LayerPlan: plan}}}
 	}
-	d, _ := deps(t, mk([]int{1}))
+	// no layer plan at all cannot be repaired: a ready verdict is downgraded (a plan missing only some examples is repaired)
+	d, _ := deps(t, mk(nil))
 	c, err := newMeetingRunnerWith(d)(Intake{Story: "s", Provenance: Provenance{CallerID: "human"}}, meetingOptions{Rounds: 1, Audit: "off", MeetingID: "m1"})
 	if err != nil || c.Verdict != VerdictNotReady || len(c.Questions) == 0 || c.Questions[len(c.Questions)-1].State != QuestionOpen || !strings.HasPrefix(c.Questions[len(c.Questions)-1].Text, "layer plan:") {
 		t.Fatalf("%q %+v %v", c.Verdict, c.Questions, err)
 	}
 	for exposed, want := range map[bool]string{true: "active", false: "not-applicable"} {
-		d, _ := deps(t, mk([]int{1, 2}))
+		d, _ := deps(t, mk([]int{1}))
 		c, err := newMeetingRunnerWith(d)(Intake{Story: "s", Provenance: Provenance{CallerID: "human"}, Constraints: Constraints{Exposed: exposed}}, meetingOptions{Rounds: 1, Audit: "off", MeetingID: "m1"})
 		if err != nil || c.Verdict != VerdictReady || c.LayerPlan[0].TestLevel != "unit" || c.Gates[4].Name != "dynamic-security" || c.Gates[4].State != want {
 			t.Fatalf("exposed=%v: %q %+v %+v %v", exposed, c.Verdict, c.LayerPlan, c.Gates, err)
@@ -94,8 +99,8 @@ func TestWire_S35_InvalidLayerPlanDowngradesReady(t *testing.T) {
 }
 
 func TestWire_SavedContractHasFinalGatesAndVerdict(t *testing.T) {
-	d, _ := deps(t, map[string][]Turn{"product": {{Rules: []string{"r1"}}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}}}},
-		"architect": {{Ready: true, LayerPlan: []Layer{{N: 1, Name: "core", Scenarios: []int{1}}}}}})
+	d, _ := deps(t, map[string][]Turn{"product": {{Rules: []string{"r1"}, Ready: true}}, "qa": {{Examples: []Example{{Rule: "r1", Text: "e1"}}, Ready: true}},
+		"architect": {{Ready: true, Deliverable: true, LayerPlan: []Layer{{N: 1, Name: "core", Scenarios: []int{1}}}}}})
 	c, err := newMeetingRunnerWith(d)(Intake{Story: "s", Provenance: Provenance{CallerID: "human"}, Constraints: Constraints{Exposed: true}}, meetingOptions{Rounds: 1, Audit: "summary", MeetingID: "m9"})
 	if err != nil || c.Verdict != VerdictReady {
 		t.Fatalf("%q %v", c.Verdict, err)

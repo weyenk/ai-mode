@@ -28,8 +28,11 @@ func (jsonCodec) Prompt(role string, in Intake, c StoryContract, focus string) s
 	b.WriteString(` "size":3, "split_into":["smaller story, only if size is above 5"],` + "\n")
 	b.WriteString(` "layer_plan":[{"n":1,"name":"layer name","scenarios":[1,2]}],` + "\n")
 	b.WriteString(` "disagreements":[{"item":"what is disputed","roles":["product","qa"],"positions":["view 1","view 2"]}],` + "\n")
+	b.WriteString(` "deliverable":false, "flag":"none",` + "\n")
 	b.WriteString(` "ready":false}` + "\n")
-	b.WriteString("Scenario numbers in layer_plan are 1-based positions in the examples list. Only the architect sets size, split_into and layer_plan. Set ready to true only when you have no open concerns.\n")
+	b.WriteString("Scenario numbers in layer_plan are 1-based positions in the examples list. Only the architect sets size, split_into, layer_plan, deliverable and flag. " +
+		"deliverable=true means the story stands on its own: once merged, main builds, its tests pass and nothing a user can reach is half-built (with its feature flag off, if it has one); flag names that feature flag, or none. " +
+		"Set ready to true only when you have no open concerns; the story is ready only when product, qa and architect all set it.\n")
 	return b.String()
 }
 

@@ -48,6 +48,11 @@ ai-mode ask architect "Where are commands registered?" --context internal/app/cl
 ai-mode plan lint docs/superpowers/plans/my-plan.md          # check a drafting-plans document (structure, ownership, scenario coverage)
 ai-mode plan lint --fix docs/superpowers/plans/my-plan.md    # first repair gofmt and excerpt markup in place, then check
 ai-mode plan verify docs/superpowers/plans/my-plan.md --task all   # apply each code task to a copy of the repo: must be red, then green
+ai-mode plan lint --feature docs/pipeline/plans/C0002-x-feature-plan.md   # a feature plan: every spec scenario in exactly one story, flags consistent
+ai-mode plan tdd-check story.plan.md --repo DIR   # on the executors' branch: each scenario test was red at its red commit, green at the tip, untouched since
+ai-mode agent coder "make the tests pass" --repo DIR --own add.go --read-only add_test.go   # a role as a tool loop: owned paths only, no shell
+ai-mode pipeline new "Simple pomodoro timer" --context hobby --body request.md --repo path/to/module   # file a request card
+ai-mode pipeline run --push --repo path/to/module   # advance it stage by stage until it needs a human or the PRs are open
 eval "$(ai-mode env)"          # OPENAI_BASE_URL for this shell
 ```
 
@@ -71,7 +76,11 @@ To make Qwen Code's chief reach for `team`/`ask`/`classify` in any workflow (not
 it adds a marked routing block to `~/.qwen/QWEN.md` and three hooks to `~/.qwen/settings.json` (`--print` shows all of it,
 `--remove` undoes it). A `UserPromptExpansion` hook (`ai-mode hook prompt-expansion`) also appends a chief stop to
 `/drafting-plans`, whose planning text otherwise outweighs the session-start rule, and a `PreToolUse` hook
-(`ai-mode hook pre-tool-use`) denies chief's `skill` tool call to `drafting-plans`, pointing it at `ai-mode ask architect`. The hook runs `ai-mode hook session-start`, which injects a short rule (the way Superpowers
+(`ai-mode hook pre-tool-use`) keeps chief to routing: it denies chief's `skill` call to `drafting-plans` and `enter_plan_mode`
+(both pointing it at `ai-mode ask architect`), `write_file`/`edit` and shell redirects outside `docs/`, and shell commands that
+delete or move files (`rm`, `mv`, `cp`, `tee`, `sed -i`), run `make clean`, change dependencies (`go get`, `go mod`), change git
+state, or stop/restart the server (`ai-mode use|stop|restart`). Other models (`/model coder`) are not limited. Re-run
+`ai-mode setup-qwen` after upgrading so the hook's matcher covers these tools. The hook runs `ai-mode hook session-start`, which injects a short rule (the way Superpowers
 injects `using-superpowers`) while an ai-mode server is running: chief's first output must be a real tool call, and
 open-ended asks go through the `ai-mode-routing` skill to `ai-mode team`. Without it, chief copies the text-form example
 calls in Qwen Code's built-in prompt (`[tool_call: read_file for ...]`) and nothing runs.
@@ -175,6 +184,64 @@ wrong-but-clear per role) and `ai-mode trace`. `evals/reviewed.jsonl` holds real
 - For `design` / `ux` screenshots, user text should include: `Critique this UI design.`
 - `qa` carries a guideline router in its prompt and loads vendored testing guides on demand from [`presets/agents/qa/guidelines/`](presets/agents/qa/guidelines/) (one layer at a time to fit its 65k ctx).
 - Podcast **audio** and **image/video generation** are outside llama-server (TTS / ComfyUI).
+
+## Dev pipeline
+
+`ai-mode pipeline` runs the ten-stage pipeline from [`docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md`](docs/superpowers/plans/2026-10-11-dev-pipeline-roadmap.md)
+(MVP design: [`docs/superpowers/specs/2026-10-11-dev-pipeline-mvp-design.md`](docs/superpowers/specs/2026-10-11-dev-pipeline-mvp-design.md))
+against a target Go module. A human files a request; every later stage is done by the dev-shop roles and leaves an
+artifact plus a note on its card. The cards are JSON files in `<module>/docs/pipeline/board/` (the record, rendered to
+`BOARD.md`), mirrored onto the [Vikunja work board](#work-board-vikunja):
+
+| # | Stage | Who | Artifact |
+| --- | --- | --- | --- |
+| 1 | intake | human: a task in the board's `init` column, or `pipeline new` | `requests/` |
+| 2 | scheduler | `pipeline tick` (one stage, one card; `launchd` prints a LaunchAgent) | commits on the branch |
+| 3 | viability | research, product, architect; go/no-go and ROI computed from their estimates | `viability/` |
+| 4 | spec | architect writes, six roles review, chief merges | `specs/`, `specs/reviews/` |
+| 5 | feature plan | architect; `plan lint --feature` | `plans/` |
+| 6 | stories | product words each story | `stories/<card>.md` |
+| 7 | amigos | product, qa, architect; ready only when all three agree | `stories/<card>.contract.json` |
+| 8 | implement | `work start`: architect's story plan, qa red, coder green, per stack layer in a separate worktree | `stories/<card>.plan.md`, layer branches |
+| 9 | review | architect per layer; coder/qa fix in the owning layer | `reviews/` |
+| 10 | hand-off | push, one draft PR per layer; only a human merges | PR links on the card |
+
+Agent-mode stages run through `ai-mode agent`: the role gets list/read/search/write/edit/run tools, may write only the
+paths its task owns, and may run only allowlisted commands (`go test|build|vet`, `gofmt`, `ai-mode plan lint|verify`),
+argv only, no shell. A stage that cannot finish moves its card to `blocked` (`needs-human`) with a note saying what to
+decide; `pipeline answer` (a paused story) and `pipeline retry` continue it. Set `AI_MODE_PRESETS` to this checkout's
+`presets/` when running a branch build. The acceptance run took a throwaway "simple pomodoro timer" request from intake
+to draft PRs; that module was only a test of the workflow and is not kept in the repo.
+
+### Work board (Vikunja)
+
+The board is a [Vikunja](https://vikunja.io) server that runs on its own, around the clock, and outside ai-mode:
+ai-mode never starts or stops it, it only uses its API, and `ai-mode doctor` checks that it answers and that the stored
+tokens work. On the Mac Studio it is set up as:
+
+| Piece | Where |
+| --- | --- |
+| Postgres 17 | Homebrew `postgresql@17`, `brew services` (launchd label `sh.brew.postgresql@17`), localhost only, database `vikunja` |
+| Vikunja v2.7.0 | binary `~/.local/share/vikunja/bin/vikunja`, config `~/.config/vikunja/config.yml` (0600, pinned secret, Postgres over `/tmp`) |
+| Service | `~/Library/LaunchAgents/local.vikunja.plist` (RunAtLoad, KeepAlive), log `~/.local/share/vikunja/logs/vikunja.log` |
+| Web UI and API | http://127.0.0.1:3456 (loopback only; put a reverse proxy in front to reach it from the LAN) |
+
+```bash
+ai-mode board init                              # once, in a terminal: sign in as the board's owner (add --register to create the account);
+                                                # creates bot-chief, bot-product, bot-architect, bot-amigos, bot-qa, bot-coder and stores
+                                                # their tokens plus ai-mode's in ~/.config/ai-mode/board.json (0600); the password is not stored
+ai-mode board status                            # server, version, tokens (doctor runs the same check)
+ai-mode board sync --repo path/to/module        # pull what people did on the board, push the cards
+```
+
+Each target gets a project named after its directory with the six columns (`init` … `blocked`) as kanban buckets. Every
+card is a task titled `<card id> <title>` with `stage:`, `type:` and `context:` labels, a parent link, `follows` links for
+stack order, and one comment per card note, posted by the bot that wrote it (notes by people come from the owner's
+account and name who wrote them). After `board init` every pipeline commit syncs the board (`AI_MODE_BOARD=off` turns it
+off). What people do on the board flows back at the start of each tick: a task added to `init` (labels `type:bug` or
+`type:spike` and `context:…` are optional) becomes a request card, and a card moved to `done` after its PRs are merged
+becomes done. Other edits on the board are overwritten by the next sync; use `pipeline retry`, `reopen`, `note` and
+`answer` for corrections. Override the address with `AI_MODE_BOARD_URL` or `BOARD_URL=` in `~/.config/ai-mode/config`.
 
 ## Superpowers pipeline (Qwen Code)
 
