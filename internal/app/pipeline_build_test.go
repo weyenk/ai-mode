@@ -403,10 +403,21 @@ func main() {
 	fmt.Println("Completed 0 focus sessions")
 }
 `), 0o644)
-	got := observedRun(dir)
-	for _, want := range []string{"received Ctrl-C (SIGINT) and exited (exit status 0)", `"tick\r\x1b[KCompleted 0 focus sessions\n"`} {
+	got := observedRun(dir).Report
+	for _, want := range []string{"received Ctrl-C (SIGINT) and exited (exit status 0)", `"tick\r\x1b[KCompleted 0 focus sessions\n"`,
+		`shows at the end (each line quoted; an empty "" line means the text was erased): "Completed 0 focus sessions" ""`,
+		`showed just before Ctrl-C (each line quoted; an empty "" line means the text was erased): ""`} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
+	}
+}
+
+func TestTerminalScreen_EraseAfterTextLeavesNothing(t *testing.T) {
+	if screen, _ := terminalScreen("Session 1: 25:00\r\x1b[KSession 1: 24:59\r\x1b[K"); strings.Join(screen, "|") != "" {
+		t.Fatalf("text then CR then erase leaves an empty line, got %q", screen)
+	}
+	if screen, bells := terminalScreen("\rSession 1: 25:00\x1b[K\rSession 1: 4:59\x1b[K\a"); strings.Join(screen, "|") != "Session 1: 4:59" || bells != 1 {
+		t.Fatalf("CR, text, erase keeps the latest status: %q %d", screen, bells)
 	}
 }
